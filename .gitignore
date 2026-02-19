@@ -1,0 +1,8 @@
+# dumps e artefatos locais
+*.sql
+*.sql.gz
+*.log
+
+# OS/editor
+.DS_Store
+.vscode/
