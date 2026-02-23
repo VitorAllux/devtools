@@ -36,13 +36,13 @@ Painéis interativos flutuantes (`fzf`) para operar sobre seus schemas locais do
 
 ### DevOps & SaaS Tmux (`tmux`, `api`, `web`)
 
-Scripts de ciclo de vida projetados especificamente para seu ecossistema tmux Eloverde.
+Scripts de ciclo de vida projetados especificamente para seu ecossistema tmux local.
 
 - **`devv tmux:up`**: Cria (ou atacha) uma sessão paralela no painel (`dev`) separando os contextos visualmente num grid vertical enxuto.
   - Sobe o `php artisan serve` no Pane API.
   - Sobe o background `php artisan horizon` no Pane Horizon.
   - Sobe o `npm run serve` no Pane Web.
-- **`devv tmux:down`**: Encerra permanentemente a sessão `eloverde` limpando os processos órfãos.
+- **`devv tmux:down`**: Encerra permanentemente a sessão `my-project` limpando os processos órfãos.
 - **`devv api:restart`**: Utilitário agressivo de flush back-end. Ele paralisa as abas locais (Ctrl+C), roda o clear do cache corporativo, optimizadores e redis-cli, mata as filas do Queue / Horizon e reinicia tudo de novo purificado, economizando muitos gigabytes de digitação diária.
 - **`devv web:restart`**: Restart exclusivo e imediato do builder do npm (frontend).
 
