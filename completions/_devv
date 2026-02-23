@@ -1,0 +1,29 @@
+#compdef devv
+
+_devv() {
+  local line state
+
+  _arguments -C \
+    "1: :->cmds" \
+    "*::arg:->args"
+
+  case "$state" in
+    cmds)
+      local -a commands
+      commands=(
+        "db\:create:Create a new database"
+        "db\:drop:Drop an existing database"
+        "db\:truncate:Truncate all tables in a database"
+        "db\:import:Import a .sql.gz dump from Google Drive"
+        "tmux\:up:Start development tmux session (API + Web)"
+        "tmux\:down:Kill development tmux session"
+        "api\:restart:Restart the API backend and flush caches/horizon"
+        "web\:restart:Restart the Web frontend"
+        "env\:setup:Install dependencies and configure zsh autocompletion"
+      )
+      _describe -t commands 'devv commands' commands
+      ;;
+  esac
+}
+
+_devv "$@"

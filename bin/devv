@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# devv - Developer Tools Router
+# Resolve its true physical path, supporting symlinks:
+DEVTOOLS_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+export DEVTOOLS_DIR
+
+# Shared UI and utilities
+source "${DEVTOOLS_DIR}/src/lib/ui.sh"
+
+show_help() {
+  title "devv - Developer Tools"
+  echo -e "  ${BOLD}Usage:${NC} devv <command> [args]\n"
+  
+  echo -e "  ${PUR}📦 Database Commands:${NC}"
+  echo -e "    ${BOLD}${CYA}db:create${NC}    ✨ Create a new database"
+  echo -e "    ${BOLD}${CYA}db:drop${NC}      🗑️  Drop an existing database"
+  echo -e "    ${BOLD}${CYA}db:truncate${NC}  🧹 Truncate all tables in a database"
+  echo -e "    ${BOLD}${CYA}db:import${NC}    📥 Import a .sql.gz dump from Google Drive\n"
+  
+  echo -e "  ${PUR}⚡ Environment & Tmux:${NC}"
+  echo -e "    ${BOLD}${CYA}tmux:up${NC}      🚀 Start development tmux session (API + Web)"
+  echo -e "    ${BOLD}${CYA}tmux:down${NC}    🛑 Kill development tmux session"
+  echo -e "    ${BOLD}${CYA}api:restart${NC}  🔄 Restart the API backend and flush caches/horizon"
+  echo -e "    ${BOLD}${CYA}web:restart${NC}  🌐 Restart the Web frontend\n"
+  
+  echo -e "  ${PUR}🛠️  System:${NC}"
+  echo -e "    ${BOLD}${CYA}env:setup${NC}    ⚙️  Install dependencies and configure zsh autocompletion\n"
+}
+
+if [[ $# -eq 0 || "$1" == "--help" || "$1" == "-h" ]]; then
+  show_help
+  exit 0
+fi
+
+COMMAND="$1"
+shift
+
+case "$COMMAND" in
+  db:create)   exec "${DEVTOOLS_DIR}/src/commands/db/create.sh" "$@" ;;
+  db:drop)     exec "${DEVTOOLS_DIR}/src/commands/db/drop.sh" "$@" ;;
+  db:truncate) exec "${DEVTOOLS_DIR}/src/commands/db/truncate.sh" "$@" ;;
+  db:import)   exec "${DEVTOOLS_DIR}/src/commands/db/import.sh" "$@" ;;
+  
+  tmux:up)     exec "${DEVTOOLS_DIR}/src/commands/tmux/up.sh" "$@" ;;
+  tmux:down)   exec "${DEVTOOLS_DIR}/src/commands/tmux/down.sh" "$@" ;;
+  api:restart) exec "${DEVTOOLS_DIR}/src/commands/tmux/api-restart.sh" "$@" ;;
+  web:restart) exec "${DEVTOOLS_DIR}/src/commands/tmux/web-restart.sh" "$@" ;;
+  
+  env:setup)   exec "${DEVTOOLS_DIR}/src/commands/setup.sh" "$@" ;;
+  
+  *)
+    err "Unknown command: ${COMMAND}"
+    show_help
+    exit 1
+    ;;
+esac
