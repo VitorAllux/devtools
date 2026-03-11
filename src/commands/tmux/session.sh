@@ -7,7 +7,7 @@ if [ -n "${WEB_DIR:-}" ] && [ -d "$WEB_DIR" ]; then search_dirs+=("$WEB_DIR"); f
 
 # Default fallback if .env dirs are missing
 if [ ${#search_dirs[@]} -eq 0 ]; then
-    search_dirs=("$HOME/workspace")
+    search_dirs=("${TMUX_DEFAULT_DIR:-$HOME/workspace}")
 fi
 
 if [[ $# -eq 1 ]]; then

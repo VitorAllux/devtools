@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 source "${DEVTOOLS_DIR}/src/lib/ui.sh"
 
-SESSION="eloverde"
-WIN="dev"
-API_DIR="$HOME/workspace/saas/api-eloverde"
+SESSION="${TMUX_SESSION:-eloverde}"
+WIN="${TMUX_WIN:-dev}"
+API_DIR="${API_DIR:-$HOME/workspace/saas/api-eloverde}"
 
 title "Restarting API & Horizon"
 

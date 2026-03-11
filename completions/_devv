@@ -14,12 +14,20 @@ _devv() {
         "db\:create:Create a new database"
         "db\:drop:Drop an existing database"
         "db\:truncate:Truncate all tables in a database"
-        "db\:import:Import a .sql.gz dump from Google Drive"
+        "db\:import:Import a dump locally or from Google Drive"
+        "db\:clean:Clean dumps interactively from local storage"
         "tmux\:up:Start development tmux session (API + Web)"
         "tmux\:down:Kill development tmux session"
+        "tmux\:session:Open a dir in a new Tmux Session via fzf (Ctrl+F)"
+        "tmux\:window:Open a dir in a new Tmux Window via fzf (Ctrl+W)"
         "api\:restart:Restart the API backend and flush caches/horizon"
         "web\:restart:Restart the Web frontend"
         "env\:setup:Install dependencies and configure zsh autocompletion"
+        "config\:set:Set configuration variable"
+        "config\:list:List configuration variables"
+        "ssh\:connect:Quick connect to servers via fzf"
+        "ssh\:add:Add a new server to the SSH list"
+        "ssh\:remove:Remove server(s) from the SSH list"
       )
       _describe -t commands 'devv commands' commands
       ;;

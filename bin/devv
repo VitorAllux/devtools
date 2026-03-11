@@ -38,11 +38,16 @@ show_help() {
   
   echo -e "  ${PUR}🛠️  System:${NC}"
   echo -e "    ${BOLD}${CYA}env:setup${NC}    ⚙️  Install dependencies and configure zsh autocompletion"
-  echo -e "    ${BOLD}${CYA}config:set${NC}    🛠️  Set configuration variable"
-  echo -e "    ${BOLD}${CYA}config:list${NC}    📄  List configuration variables\n"
+  echo -e "    ${BOLD}${CYA}config:set${NC}   🛠️  Set configuration variable"
+  echo -e "    ${BOLD}${CYA}config:list${NC}  📄  List configuration variables\n"
+  
+  echo -e "  ${PUR}🌐 Network & SSH:${NC}"
+  echo -e "    ${BOLD}${CYA}ssh:connect${NC}  🔌 Quick connect to servers via fzf"
+  echo -e "    ${BOLD}${CYA}ssh:add${NC}      ➕ Add a new server to the SSH list"
+  echo -e "    ${BOLD}${CYA}ssh:remove${NC}   ❌ Remove server(s) from the SSH list\n"
 }
 
-if [[ $# -eq 0 || "$1" == "--help" || "$1" == "-h" ]]; then
+if [[ $# -eq 0 || "$1" == "help" || "$1" == "--help" || "$1" == "-h" ]]; then
   show_help
   exit 0
 fi
@@ -65,8 +70,12 @@ case "$COMMAND" in
   web:restart) exec "${DEVTOOLS_DIR}/src/commands/tmux/web-restart.sh" "$@" ;;
   
   env:setup)   exec "${DEVTOOLS_DIR}/src/commands/setup.sh" "$@" ;;
-config:set)  exec "${DEVTOOLS_DIR}/src/commands/config/set.sh" "$@" ;;
-config:list) exec "${DEVTOOLS_DIR}/src/commands/config/list.sh" "$@" ;;
+  config:set)  exec "${DEVTOOLS_DIR}/src/commands/config/set.sh" "$@" ;;
+  config:list) exec "${DEVTOOLS_DIR}/src/commands/config/list.sh" "$@" ;;
+  
+  ssh:connect) bash "${DEVTOOLS_DIR}/src/commands/ssh/connect.sh" "$@" ;;
+  ssh:add)     bash "${DEVTOOLS_DIR}/src/commands/ssh/add.sh" "$@" ;;
+  ssh:remove)  bash "${DEVTOOLS_DIR}/src/commands/ssh/remove.sh" "$@" ;;
   
   *)
     err "Unknown command: ${COMMAND}"

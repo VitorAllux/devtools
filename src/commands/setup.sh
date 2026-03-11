@@ -16,7 +16,7 @@ fi
 
 info "Configuring Native ZSH Autocompletion for devv..."
 mkdir -p ~/.zfunc
-cp "${DEVTOOLS_DIR}/completions/_devv" ~/.zfunc/_devv
+ln -sf "${DEVTOOLS_DIR}/completions/_devv" ~/.zfunc/_devv
 
 if ! grep -q "fpath+=(~/.zfunc)" ~/.zshrc 2>/dev/null; then
   echo '' >> ~/.zshrc

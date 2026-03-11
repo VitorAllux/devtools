@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 source "${DEVTOOLS_DIR}/src/lib/ui.sh"
 
-SESSION="eloverde"
-WIN="dev"
-WEB_DIR="$HOME/workspace/saas/web-eloverde"
+SESSION="${TMUX_SESSION:-eloverde}"
+WIN="${TMUX_WIN:-dev}"
+WEB_DIR="${WEB_DIR:-$HOME/workspace/saas/web-eloverde}"
 
 title "Restarting Web Frontend"
 

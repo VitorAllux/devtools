@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 source "${DEVTOOLS_DIR}/src/lib/ui.sh"
 
-SESSION="eloverde"
-WIN="dev"
-API_DIR="$HOME/workspace/saas/api-eloverde"
-WEB_DIR="$HOME/workspace/saas/web-eloverde"
+SESSION="${TMUX_SESSION:-eloverde}"
+WIN="${TMUX_WIN:-dev}"
+API_DIR="${API_DIR:-$HOME/workspace/saas/api-eloverde}"
+WEB_DIR="${WEB_DIR:-$HOME/workspace/saas/web-eloverde}"
 
 export SESSION WIN API_DIR WEB_DIR
 
@@ -29,7 +29,11 @@ title "Starting Tmux Environment"
 
 if tmux has-session -t "$SESSION" 2>/dev/null; then
   info "Session $SESSION already exists. Attaching..."
-  tmux attach -t "$SESSION"
+  if [ -n "$TMUX" ]; then
+    tmux switch-client -t "$SESSION"
+  else
+    tmux attach -t "$SESSION"
+  fi
   exit 0
 fi
 
@@ -54,4 +58,8 @@ tmux send-keys -t "${SESSION}:${WIN}.1" "cd $API_DIR && php artisan horizon" Ent
 tmux send-keys -t "${SESSION}:${WIN}.2" "cd $WEB_DIR && npm run serve" Enter
 
 ok "Environment ready! Attaching to session..."
-tmux attach -t "$SESSION"
+if [ -n "$TMUX" ]; then
+  tmux switch-client -t "$SESSION"
+else
+  tmux attach -t "$SESSION"
+fi
