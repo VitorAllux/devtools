@@ -30,6 +30,14 @@ sed -i '/compdef devv=just/d' ~/.zshrc 2>/dev/null || true
 sed -i '/_devv() { words=/d' ~/.zshrc 2>/dev/null || true
 sed -i '/compdef _devv devv/d' ~/.zshrc 2>/dev/null || true
 
+info "Configuring devv Keybindings (Tmux FZF)..."
+if ! grep -q "devv tmux:session" ~/.zshrc 2>/dev/null; then
+  echo 'bindkey -s ^f "devv tmux:session\n"' >> ~/.zshrc
+fi
+if ! grep -q "devv tmux:window" ~/.zshrc 2>/dev/null; then
+  echo 'bindkey -s ^w "devv tmux:window\n"' >> ~/.zshrc
+fi
+
 info "Ensuring global PATH access in .zshrc and .bashrc..."
 BIN_DIR="${HOME}/workspace/bin"
 mkdir -p "$BIN_DIR"

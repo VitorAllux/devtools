@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+source "${DEVTOOLS_DIR}/src/lib/ui.sh"
+
+need fzf
+
+DEFAULT_DUMPS_DIR="${DEVT_DUMPS_DIR:-${DEVTOOLS_DIR}/dumps}"
+
+title "Clean Dumps (.sql / .sql.gz)"
+
+if [[ ! -d "${DEFAULT_DUMPS_DIR}" ]]; then
+  die "Dumps directory does not exist: ${DEFAULT_DUMPS_DIR}"
+fi
+
+LOCAL_DUMPS=$(find "${DEFAULT_DUMPS_DIR}" -type f -name "*.sql" -o -name "*.sql.gz" 2>/dev/null | sed "s|^${DEFAULT_DUMPS_DIR}/||")
+
+if [[ -z "${LOCAL_DUMPS}" ]]; then
+  info "No dumps found in ${DEFAULT_DUMPS_DIR}"
+  exit 0
+fi
+
+info "Select dumps to delete (TAB to select multiple, ENTER to confirm)"
+SELECTED_DUMPS=$(echo "$LOCAL_DUMPS" | fzf --multi --prompt="Delete Dumps > ")
+
+if [[ -z "$SELECTED_DUMPS" ]]; then
+  ok "Operation cancelled, no dumps selected."
+  exit 0
+fi
+
+echo
+title "Pending Deletion"
+while IFS= read -r dump; do
+  warn " - $dump"
+done <<< "$SELECTED_DUMPS"
+echo
+
+if ! confirm "Are you sure you want to permanently delete these dumps? [y/N]"; then
+  die "Cancelled."
+fi
+
+while IFS= read -r dump; do
+  rm -f "${DEFAULT_DUMPS_DIR}/${dump}"
+done <<< "$SELECTED_DUMPS"
+
+ok "Selected dumps have been deleted."

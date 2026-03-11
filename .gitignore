@@ -3,6 +3,9 @@
 *.sql.gz
 *.log
 
+# environment
+.env
+
 # OS/editor
 .DS_Store
 .vscode/

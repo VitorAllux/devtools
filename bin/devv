@@ -6,8 +6,16 @@ set -euo pipefail
 DEVTOOLS_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
 export DEVTOOLS_DIR
 
+# Load local environment variables if present
+if [[ -f "${DEVTOOLS_DIR}/.env" ]]; then
+  set -a
+  source "${DEVTOOLS_DIR}/.env"
+  set +a
+fi
+
 # Shared UI and utilities
 source "${DEVTOOLS_DIR}/src/lib/ui.sh"
+source "${DEVTOOLS_DIR}/src/lib/config.sh"
 
 show_help() {
   title "devv - Developer Tools"
@@ -17,16 +25,21 @@ show_help() {
   echo -e "    ${BOLD}${CYA}db:create${NC}    ✨ Create a new database"
   echo -e "    ${BOLD}${CYA}db:drop${NC}      🗑️  Drop an existing database"
   echo -e "    ${BOLD}${CYA}db:truncate${NC}  🧹 Truncate all tables in a database"
-  echo -e "    ${BOLD}${CYA}db:import${NC}    📥 Import a .sql.gz dump from Google Drive\n"
+  echo -e "    ${BOLD}${CYA}db:import${NC}    📥 Import a dump locally or from Google Drive"
+  echo -e "    ${BOLD}${CYA}db:clean${NC}     🗑️  Clean dumps interactively from local storage\n"
   
   echo -e "  ${PUR}⚡ Environment & Tmux:${NC}"
   echo -e "    ${BOLD}${CYA}tmux:up${NC}      🚀 Start development tmux session (API + Web)"
   echo -e "    ${BOLD}${CYA}tmux:down${NC}    🛑 Kill development tmux session"
+  echo -e "    ${BOLD}${CYA}tmux:session${NC} 📂 Open a dir in a new Tmux Session via fzf (Ctrl+F)"
+  echo -e "    ${BOLD}${CYA}tmux:window${NC}  🪟 Open a dir in a new Tmux Window via fzf (Ctrl+W)"
   echo -e "    ${BOLD}${CYA}api:restart${NC}  🔄 Restart the API backend and flush caches/horizon"
   echo -e "    ${BOLD}${CYA}web:restart${NC}  🌐 Restart the Web frontend\n"
   
   echo -e "  ${PUR}🛠️  System:${NC}"
-  echo -e "    ${BOLD}${CYA}env:setup${NC}    ⚙️  Install dependencies and configure zsh autocompletion\n"
+  echo -e "    ${BOLD}${CYA}env:setup${NC}    ⚙️  Install dependencies and configure zsh autocompletion"
+  echo -e "    ${BOLD}${CYA}config:set${NC}    🛠️  Set configuration variable"
+  echo -e "    ${BOLD}${CYA}config:list${NC}    📄  List configuration variables\n"
 }
 
 if [[ $# -eq 0 || "$1" == "--help" || "$1" == "-h" ]]; then
@@ -42,13 +55,18 @@ case "$COMMAND" in
   db:drop)     exec "${DEVTOOLS_DIR}/src/commands/db/drop.sh" "$@" ;;
   db:truncate) exec "${DEVTOOLS_DIR}/src/commands/db/truncate.sh" "$@" ;;
   db:import)   exec "${DEVTOOLS_DIR}/src/commands/db/import.sh" "$@" ;;
+  db:clean)    exec "${DEVTOOLS_DIR}/src/commands/db/clean.sh" "$@" ;;
   
   tmux:up)     exec "${DEVTOOLS_DIR}/src/commands/tmux/up.sh" "$@" ;;
   tmux:down)   exec "${DEVTOOLS_DIR}/src/commands/tmux/down.sh" "$@" ;;
+  tmux:session)exec "${DEVTOOLS_DIR}/src/commands/tmux/session.sh" "$@" ;;
+  tmux:window) exec "${DEVTOOLS_DIR}/src/commands/tmux/window.sh" "$@" ;;
   api:restart) exec "${DEVTOOLS_DIR}/src/commands/tmux/api-restart.sh" "$@" ;;
   web:restart) exec "${DEVTOOLS_DIR}/src/commands/tmux/web-restart.sh" "$@" ;;
   
   env:setup)   exec "${DEVTOOLS_DIR}/src/commands/setup.sh" "$@" ;;
+config:set)  exec "${DEVTOOLS_DIR}/src/commands/config/set.sh" "$@" ;;
+config:list) exec "${DEVTOOLS_DIR}/src/commands/config/list.sh" "$@" ;;
   
   *)
     err "Unknown command: ${COMMAND}"
