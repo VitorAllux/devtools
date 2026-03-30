@@ -9,6 +9,59 @@ need pv
 need gunzip
 need jq
 
+extract_drive_file_id() {
+  local raw="${1:-}"
+
+  raw="${raw#"${raw%%[![:space:]]*}"}"
+  raw="${raw%"${raw##*[![:space:]]}"}"
+
+  if [[ -z "$raw" ]]; then
+    return 1
+  fi
+
+  if [[ "$raw" =~ /file/d/([a-zA-Z0-9_-]+) ]]; then
+    echo "${BASH_REMATCH[1]}"
+    return 0
+  fi
+
+  if [[ "$raw" =~ [\?\&]id=([a-zA-Z0-9_-]+) ]]; then
+    echo "${BASH_REMATCH[1]}"
+    return 0
+  fi
+
+  if [[ "$raw" =~ ^[a-zA-Z0-9_-]{10,}$ ]]; then
+    echo "$raw"
+    return 0
+  fi
+
+  return 1
+}
+
+normalize_name() {
+  local raw="${1:-}"
+  echo "$raw" \
+    | tr '[:upper:]' '[:lower:]' \
+    | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
+}
+
+build_elo_name_with_timestamp() {
+  local raw="${1:-}"
+  local normalized
+  local stamp
+
+  normalized="$(normalize_name "$raw")"
+  [[ -n "$normalized" ]] || return 1
+
+  stamp="$(date '+%d-%m-%Y-%H-%M')"
+  printf "elo-%s-%s" "$normalized" "$stamp"
+}
+
+build_dump_file_name_from_base() {
+  local base
+  base="$(build_elo_name_with_timestamp "${1:-}")" || return 1
+  printf "%s.sql.gz" "$base"
+}
+
 DEFAULT_REMOTE="${DEVT_RCLONE_REMOTE:-gdrive}"
 DEFAULT_DUMPS_DIR="${DEVT_DUMPS_DIR:-${DEVTOOLS_DIR}/dumps}"
 
@@ -16,51 +69,82 @@ title "Import Dump (.sql.gz)"
 
 mkdir -p "${DEFAULT_DUMPS_DIR}"
 GDRIVE_OPTION="[+] Download from Google Drive"
-LOCAL_DUMPS=$(find "${DEFAULT_DUMPS_DIR}" -type f -name "*.sql" -o -name "*.sql.gz" 2>/dev/null | sed "s|^${DEFAULT_DUMPS_DIR}/||")
-MENU_OPTIONS="$GDRIVE_OPTION"$'\n'"$LOCAL_DUMPS"
+LOCAL_DUMPS=$(find "${DEFAULT_DUMPS_DIR}" -maxdepth 1 -type f 2>/dev/null | sed "s|^${DEFAULT_DUMPS_DIR}/||")
+if [[ -n "${LOCAL_DUMPS}" ]]; then
+  MENU_OPTIONS="$GDRIVE_OPTION"$'\n'"$LOCAL_DUMPS"
+else
+  MENU_OPTIONS="$GDRIVE_OPTION"
+fi
 
 info "Scanning local dumps..."
 DUMP_SELECTION=$(select_with_fzf "Select a local dump or download from Google Drive" "$MENU_OPTIONS")
 
 if [[ "$DUMP_SELECTION" == "$GDRIVE_OPTION" ]]; then
-  REMOTE="$(prompt_input "Rclone Remote [${DEFAULT_REMOTE}]")"
-  REMOTE="${REMOTE:-$DEFAULT_REMOTE}"
-  
-  FILE_ID="$(prompt_input "Google Drive File ID")"
-  if [[ -z "$FILE_ID" ]]; then
-    die "File ID is required."
-  fi
-  
-  FILE_NAME="$(prompt_input "Local File Name (Leave empty to scan from Drive)")"
-  DRIVE_SCAN_PATH=""
-  
-  if [[ -z "$FILE_NAME" ]]; then
-    warn "You left the file name empty."
-    info "I need a Drive folder to scan for the name. E.g., 'dumps' or 'backups/feb-2026'"
-    DRIVE_SCAN_PATH="$(prompt_input "Drive folder to scan (Leave empty to skip scan)")"
-  fi
-  
-  RESOLVED_FILE_NAME="${FILE_NAME:-}"
-
-  if [[ -z "${RESOLVED_FILE_NAME}" ]]; then
-    if [[ -n "${DRIVE_SCAN_PATH:-}" ]]; then
-      title "Discovering file name from Drive"
-      info "Scanning for ID inside: ${BOLD}${REMOTE}:${DRIVE_SCAN_PATH}${NC}"
-      
-      FOUND_NAME="$(rclone lsjson -R "${REMOTE}:${DRIVE_SCAN_PATH}" 2>/dev/null \
-        | jq -r --arg id "$FILE_ID" '.[] | select(.ID == $id) | .Name' \
-        | head -n 1 || true)"
-
-      if [[ -n "${FOUND_NAME}" && "${FOUND_NAME}" != "null" ]]; then
-        RESOLVED_FILE_NAME="${FOUND_NAME}"
-        ok "Name found: ${BOLD}${RESOLVED_FILE_NAME}${NC}"
+  REMOTE_OPTIONS="$(rclone listremotes 2>/dev/null | sed 's/:$//' | sed '/^$/d')"
+  if [[ -n "$REMOTE_OPTIONS" ]]; then
+    info "Listing configured rclone remotes..."
+    if echo "$REMOTE_OPTIONS" | grep -Fxq "$DEFAULT_REMOTE"; then
+      REMOTE_OTHERS="$(echo "$REMOTE_OPTIONS" | grep -Fvx "$DEFAULT_REMOTE" || true)"
+      if [[ -n "$REMOTE_OTHERS" ]]; then
+        REMOTE_OPTIONS="${DEFAULT_REMOTE}"$'\n'"${REMOTE_OTHERS}"
       else
-        RESOLVED_FILE_NAME="${FILE_ID}.sql.gz"
-        warn "Scan failed. Using fallback name: ${BOLD}${RESOLVED_FILE_NAME}${NC}"
+        REMOTE_OPTIONS="${DEFAULT_REMOTE}"
       fi
+    fi
+    REMOTE="$(select_with_fzf "Select rclone remote" "$REMOTE_OPTIONS")"
+  else
+    warn "No rclone remotes found. Falling back to manual input."
+    REMOTE="$(prompt_input "Rclone Remote [${DEFAULT_REMOTE}]")"
+    REMOTE="${REMOTE:-$DEFAULT_REMOTE}"
+  fi
+
+  FILE_ID_OR_LINK="$(prompt_input "Google Drive File ID or File Link")"
+  FILE_ID="$(extract_drive_file_id "$FILE_ID_OR_LINK")" || die "Invalid Google Drive File ID/Link."
+
+  NAME_MODE_AUTO="Generate local name (elo-<name>-dd-mm-yyyy-hh-mm.sql.gz)"
+  NAME_MODE_MANUAL="Type exact local file name"
+  NAME_MODE_SCAN="Scan Drive folder and use original file name"
+  NAME_MODE_OPTIONS="$NAME_MODE_AUTO"$'\n'"$NAME_MODE_MANUAL"$'\n'"$NAME_MODE_SCAN"
+  NAME_MODE_SELECTION="$(select_with_fzf "How should the local file name be defined?" "$NAME_MODE_OPTIONS")"
+
+  DRIVE_SCAN_PATH=""
+  RESOLVED_FILE_NAME=""
+
+  if [[ "$NAME_MODE_SELECTION" == "$NAME_MODE_AUTO" ]]; then
+    CUSTOM_NAME="$(prompt_input "Custom name (e.g. coamo)")"
+    if [[ -z "$CUSTOM_NAME" ]]; then
+      die "Custom name is required."
+    fi
+    RESOLVED_FILE_NAME="$(build_dump_file_name_from_base "$CUSTOM_NAME")" \
+      || die "Could not generate file name from custom name."
+    ok "Generated local file name: ${BOLD}${RESOLVED_FILE_NAME}${NC}"
+  elif [[ "$NAME_MODE_SELECTION" == "$NAME_MODE_MANUAL" ]]; then
+    FILE_NAME="$(prompt_input "Exact local file name (e.g. dump.sql.gz)")"
+    if [[ -z "$FILE_NAME" ]]; then
+      RESOLVED_FILE_NAME="${FILE_ID}.sql.gz"
+      warn "Empty name. Using fallback: ${BOLD}${RESOLVED_FILE_NAME}${NC}"
+    else
+      RESOLVED_FILE_NAME="$FILE_NAME"
+    fi
+  else
+    DRIVE_SCAN_PATH="$(prompt_input "Drive folder to scan (e.g. dumps or backups/2026)")"
+    if [[ -z "$DRIVE_SCAN_PATH" ]]; then
+      die "Drive folder is required for scan mode."
+    fi
+
+    title "Discovering file name from Drive"
+    info "Scanning for ID inside: ${BOLD}${REMOTE}:${DRIVE_SCAN_PATH}${NC}"
+
+    FOUND_NAME="$(rclone lsjson -R "${REMOTE}:${DRIVE_SCAN_PATH}" 2>/dev/null \
+      | jq -r --arg id "$FILE_ID" '.[] | select(.ID == $id) | .Name' \
+      | head -n 1 || true)"
+
+    if [[ -n "${FOUND_NAME}" && "${FOUND_NAME}" != "null" ]]; then
+      RESOLVED_FILE_NAME="${FOUND_NAME}"
+      ok "Name found: ${BOLD}${RESOLVED_FILE_NAME}${NC}"
     else
       RESOLVED_FILE_NAME="${FILE_ID}.sql.gz"
-      warn "Scan skipped. Using fallback name: ${BOLD}${RESOLVED_FILE_NAME}${NC}"
+      warn "Scan failed. Using fallback name: ${BOLD}${RESOLVED_FILE_NAME}${NC}"
     fi
   fi
   
@@ -90,7 +174,12 @@ info "Fetching databases..."
 DB_SELECTION=$(select_with_fzf "Select the Target Database for Import" "$MENU_OPTIONS")
 
 if [[ "$DB_SELECTION" == "$NEW_DB_OPTION" ]]; then
-  DB_NAME="$(prompt_input "Enter the name of the NEW database (e.g. veo01)")"
+  DB_CUSTOM_NAME="$(prompt_input "Custom name for NEW database (e.g. coamo)")"
+  if [[ -z "$DB_CUSTOM_NAME" ]]; then
+    die "Database custom name is required."
+  fi
+  DB_NAME="$(build_elo_name_with_timestamp "$DB_CUSTOM_NAME")" || die "Invalid database custom name."
+  ok "Generated DB name: ${BOLD}${DB_NAME}${NC}"
 else
   DB_NAME="$DB_SELECTION"
 fi
@@ -102,11 +191,11 @@ fi
 info "Destination:     ${BOLD}${DEST}${NC}"
 info "Target DB:       ${BOLD}${DB_NAME}${NC}"
 
-echo
+if ! confirm "Start download (if needed) + validation + import? [y/N]"; then
+  die "Cancelled."
+fi
+
 if [[ -z "$SKIP_DOWNLOAD" ]]; then
-  if ! confirm "Start download + validation + import? [y/N]"; then
-    die "Cancelled."
-  fi
   title "Download"
   info "Downloading via rclone copyid..."
   rclone backend copyid "${REMOTE}:" "${FILE_ID}" "${DEST}"
@@ -114,29 +203,24 @@ if [[ -z "$SKIP_DOWNLOAD" ]]; then
 else
   info "Using local file ${DEST}"
 fi
-if [[ "${DEST}" == *.gz ]]; then
+IS_GZIP=0
+if gzip -t "${DEST}" 2>/dev/null; then
+  IS_GZIP=1
   title "Gzip Validation"
-  if gzip -t "${DEST}"; then
-    ok "Gzip is valid."
-  else
-    die "Gzip file is corrupted."
-  fi
+  ok "Gzip is valid."
   
   title "SQL Preview"
   info "Showing first 20 lines:"
   set +o pipefail
   zcat -f "${DEST}" | head -n 20
   set -o pipefail
+elif [[ "${DEST}" == *.gz ]]; then
+  title "Gzip Validation"
+  die "Gzip file is corrupted."
 else
   title "SQL Preview"
   info "Showing first 20 lines:"
   head -n 20 "${DEST}"
-fi
-
-echo
-
-if ! confirm "Create database and import now? [y/N]"; then
-  die "Cancelled before import."
 fi
 
 title "Create DB"
@@ -144,7 +228,7 @@ mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;"
 ok "Database verified: ${BOLD}${DB_NAME}${NC}"
 
 title "Importing"
-if [[ "${DEST}" == *.gz ]]; then
+if [[ "${IS_GZIP}" == "1" ]]; then
   info "Importing with progress (pv | gunzip | mysql)..."
   pv "${DEST}" | gunzip | mysql -u root -p --default-character-set=utf8mb4 "${DB_NAME}"
 else

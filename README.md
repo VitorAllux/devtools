@@ -34,6 +34,7 @@ Painéis interativos flutuantes (`fzf`) para operar sobre seus schemas locais do
 - **`devv db:truncate`**: Selecione um schema no _fzf_ para limpá-lo inteiramente e sumariamente pulando restrições de chaves-estrangeiras (Foreign Keys constraint bypass).
 - **`devv db:import`**: Utilitário colossal que **lista os dumps locais via fzf na tela**. Se houver um arquivo desejado você já importa diretamente, pulando burocracias. Caso contrário, ele possui uma opção integrada chamada `[+] Download from Google Drive` que faz o download seguro de dumps SQL comprimidos (`.sql.gz`) através do rclone, realizando streaming em tempo-real do unzip + MySQL usando `pv` para tracking de progresso em MB/s.
 - **`devv db:clean`**: Lixeiro interativo. Lista todos os arquivos `.sql` e `.sql.gz` hospedados na pasta interna `devtools/dumps`. **Suporta multi-seleção (aperte `TAB` em cima dos nomes dos arquivos no fzf)** para apagar múltiplos arquivos pesados simultaneamente de forma segura.
+- **`devv db:ui` (`Ctrl+G`)**: A **IDE SQL do Terminal**. Inicia o `harlequin` (TUI interativo) com auto-discovery de credenciais baseadas no seu `.env`. É extremamente polido, com suporte total a mouse, abas e editor com autocomplete. (Atalho: `Ctrl+G` | No Tmux: `Prefix + u`).
 
 ### DevOps & SaaS Tmux (`tmux`, `api`, `web`)
 
@@ -44,8 +45,8 @@ Scripts de ciclo de vida projetados especificamente para seu ecossistema tmux lo
   - Sobe o background `php artisan horizon` no Pane Horizon.
   - Sobe o `npm run serve` no Pane Web.
 - **`devv tmux:down`**: Encerra permanentemente a sessão `my-project` limpando os processos órfãos.
-- **`devv tmux:session` (`Ctrl+F`)**: O famoso _Sessionizer_. Encontra automaticamente as pastas de desenvolvimento configuradas e as listas via `fzf`. Ao escolher, ele cria dinamicamente uma **nova Session** nomeada e dá o switch instantâneo, super útil para navegar entre múltiplos monolitos. (Atalho injetado no ZSH: `Ctrl+F`).
-- **`devv tmux:window` (`Ctrl+W`)**: O _Windownizer_. Mesma premissa magnética do Sessionizer via `fzf`, mas esse cria uma **nova Window** na sessão onde você atualmente se encontra apontando pro diretório base, sem abrir uma nova árvore. (Atalho injetado no ZSH: `Ctrl+W`).
+- **`devv tmux:session` (`Ctrl+F`)**: O famoso _Sessionizer_. Encontra automaticamente as pastas de desenvolvimento. Agora **respeita o contexto atual (`$PWD`)** e permite busca global recursiva (ex: digite `api-eloverde` para encontrar o projeto em qualquer profundidade). (Atalho: `Ctrl+F`).
+- **`devv tmux:window` (`Ctrl+W`)**: O _Windownizer_. Abre uma nova Window no diretório selecionado. Também respeita o contexto do diretório atual. (Atalho: `Ctrl+W`).
 - **`devv api:restart`**: Utilitário agressivo de flush back-end. Ele paralisa as abas locais (Ctrl+C), roda o clear do cache corporativo, optimizadores e redis-cli, mata as filas do Queue / Horizon e reinicia tudo de novo purificado, economizando muitos gigabytes de digitação diária.
 - **`devv web:restart`**: Restart exclusivo e imediato do builder do npm (frontend).
 
@@ -63,11 +64,6 @@ DEVT_RCLONE_REMOTE="gdrive"
 ```
 
 Estas variáveis em cache retro-alimentam as rotas flutuantes do Sessionizer ou o comportamento padrão de onde os arquivos residem, servindo de Fallback. Se você não fornecer nenhuma `.env`, o motor usará locais comuns como `~/workspace/personal`.
-
----
-
-- **`devv api:restart`**: Utilitário agressivo de flush back-end. Ele paralisa as abas locais (Ctrl+C), roda o clear do cache corporativo, optimizadores e redis-cli, mata as filas do Queue / Horizon e reinicia tudo de novo purificado, economizando muitos gigabytes de digitação diária.
-- **`devv web:restart`**: Restart exclusivo e imediato do builder do npm (frontend).
 
 ---
 

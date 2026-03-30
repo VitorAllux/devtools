@@ -5,13 +5,13 @@ need fzf
 
 DEFAULT_DUMPS_DIR="${DEVT_DUMPS_DIR:-${DEVTOOLS_DIR}/dumps}"
 
-title "Clean Dumps (.sql / .sql.gz)"
+title "Clean Dumps"
 
 if [[ ! -d "${DEFAULT_DUMPS_DIR}" ]]; then
   die "Dumps directory does not exist: ${DEFAULT_DUMPS_DIR}"
 fi
 
-LOCAL_DUMPS=$(find "${DEFAULT_DUMPS_DIR}" -type f -name "*.sql" -o -name "*.sql.gz" 2>/dev/null | sed "s|^${DEFAULT_DUMPS_DIR}/||")
+LOCAL_DUMPS=$(find "${DEFAULT_DUMPS_DIR}" -maxdepth 1 -type f 2>/dev/null | sed "s|^${DEFAULT_DUMPS_DIR}/||")
 
 if [[ -z "${LOCAL_DUMPS}" ]]; then
   info "No dumps found in ${DEFAULT_DUMPS_DIR}"

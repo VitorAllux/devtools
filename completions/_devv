@@ -16,6 +16,7 @@ _devv() {
         "db\:truncate:Truncate all tables in a database"
         "db\:import:Import a dump locally or from Google Drive"
         "db\:clean:Clean dumps interactively from local storage"
+        "db\:ui:Interactive Database TUI (LazySQL)"
         "tmux\:up:Start development tmux session (API + Web)"
         "tmux\:down:Kill development tmux session"
         "tmux\:session:Open a dir in a new Tmux Session via fzf (Ctrl+F)"

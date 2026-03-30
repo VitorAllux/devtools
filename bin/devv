@@ -26,7 +26,8 @@ show_help() {
   echo -e "    ${BOLD}${CYA}db:drop${NC}      🗑️  Drop an existing database"
   echo -e "    ${BOLD}${CYA}db:truncate${NC}  🧹 Truncate all tables in a database"
   echo -e "    ${BOLD}${CYA}db:import${NC}    📥 Import a dump locally or from Google Drive"
-  echo -e "    ${BOLD}${CYA}db:clean${NC}     🗑️  Clean dumps interactively from local storage\n"
+  echo -e "    ${BOLD}${CYA}db:clean${NC}     🗑️  Clean dumps interactively from local storage"
+  echo -e "    ${BOLD}${CYA}db:ui${NC}        📊 Interactive Database TUI (LazySQL)\n"
   
   echo -e "  ${PUR}⚡ Environment & Tmux:${NC}"
   echo -e "    ${BOLD}${CYA}tmux:up${NC}      🚀 Start development tmux session (API + Web)"
@@ -47,7 +48,7 @@ show_help() {
   echo -e "    ${BOLD}${CYA}ssh:remove${NC}   ❌ Remove server(s) from the SSH list\n"
 }
 
-if [[ $# -eq 0 || "$1" == "help" || "$1" == "--help" || "$1" == "-h" ]]; then
+if [[ $# -eq 0 || "$1" == "help" || "$1" == "--help" || "$1" == "-h" || "$1" == "-help" ]]; then
   show_help
   exit 0
 fi
@@ -61,6 +62,7 @@ case "$COMMAND" in
   db:truncate) exec "${DEVTOOLS_DIR}/src/commands/db/truncate.sh" "$@" ;;
   db:import)   exec "${DEVTOOLS_DIR}/src/commands/db/import.sh" "$@" ;;
   db:clean)    exec "${DEVTOOLS_DIR}/src/commands/db/clean.sh" "$@" ;;
+  db:ui)       exec "${DEVTOOLS_DIR}/src/commands/db/ui.sh" "$@" ;;
   
   tmux:up)     exec "${DEVTOOLS_DIR}/src/commands/tmux/up.sh" "$@" ;;
   tmux:down)   exec "${DEVTOOLS_DIR}/src/commands/tmux/down.sh" "$@" ;;

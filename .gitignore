@@ -1,4 +1,5 @@
 # dumps e artefatos locais
+dumps/
 *.sql
 *.sql.gz
 *.log

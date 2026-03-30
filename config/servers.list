@@ -2,3 +2,4 @@ elo-bgworker forge@10.120.0.208
 elo-forge-userworker forge@10.120.0.169
 elo-forge-tests forge@10.120.0.244
 elo-web-tests web@10.120.0.244
+elo-api-testes api@10.120.0.244

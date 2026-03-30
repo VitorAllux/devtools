@@ -5,7 +5,7 @@ title "Setting up devtools Environment"
 
 info "Installing dependencies via apt (requires sudo)..."
 sudo apt-get update -y
-sudo apt-get install -y zsh htop curl wget git jq pv rclone mysql-client gzip fzf
+sudo apt-get install -y zsh htop curl wget git jq pv rclone mysql-client gzip fzf xclip wl-clipboard python3-pip pipx
 
 if [[ "$SHELL" != "/usr/bin/zsh" ]]; then
   info "Setting ZSH as the default shell..."
@@ -37,6 +37,9 @@ fi
 if ! grep -q "devv tmux:window" ~/.zshrc 2>/dev/null; then
   echo 'bindkey -s ^w "devv tmux:window\n"' >> ~/.zshrc
 fi
+if ! grep -q "devv db:ui" ~/.zshrc 2>/dev/null; then
+  echo 'bindkey -s ^g "devv db:ui\n"' >> ~/.zshrc
+fi
 
 info "Ensuring global PATH access in .zshrc and .bashrc..."
 BIN_DIR="${HOME}/workspace/bin"
@@ -52,6 +55,7 @@ fi
 # Create symlink instead of copying so it dynamically updates
 ln -sf "${DEVTOOLS_DIR}/bin/devv" "${BIN_DIR}/devv"
 chmod +x "${DEVTOOLS_DIR}/bin/devv"
+find "${DEVTOOLS_DIR}/src/commands" -name "*.sh" -exec chmod +x {} +
 
 ok "Setup complete!"
 info "Please restart your terminal or run 'exec zsh' to apply changes."

@@ -5,13 +5,17 @@
 # Load config helper
 source "${DEVTOOLS_DIR}/src/lib/config.sh"
 
-if [[ $# -ne 2 ]]; then
+if [[ $# -lt 2 ]]; then
   echo "Usage: devv config:set <KEY> <VALUE>"
   exit 1
 fi
 
-KEY="$1"
-VALUE="$2"
+KEY="${1:-}"
+VALUE="${2:-}"
+
+if [[ -z "$KEY" ]]; then
+  die "Key cannot be empty."
+fi
 
 config_set "$KEY" "$VALUE"
 
