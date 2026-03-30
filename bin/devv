@@ -39,6 +39,7 @@ show_help() {
   
   echo -e "  ${PUR}🛠️  System:${NC}"
   echo -e "    ${BOLD}${CYA}env:setup${NC}    ⚙️  Install dependencies and configure zsh autocompletion"
+  echo -e "    ${BOLD}${CYA}env:bootstrap${NC} ♻️  Setup + restore encrypted local secrets"
   echo -e "    ${BOLD}${CYA}config:set${NC}   🛠️  Set configuration variable"
   echo -e "    ${BOLD}${CYA}config:list${NC}  📄  List configuration variables\n"
   
@@ -72,6 +73,7 @@ case "$COMMAND" in
   web:restart) exec "${DEVTOOLS_DIR}/src/commands/tmux/web-restart.sh" "$@" ;;
   
   env:setup)   exec "${DEVTOOLS_DIR}/src/commands/setup.sh" "$@" ;;
+  env:bootstrap) exec "${DEVTOOLS_DIR}/src/commands/env/bootstrap.sh" "$@" ;;
   config:set)  exec "${DEVTOOLS_DIR}/src/commands/config/set.sh" "$@" ;;
   config:list) exec "${DEVTOOLS_DIR}/src/commands/config/list.sh" "$@" ;;
   

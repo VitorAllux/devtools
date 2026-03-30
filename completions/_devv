@@ -24,6 +24,7 @@ _devv() {
         "api\:restart:Restart the API backend and flush caches/horizon"
         "web\:restart:Restart the Web frontend"
         "env\:setup:Install dependencies and configure zsh autocompletion"
+        "env\:bootstrap:Setup + restore encrypted local secrets"
         "config\:set:Set configuration variable"
         "config\:list:List configuration variables"
         "ssh\:connect:Quick connect to servers via fzf"

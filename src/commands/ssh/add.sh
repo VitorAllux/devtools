@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 source "${DEVTOOLS_DIR}/src/lib/ui.sh"
+source "${DEVTOOLS_DIR}/src/lib/secrets.sh"
 
-CONFIG_FILE="${DEVTOOLS_DIR}/config/servers.list"
-mkdir -p "$(dirname "$CONFIG_FILE")"
-touch "$CONFIG_FILE"
+if migrate_legacy_servers_file; then
+  info "Legacy SSH list migrated to ${DEVV_SERVERS_FILE}."
+fi
+
+ensure_servers_file
 
 title "Add SSH Server"
 
@@ -23,5 +26,13 @@ if [[ -z "$server_conn" ]]; then
   exit 1
 fi
 
-echo "$server_name $server_conn" >> "$CONFIG_FILE"
+echo "$server_name $server_conn" >> "${DEVV_SERVERS_FILE}"
+chmod 600 "${DEVV_SERVERS_FILE}" 2>/dev/null || true
+
+if sync_encrypted_servers_file; then
+  info "Encrypted SSH secret updated in ${DEVV_ENCRYPTED_SERVERS_FILE}."
+else
+  warn "Could not update encrypted SSH secret automatically. Run env:bootstrap after configuring key/recipients."
+fi
+
 ok "Added $server_name to the SSH connect list!"

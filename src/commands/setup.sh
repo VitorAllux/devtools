@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 source "${DEVTOOLS_DIR}/src/lib/ui.sh"
+source "${DEVTOOLS_DIR}/src/lib/secrets.sh"
 
 title "Setting up devtools Environment"
 
 info "Installing dependencies via apt (requires sudo)..."
 sudo apt-get update -y
-sudo apt-get install -y zsh htop curl wget git jq pv rclone mysql-client gzip fzf xclip wl-clipboard python3-pip pipx
+sudo apt-get install -y zsh htop curl wget git jq pv rclone mysql-client gzip fzf xclip wl-clipboard python3-pip pipx age
+
+if ! command -v bw >/dev/null 2>&1; then
+  warn "Bitwarden CLI (bw) not found. Install it to enable secret restore during env:bootstrap."
+fi
 
 if [[ "$SHELL" != "/usr/bin/zsh" ]]; then
   info "Setting ZSH as the default shell..."
@@ -58,4 +63,7 @@ chmod +x "${DEVTOOLS_DIR}/bin/devv"
 find "${DEVTOOLS_DIR}/src/commands" -name "*.sh" -exec chmod +x {} +
 
 ok "Setup complete!"
+if [[ -f "${DEVV_ENCRYPTED_SERVERS_FILE}" && ! -s "${DEVV_SERVERS_FILE}" ]]; then
+  info "Encrypted secrets detected. Run 'devv env:bootstrap' to restore local sensitive files."
+fi
 info "Please restart your terminal or run 'exec zsh' to apply changes."

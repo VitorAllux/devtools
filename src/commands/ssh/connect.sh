@@ -1,28 +1,39 @@
 #!/usr/bin/env bash
 source "${DEVTOOLS_DIR}/src/lib/ui.sh"
+source "${DEVTOOLS_DIR}/src/lib/secrets.sh"
 
-CONFIG_FILE="${DEVTOOLS_DIR}/config/servers.list"
+if migrate_legacy_servers_file; then
+  info "Legacy SSH list migrated to ${DEVV_SERVERS_FILE}."
+fi
+
+if [[ ! -s "${DEVV_SERVERS_FILE}" ]] && [[ -f "${DEVV_ENCRYPTED_SERVERS_FILE}" ]]; then
+  if decrypt_encrypted_servers_file; then
+    info "SSH servers restored from encrypted backup."
+  fi
+fi
+
+ensure_servers_file
 
 title "SSH Connection Manager"
 
-if [[ ! -f "$CONFIG_FILE" || ! -s "$CONFIG_FILE" ]]; then
-  warn "No servers found in $CONFIG_FILE"
+if [[ ! -s "${DEVV_SERVERS_FILE}" ]]; then
+  warn "No servers found in ${DEVV_SERVERS_FILE}"
   info "Please add servers in this format: ServerName user@ip"
   echo "Example:"
   echo "elo-bgworker forge@10.120.0.208"
   echo "my-vps root@1.2.3.4"
   
   if confirm "Do you want to create an example file now? [Y/n]" "Y"; then
-    mkdir -p "$(dirname "$CONFIG_FILE")"
-    echo "elo-bgworker forge@10.120.0.208" > "$CONFIG_FILE"
-    echo "# Add your servers above this line. Format: ServerName user@ip" >> "$CONFIG_FILE"
-    ok "Created $CONFIG_FILE."
+    echo "elo-bgworker forge@10.120.0.208" > "${DEVV_SERVERS_FILE}"
+    echo "# Add your servers above this line. Format: ServerName user@ip" >> "${DEVV_SERVERS_FILE}"
+    chmod 600 "${DEVV_SERVERS_FILE}" 2>/dev/null || true
+    ok "Created ${DEVV_SERVERS_FILE}."
   else
     exit 0
   fi
 fi
 
-selected=$(cat "$CONFIG_FILE" | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' | fzf --prompt="Select Server to SSH > " --height=40% --layout=reverse)
+selected=$(list_servers_entries | fzf --prompt="Select Server to SSH > " --height=40% --layout=reverse)
 
 if [[ -z "$selected" ]]; then
   echo "Connection canceled."

@@ -7,6 +7,9 @@ dumps/
 # environment
 .env
 
+# local sensitive files
+config/servers.list
+
 # OS/editor
 .DS_Store
 .vscode/

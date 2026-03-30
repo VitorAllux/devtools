@@ -1,70 +1,93 @@
-# Devtools (`devv`)
+# devv
 
-Um conjunto de ferramentas avançadas de linha de comando (CLI) arquitetadas para otimizar fluxos de desenvolvimento locais utilizando ZSH, MySQL, tmux e fzf.
+CLI pessoal para acelerar rotina local de desenvolvimento (tmux, MySQL, SSH e utilidades de ambiente).
 
-O antigo core baseado em `Justfile` foi substituído por uma **arquitetura de Roteador em Bash** interativa e global chamada **`devv`**.
+Versao atual: `1.0.0`
 
-## 🚀 Instalação (Ubuntu / WSL)
+## Objetivo
 
-Para configurar globalmente o motor na sua máquina, instanciar o autocomplete no ZSH e baixar todas as dependências interativas, rode:
+- Padronizar tarefas repetitivas em comandos curtos.
+- Centralizar setup de shell/autocomplete e atalhos.
+- Manter dados sensiveis fora do Git e recuperaveis apos formatacao.
+
+## Instalacao
 
 ```bash
-cd ~/workspace/personal
 git clone git@github.com:VitorAllux/devtools.git
 cd devtools
-
-# Setup Automático Completo:
 ./bin/devv env:setup
+exec zsh
 ```
 
-> Após o setup, reinicie seu terminal ou rode `exec zsh`. O comando local `devv` agora estará ativo globalmente.
+## Comandos principais
 
----
+### Ambiente
 
-## 💻 Catálogo de Comandos
+- `devv env:setup`: instala dependencias base e integra shell/autocomplete.
+- `devv env:bootstrap`: roda setup + restaura arquivos sensiveis locais.
 
-Todos os comandos possuem ZSH Autocompletion Nativo. Digite `devv <TAB>` em qualquer lugar do seu terminal para navegar pelas descrições em inglês.
+### Banco (MySQL local)
 
-### Gerenciamento de Banco de Dados (`db`)
+- `devv db:create`
+- `devv db:drop`
+- `devv db:truncate`
+- `devv db:import`
+- `devv db:clean`
+- `devv db:ui`
 
-Painéis interativos flutuantes (`fzf`) para operar sobre seus schemas locais do MySQL.
+### Tmux
 
-- **`devv db:create`**: Menu dinâmico para input do nome e criação de um novo schema usando codificação moderna UTF-8 (`utf8mb4_unicode_ci`).
-- **`devv db:drop`**: Lista via menu dinâmico flutuante todos os BDs locais. Selecione o banco usando as setas para apagar. Inclui etapa de "Alerta Vermelho" e confirmação de segurança antes da exclusão estrutural.
-- **`devv db:truncate`**: Selecione um schema no _fzf_ para limpá-lo inteiramente e sumariamente pulando restrições de chaves-estrangeiras (Foreign Keys constraint bypass).
-- **`devv db:import`**: Utilitário colossal que **lista os dumps locais via fzf na tela**. Se houver um arquivo desejado você já importa diretamente, pulando burocracias. Caso contrário, ele possui uma opção integrada chamada `[+] Download from Google Drive` que faz o download seguro de dumps SQL comprimidos (`.sql.gz`) através do rclone, realizando streaming em tempo-real do unzip + MySQL usando `pv` para tracking de progresso em MB/s.
-- **`devv db:clean`**: Lixeiro interativo. Lista todos os arquivos `.sql` e `.sql.gz` hospedados na pasta interna `devtools/dumps`. **Suporta multi-seleção (aperte `TAB` em cima dos nomes dos arquivos no fzf)** para apagar múltiplos arquivos pesados simultaneamente de forma segura.
-- **`devv db:ui` (`Ctrl+G`)**: A **IDE SQL do Terminal**. Inicia o `harlequin` (TUI interativo) com auto-discovery de credenciais baseadas no seu `.env`. É extremamente polido, com suporte total a mouse, abas e editor com autocomplete. (Atalho: `Ctrl+G` | No Tmux: `Prefix + u`).
+- `devv tmux:up`
+- `devv tmux:down`
+- `devv tmux:session`
+- `devv tmux:window`
+- `devv api:restart`
+- `devv web:restart`
 
-### DevOps & SaaS Tmux (`tmux`, `api`, `web`)
+### SSH
 
-Scripts de ciclo de vida projetados especificamente para seu ecossistema tmux local.
+- `devv ssh:connect`
+- `devv ssh:add`
+- `devv ssh:remove`
 
-- **`devv tmux:up`**: Cria (ou atacha) uma sessão paralela no painel (`dev`) separando os contextos visualmente num grid vertical enxuto.
-  - Sobe o `php artisan serve` no Pane API.
-  - Sobe o background `php artisan horizon` no Pane Horizon.
-  - Sobe o `npm run serve` no Pane Web.
-- **`devv tmux:down`**: Encerra permanentemente a sessão `my-project` limpando os processos órfãos.
-- **`devv tmux:session` (`Ctrl+F`)**: O famoso _Sessionizer_. Encontra automaticamente as pastas de desenvolvimento. Agora **respeita o contexto atual (`$PWD`)** e permite busca global recursiva (ex: digite `api-eloverde` para encontrar o projeto em qualquer profundidade). (Atalho: `Ctrl+F`).
-- **`devv tmux:window` (`Ctrl+W`)**: O _Windownizer_. Abre uma nova Window no diretório selecionado. Também respeita o contexto do diretório atual. (Atalho: `Ctrl+W`).
-- **`devv api:restart`**: Utilitário agressivo de flush back-end. Ele paralisa as abas locais (Ctrl+C), roda o clear do cache corporativo, optimizadores e redis-cli, mata as filas do Queue / Horizon e reinicia tudo de novo purificado, economizando muitos gigabytes de digitação diária.
-- **`devv web:restart`**: Restart exclusivo e imediato do builder do npm (frontend).
+### Configuracao
 
----
+- `devv config:set <KEY> <VALUE>`
+- `devv config:list`
 
-## ⚙️ Configurações de Escopo Local (`.env`)
+## Seguranca e segredos
 
-Para não codificar caminhos absolutos atrelado ao usuário no código global do roteador, o Core do comando lê as variáveis declaradas no arquivo `.env` contido na raiz do projeto (`devtools/.env`).
+Arquivos sensiveis nao ficam mais versionados em texto puro.
+
+- Lista SSH local: `~/.config/devv/servers.list`
+- Chave privada age local: `~/.config/devv/keys/age.key`
+- Backup criptografado no repo: `secrets/servers.list.age`
+- Recipients publicos: `secrets/age-recipients.txt`
+
+O arquivo antigo `config/servers.list` foi descontinuado (mantido apenas `config/servers.list.example`).
+
+## Fluxo de recuperacao (formatou o PC)
+
+1. Clone o repositorio.
+2. Rode `devv env:bootstrap`.
+3. Se houver backup criptografado, o comando tenta restaurar a chave via Bitwarden CLI (`bw`).
+4. Se a chave for restaurada, o `servers.list` local e reidratado automaticamente.
+
+Para informar o item do Bitwarden que guarda a chave age:
 
 ```bash
-# Exemplo de .env
-API_DIR="$HOME/workspace/development/api"
-WEB_DIR="$HOME/workspace/development/web"
-DEVT_RCLONE_REMOTE="gdrive"
+devv config:set DEVT_BW_AGE_KEY_ITEM "<item-id-ou-nome>"
 ```
 
-Estas variáveis em cache retro-alimentam as rotas flutuantes do Sessionizer ou o comportamento padrão de onde os arquivos residem, servindo de Fallback. Se você não fornecer nenhuma `.env`, o motor usará locais comuns como `~/workspace/personal`.
+## Estrutura relevante
 
----
+- `bin/devv`: roteador principal de comandos.
+- `src/commands`: comandos do CLI.
+- `src/lib/ui.sh`: helpers visuais e utilitarios.
+- `src/lib/config.sh`: configuracoes em `~/.config/devv/config.env`.
+- `src/lib/secrets.sh`: gerenciamento de segredo local + backup criptografado.
 
-🛠 **Desenvolvido com Bash Router, UI em Fzf e Automapping de Zsh.**
+## Observacoes
+
+- Este projeto nao usa banco proprio para persistir configuracoes do devv.
+- Os comandos `db:*` operam sobre bancos MySQL locais dos seus projetos.
