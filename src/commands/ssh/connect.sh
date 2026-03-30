@@ -8,7 +8,11 @@ fi
 
 if [[ ! -s "${DEVV_SERVERS_FILE}" ]] && [[ -f "${DEVV_ENCRYPTED_SERVERS_FILE}" ]]; then
   if decrypt_encrypted_servers_file; then
-    info "SSH servers restored from encrypted backup."
+    if servers_file_has_entries; then
+      info "SSH servers restored from encrypted backup."
+    else
+      warn "Encrypted backup has no server entries yet."
+    fi
   fi
 fi
 

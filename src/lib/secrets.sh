@@ -44,6 +44,11 @@ list_servers_entries() {
   grep -v '^[[:space:]]*#' "${DEVV_SERVERS_FILE}" | grep -v '^[[:space:]]*$' || true
 }
 
+servers_file_has_entries() {
+  [[ -f "${DEVV_SERVERS_FILE}" ]] || return 1
+  list_servers_entries | grep -q .
+}
+
 ensure_age_key_permissions() {
   if [[ -f "${DEVV_AGE_KEY_FILE}" ]]; then
     chmod 600 "${DEVV_AGE_KEY_FILE}" 2>/dev/null || true
@@ -86,6 +91,7 @@ sync_encrypted_servers_file() {
   command -v age >/dev/null 2>&1 || return 1
   [[ -f "${DEVV_AGE_RECIPIENTS_FILE}" ]] || return 1
   [[ -f "${DEVV_SERVERS_FILE}" ]] || return 1
+  servers_file_has_entries || return 1
 
   mkdir -p "${DEVV_SECRETS_DIR}"
   age -R "${DEVV_AGE_RECIPIENTS_FILE}" -o "${DEVV_ENCRYPTED_SERVERS_FILE}" "${DEVV_SERVERS_FILE}"

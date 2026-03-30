@@ -41,7 +41,11 @@ if [[ -f "${DEVV_ENCRYPTED_SERVERS_FILE}" ]]; then
   if age_key_exists; then
     if [[ "$FORCE_RESTORE" -eq 1 || ! -s "${DEVV_SERVERS_FILE}" ]]; then
       if decrypt_encrypted_servers_file; then
-        ok "Restored SSH servers from encrypted backup."
+        if servers_file_has_entries; then
+          ok "Restored SSH servers from encrypted backup."
+        else
+          warn "Encrypted backup decrypted, but it has no server entries."
+        fi
       else
         warn "Encrypted SSH backup exists, but decryption failed."
       fi
@@ -67,7 +71,11 @@ ensure_servers_file
 if sync_encrypted_servers_file; then
   ok "Encrypted SSH backup updated at ${DEVV_ENCRYPTED_SERVERS_FILE}."
 else
-  warn "Encrypted SSH backup was not updated (check age and recipients file)."
+  if servers_file_has_entries; then
+    warn "Encrypted SSH backup was not updated (check age and recipients file)."
+  else
+    info "Skipped encrypted backup update because there are no SSH server entries yet."
+  fi
 fi
 
 info "Bootstrap complete."

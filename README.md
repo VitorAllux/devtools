@@ -1,16 +1,16 @@
 # devv
 
-CLI pessoal para acelerar rotina local de desenvolvimento (tmux, MySQL, SSH e utilidades de ambiente).
+CLI pessoal para automacao de desenvolvimento local (tmux, MySQL, SSH e utilitarios).
 
 Versao atual: `1.0.0`
 
-## Objetivo
+## O que este projeto faz
 
-- Padronizar tarefas repetitivas em comandos curtos.
-- Centralizar setup de shell/autocomplete e atalhos.
-- Manter dados sensiveis fora do Git e recuperaveis apos formatacao.
+- Padroniza tarefas repetitivas em comandos curtos.
+- Centraliza setup de shell/autocomplete e atalhos.
+- Mantem dados sensiveis fora do Git com backup criptografado.
 
-## Instalacao
+## Instalacao rapida
 
 ```bash
 git clone git@github.com:VitorAllux/devtools.git
@@ -19,12 +19,59 @@ cd devtools
 exec zsh
 ```
 
+`bw` (Bitwarden CLI) e opcional no `env:setup`; ao final, o comando pergunta se voce quer instalar.
+
+## Passo a passo completo de segredos (Bitwarden + age)
+
+### 1) Primeira configuracao (maquina atual)
+
+1. Rode `devv env:setup`.
+2. Rode `bw login`.
+3. Rode `export BW_SESSION="$(bw unlock --raw)"`.
+4. Rode `bw sync`.
+5. Rode `devv env:bootstrap` para gerar/validar chave age e backup criptografado.
+6. Copie a chave privada local (`cat ~/.config/devv/keys/age.key`).
+7. Crie um item no Bitwarden (Secure Note) chamado `devv-age-key` e cole a chave no campo Notes.
+8. Pegue o ID do item: `bw list items --search "devv-age-key" | jq -r '.[0].id'`.
+9. Salve no devv: `devv config:set DEVT_BW_AGE_KEY_ITEM "<ITEM_ID>"`.
+10. Rode `devv env:bootstrap --force` para validar restauracao completa.
+
+### 2) Recuperacao apos formatar PC
+
+1. Clone o repositorio e rode `devv env:setup`.
+2. Rode `bw login`.
+3. Rode `export BW_SESSION="$(bw unlock --raw)"`.
+4. Rode `bw sync`.
+5. Rode `devv env:bootstrap --force`.
+
+Resultado esperado:
+
+- `~/.config/devv/keys/age.key` restaurada (ou existente).
+- `~/.config/devv/servers.list` restaurado do `secrets/servers.list.age`.
+
+### 3) Validacao rapida
+
+```bash
+ls -l ~/.config/devv/keys/age.key ~/.config/devv/servers.list
+devv ssh:connect
+```
+
+## Onde os dados ficam
+
+- Lista SSH local: `~/.config/devv/servers.list`
+- Chave age privada local: `~/.config/devv/keys/age.key`
+- Backup criptografado versionado: `secrets/servers.list.age`
+- Lista de recipients publicos: `secrets/age-recipients.txt`
+- Configuracao local do devv: `~/.config/devv/config.env`
+
+O arquivo antigo `config/servers.list` foi descontinuado e substituido por `config/servers.list.example`.
+
 ## Comandos principais
 
 ### Ambiente
 
-- `devv env:setup`: instala dependencias base e integra shell/autocomplete.
-- `devv env:bootstrap`: roda setup + restaura arquivos sensiveis locais.
+- `devv env:setup`
+- `devv env:bootstrap`
 
 ### Banco (MySQL local)
 
@@ -55,39 +102,14 @@ exec zsh
 - `devv config:set <KEY> <VALUE>`
 - `devv config:list`
 
-## Seguranca e segredos
-
-Arquivos sensiveis nao ficam mais versionados em texto puro.
-
-- Lista SSH local: `~/.config/devv/servers.list`
-- Chave privada age local: `~/.config/devv/keys/age.key`
-- Backup criptografado no repo: `secrets/servers.list.age`
-- Recipients publicos: `secrets/age-recipients.txt`
-
-O arquivo antigo `config/servers.list` foi descontinuado (mantido apenas `config/servers.list.example`).
-
-## Fluxo de recuperacao (formatou o PC)
-
-1. Clone o repositorio.
-2. Rode `devv env:bootstrap`.
-3. Se houver backup criptografado, o comando tenta restaurar a chave via Bitwarden CLI (`bw`).
-4. Se a chave for restaurada, o `servers.list` local e reidratado automaticamente.
-
-Para informar o item do Bitwarden que guarda a chave age:
-
-```bash
-devv config:set DEVT_BW_AGE_KEY_ITEM "<item-id-ou-nome>"
-```
-
 ## Estrutura relevante
 
-- `bin/devv`: roteador principal de comandos.
+- `bin/devv`: roteador principal.
 - `src/commands`: comandos do CLI.
-- `src/lib/ui.sh`: helpers visuais e utilitarios.
-- `src/lib/config.sh`: configuracoes em `~/.config/devv/config.env`.
-- `src/lib/secrets.sh`: gerenciamento de segredo local + backup criptografado.
+- `src/lib/config.sh`: leitura/escrita em `~/.config/devv/config.env`.
+- `src/lib/secrets.sh`: fluxo de segredo local + backup criptografado.
 
 ## Observacoes
 
-- Este projeto nao usa banco proprio para persistir configuracoes do devv.
-- Os comandos `db:*` operam sobre bancos MySQL locais dos seus projetos.
+- Este projeto nao usa banco proprio para persistencia do devv.
+- Os comandos `db:*` operam sobre bancos MySQL locais de outros projetos.

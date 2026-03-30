@@ -9,7 +9,30 @@ sudo apt-get update -y
 sudo apt-get install -y zsh htop curl wget git jq pv rclone mysql-client gzip fzf xclip wl-clipboard python3-pip pipx age
 
 if ! command -v bw >/dev/null 2>&1; then
-  warn "Bitwarden CLI (bw) not found. Install it to enable secret restore during env:bootstrap."
+  warn "Bitwarden CLI (bw) not found. It is optional, but recommended for secret restore during env:bootstrap."
+
+  if [[ -t 0 ]]; then
+    if confirm "Do you want to install Bitwarden CLI now? [y/N]"; then
+      info "Installing Bitwarden CLI..."
+
+      if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+        info "Installing nodejs and npm..."
+        sudo apt-get install -y nodejs npm
+      fi
+
+      sudo npm install -g @bitwarden/cli
+
+      if command -v bw >/dev/null 2>&1; then
+        ok "Bitwarden CLI installed successfully."
+      else
+        warn "Could not validate Bitwarden CLI installation. Install manually later if needed."
+      fi
+    else
+      info "Skipping Bitwarden CLI install. You can install it later for automatic secret restore."
+    fi
+  else
+    info "Non-interactive mode detected. Skipping optional Bitwarden CLI install."
+  fi
 fi
 
 if [[ "$SHELL" != "/usr/bin/zsh" ]]; then
