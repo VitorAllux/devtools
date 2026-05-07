@@ -195,12 +195,11 @@ info "Fetching databases..."
 DB_SELECTION=$(select_with_fzf "Select the Target Database for Import" "$MENU_OPTIONS")
 
 if [[ "$DB_SELECTION" == "$NEW_DB_OPTION" ]]; then
-  DB_CUSTOM_NAME="$(prompt_input "Custom name for NEW database (e.g. coamo)")"
-  if [[ -z "$DB_CUSTOM_NAME" ]]; then
-    die "Database custom name is required."
+  DB_NAME="$(prompt_input "Name for NEW database (e.g. coamo)")"
+  if [[ -z "$DB_NAME" ]]; then
+    die "Database name is required."
   fi
-  DB_NAME="$(build_elo_name_with_timestamp "$DB_CUSTOM_NAME")" || die "Invalid database custom name."
-  ok "Generated DB name: ${BOLD}${DB_NAME}${NC}"
+  ok "Using DB name: ${BOLD}${DB_NAME}${NC}"
 else
   DB_NAME="$DB_SELECTION"
 fi
