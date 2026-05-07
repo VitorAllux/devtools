@@ -1,6 +1,27 @@
 #!/usr/bin/env bash
+set -euo pipefail
+
 source "${DEVTOOLS_DIR}/src/lib/ui.sh"
 source "${DEVTOOLS_DIR}/src/lib/secrets.sh"
+
+target=""
+target_name=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --target)
+      target="${2:-}"
+      shift 2
+      ;;
+    --name)
+      target_name="${2:-}"
+      shift 2
+      ;;
+    *)
+      die "Unknown option for ssh:connect: $1"
+      ;;
+  esac
+done
 
 if migrate_legacy_servers_file; then
   info "Legacy SSH list migrated to ${DEVV_SERVERS_FILE}."
@@ -19,6 +40,18 @@ fi
 ensure_servers_file
 
 title "SSH Connection Manager"
+
+if [[ -n "${target}" ]]; then
+  info "Connecting to ${target} ..."
+  exec ssh "${target}"
+fi
+
+if [[ -n "${target_name}" ]]; then
+  resolved_target="$(list_servers_entries | awk -v name="${target_name}" '$1 == name {print $NF; exit}')"
+  [[ -n "${resolved_target}" ]] || die "Server '${target_name}' not found in ${DEVV_SERVERS_FILE}."
+  info "Connecting to ${resolved_target} ..."
+  exec ssh "${resolved_target}"
+fi
 
 if [[ ! -s "${DEVV_SERVERS_FILE}" ]]; then
   warn "No servers found in ${DEVV_SERVERS_FILE}"

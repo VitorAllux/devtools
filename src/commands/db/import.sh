@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -o pipefail
+
 source "${DEVTOOLS_DIR}/src/lib/ui.sh"
 
 need rclone
@@ -60,6 +62,25 @@ build_dump_file_name_from_base() {
   local base
   base="$(build_elo_name_with_timestamp "${1:-}")" || return 1
   printf "%s.sql.gz" "$base"
+}
+
+sanitize_sql_stream() {
+  awk '
+    {
+      line = $0
+      sub(/\r$/, "", line)
+      if (line == "-") {
+        removed++
+        next
+      }
+      print
+    }
+    END {
+      if (removed > 0) {
+        printf "[devv][db::import] Removed %d invalid SQL line(s) containing only \"-\" before import.\n", removed > "/dev/stderr"
+      }
+    }
+  '
 }
 
 DEFAULT_REMOTE="${DEVT_RCLONE_REMOTE:-gdrive}"
@@ -229,11 +250,23 @@ ok "Database verified: ${BOLD}${DB_NAME}${NC}"
 
 title "Importing"
 if [[ "${IS_GZIP}" == "1" ]]; then
-  info "Importing with progress (pv | gunzip | mysql)..."
-  pv "${DEST}" | gunzip | mysql -u root -p --default-character-set=utf8mb4 "${DB_NAME}"
+  info "Importing with progress (pv | gunzip | sanitize | mysql)..."
+  if [[ -t 2 ]]; then
+    pv "${DEST}" 2>/dev/tty | gunzip -c | sanitize_sql_stream | mysql -u root -p --default-character-set=utf8mb4 "${DB_NAME}"
+  else
+    pv "${DEST}" 2>/dev/null | gunzip -c | sanitize_sql_stream | mysql -u root -p --default-character-set=utf8mb4 "${DB_NAME}"
+  fi
 else
-  info "Importing plain SQL with progress (pv | mysql)..."
-  pv "${DEST}" | mysql -u root -p --default-character-set=utf8mb4 "${DB_NAME}"
+  info "Importing plain SQL with progress (pv | sanitize | mysql)..."
+  if [[ -t 2 ]]; then
+    pv "${DEST}" 2>/dev/tty | sanitize_sql_stream | mysql -u root -p --default-character-set=utf8mb4 "${DB_NAME}"
+  else
+    pv "${DEST}" 2>/dev/null | sanitize_sql_stream | mysql -u root -p --default-character-set=utf8mb4 "${DB_NAME}"
+  fi
+fi
+
+if [[ $? -ne 0 ]]; then
+  die "Import failed into '${BOLD}${DB_NAME}${NC}'."
 fi
 
 title "Finish"

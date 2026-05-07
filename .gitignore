@@ -13,3 +13,7 @@ config/servers.list
 # OS/editor
 .DS_Store
 .vscode/
+
+# python
+__pycache__/
+*.pyc

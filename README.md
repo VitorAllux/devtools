@@ -96,6 +96,19 @@ O arquivo antigo `config/servers.list` foi descontinuado e substituido por `conf
 - `devv ssh:connect`
 - `devv ssh:add`
 - `devv ssh:remove`
+- `devv ssh:list`
+
+### WSL
+
+- `devv wsl:list`
+- `devv wsl:status`
+- `devv wsl:start <distro>`
+- `devv wsl:stop <distro>`
+- `devv wsl:shutdown`
+
+### Interface grafica (Control Center)
+
+- `devv ui`
 
 ### Configuracao
 
@@ -108,6 +121,7 @@ O arquivo antigo `config/servers.list` foi descontinuado e substituido por `conf
 - `src/commands`: comandos do CLI.
 - `src/lib/config.sh`: leitura/escrita em `~/.config/devv/config.env`.
 - `src/lib/secrets.sh`: fluxo de segredo local + backup criptografado.
+- `src/control_center/app.py`: UI desktop (fase 1) para gerir WSL/SSH/config.
 
 ## Observacoes
 

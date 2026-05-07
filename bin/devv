@@ -46,7 +46,18 @@ show_help() {
   echo -e "  ${PUR}🌐 Network & SSH:${NC}"
   echo -e "    ${BOLD}${CYA}ssh:connect${NC}  🔌 Quick connect to servers via fzf"
   echo -e "    ${BOLD}${CYA}ssh:add${NC}      ➕ Add a new server to the SSH list"
-  echo -e "    ${BOLD}${CYA}ssh:remove${NC}   ❌ Remove server(s) from the SSH list\n"
+  echo -e "    ${BOLD}${CYA}ssh:remove${NC}   ❌ Remove server(s) from the SSH list"
+  echo -e "    ${BOLD}${CYA}ssh:list${NC}     📜 List SSH entries\n"
+
+  echo -e "  ${PUR}🐧 WSL:${NC}"
+  echo -e "    ${BOLD}${CYA}wsl:list${NC}     📋 List WSL distros"
+  echo -e "    ${BOLD}${CYA}wsl:status${NC}   🩺 Show WSL global status"
+  echo -e "    ${BOLD}${CYA}wsl:start${NC}    ▶️  Start a distro (devv wsl:start Ubuntu)"
+  echo -e "    ${BOLD}${CYA}wsl:stop${NC}     ⏹️  Stop a distro (devv wsl:stop Ubuntu)"
+  echo -e "    ${BOLD}${CYA}wsl:shutdown${NC} 🛑 Shutdown all WSL distros\n"
+
+  echo -e "  ${PUR}🖥️  Control Center:${NC}"
+  echo -e "    ${BOLD}${CYA}ui${NC}           🧭 Open devv desktop control center\n"
 }
 
 if [[ $# -eq 0 || "$1" == "help" || "$1" == "--help" || "$1" == "-h" || "$1" == "-help" ]]; then
@@ -80,6 +91,15 @@ case "$COMMAND" in
   ssh:connect) bash "${DEVTOOLS_DIR}/src/commands/ssh/connect.sh" "$@" ;;
   ssh:add)     bash "${DEVTOOLS_DIR}/src/commands/ssh/add.sh" "$@" ;;
   ssh:remove)  bash "${DEVTOOLS_DIR}/src/commands/ssh/remove.sh" "$@" ;;
+  ssh:list)    bash "${DEVTOOLS_DIR}/src/commands/ssh/list.sh" "$@" ;;
+
+  wsl:list)    exec "${DEVTOOLS_DIR}/src/commands/wsl/list.sh" "$@" ;;
+  wsl:status)  exec "${DEVTOOLS_DIR}/src/commands/wsl/status.sh" "$@" ;;
+  wsl:start)   exec "${DEVTOOLS_DIR}/src/commands/wsl/start.sh" "$@" ;;
+  wsl:stop)    exec "${DEVTOOLS_DIR}/src/commands/wsl/stop.sh" "$@" ;;
+  wsl:shutdown) exec "${DEVTOOLS_DIR}/src/commands/wsl/shutdown.sh" "$@" ;;
+
+  ui)          exec "${DEVTOOLS_DIR}/src/commands/ui/open.sh" "$@" ;;
   
   *)
     err "Unknown command: ${COMMAND}"
