@@ -62,7 +62,10 @@ info "Removing legacy devv shell keybindings to avoid editor/terminal conflicts.
 sed -i '/bindkey -s \^f "devv tmux:session\\n"/d' ~/.zshrc 2>/dev/null || true
 sed -i '/bindkey -s \^w "devv tmux:window\\n"/d' ~/.zshrc 2>/dev/null || true
 sed -i '/bindkey -s \^g "devv db:ui\\n"/d' ~/.zshrc 2>/dev/null || true
-info "No global devv keybindings are installed by default. Use explicit devv commands or configure local shortcuts manually."
+sed -i '/bindkey -s .*\(devv ssh:connect\\n\|devv ssh\\n\)/d' ~/.zshrc 2>/dev/null || true
+
+info "Configuring devv SSH shortcut (Alt+S)..."
+echo 'bindkey -s "\es" "devv ssh\n"' >> ~/.zshrc
 
 info "Ensuring global PATH access in .zshrc and .bashrc..."
 BIN_DIR="${HOME}/workspace/bin"

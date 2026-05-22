@@ -4,7 +4,7 @@ set -euo pipefail
 source "${DEVTOOLS_DIR}/src/lib/symlink-workspace-hub.sh"
 
 usage() {
-  echo "Usage: devv workspace [cursor|code|codex|shell]"
+  echo "Usage: devv workspace [auto|cursor|code|vscode|opencode|codex|shell]"
 }
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
@@ -12,9 +12,10 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   exit 0
 fi
 
-[[ $# -le 1 ]] || die "workspace accepts only one optional opener: cursor, code, codex, or shell."
+[[ $# -le 1 ]] || die "workspace accepts only one optional opener: auto, cursor, code, vscode, opencode, codex, or shell."
 
-tool="${1:-auto}"
+tool="${1:-${DEVT_WORKSPACE_OPENER:-auto}}"
+header="Enter: open | Alt-C: create | Alt-M: manage | Alt-D: delete | Esc: exit"
 
 while true; do
   rows="$(workspace_menu_rows)"
@@ -34,7 +35,7 @@ while true; do
     --delimiter='\t' \
     --with-nth=1,2,3 \
     --prompt="Workspaces > " \
-    --header="Enter: open | Alt-C: create | Alt-M: manage | Alt-D: delete | Esc: exit" \
+    --header="${header}" \
     --expect=alt-c,alt-m,alt-d \
     > "$selection_file"; then
     rm -f "$selection_file"
@@ -65,7 +66,7 @@ while true; do
       ;;
     "")
       [[ -n "$selected" ]] || continue
-      open_workspace_path "$workspace" "$tool"
+      open_workspace_path "$workspace" "$tool" || continue
       exit 0
       ;;
   esac

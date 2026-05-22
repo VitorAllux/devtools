@@ -6,10 +6,13 @@ Current version: `1.1.0`
 
 ## What's New In 1.1.0
 
+- New `devv ssh` hub for connecting, adding, and removing SSH entries from one fzf screen.
+- `ssh:connect` was removed from the public command surface; use `devv ssh`.
+- `env:setup` configures `Alt+S` as the shell shortcut for `devv ssh`.
 - New `devv workspace` hub for creating, opening, managing, and deleting symlink workspaces.
 - New `devv workspace:list` command for quick workspace inspection.
 - Main help and zsh completions now match the current command surface.
-- Legacy global shell keybindings are cleaned up instead of installed by default.
+- Legacy `Ctrl-*` shell keybindings are cleaned up instead of installed by default.
 - Project-specific conventions for future agents and maintainers are documented in `AGENTS.md`.
 
 ## Quick Install
@@ -29,7 +32,7 @@ exec zsh
 devv help
 devv workspace
 devv tmux:up
-devv ssh:connect
+devv ssh
 devv db:ui
 ```
 
@@ -57,12 +60,31 @@ Useful workspace commands:
 devv workspace
 devv workspace cursor
 devv workspace code
+devv workspace vscode
+devv workspace opencode
 devv workspace codex
 devv workspace shell
 devv workspace:list
 ```
 
-The default opener tries `cursor`, `cursor.exe`, `code`, and `code.exe`, in that order. If none are available, it prints the workspace path.
+If `DEVT_WORKSPACE_OPENER` is configured, `Enter` opens the workspace with that opener. If it is not configured, `Enter` lists the openers found on the system and lets you choose.
+
+Supported opener values:
+
+```bash
+cursor
+code
+vscode
+opencode
+codex
+shell
+```
+
+Example:
+
+```bash
+devv config:set DEVT_WORKSPACE_OPENER opencode
+```
 
 Workspace root priority:
 
@@ -122,10 +144,20 @@ Workspace creation, project management, opening, and deletion live inside the in
 
 ### SSH
 
-- `devv ssh:connect`
+- `devv ssh`
 - `devv ssh:add`
 - `devv ssh:remove`
 - `devv ssh:list`
+
+`devv ssh` opens the SSH hub:
+
+- `Enter`: connect to the selected server in the current terminal.
+- `Alt-A`: add a new SSH entry.
+- `Alt-R`: remove the selected SSH entry.
+- `Alt-T`: open the selected SSH connection in a new terminal when a compatible terminal launcher is available.
+- `Esc`: exit.
+
+`Alt+S` opens `devv ssh` from zsh after running `devv env:setup`.
 
 ### WSL
 
@@ -202,4 +234,5 @@ Expected result:
 - `db:*` commands operate on local MySQL databases.
 - `workspace:remove` and other direct workspace mutation commands are not public commands; use `devv workspace`.
 - Workspace deletion refuses directories that contain non-symlink content.
-- No global shell keybindings are installed by default. Use explicit commands or configure personal shortcuts outside this project.
+- `env:setup` installs only one project-managed shell shortcut: `Alt+S` for `devv ssh`.
+- Other shortcuts should stay personal and outside this project.

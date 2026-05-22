@@ -58,7 +58,7 @@ show_help() {
   echo
   
   echo -e "  ${PUR}🌐 Network & SSH:${NC}"
-  help_entry "ssh:connect" "🔌 Quick connect to servers via fzf"
+  help_entry "ssh" "🔌 Interactive SSH hub via fzf (Alt+S)"
   help_entry "ssh:add" "➕ Add a new server to the SSH list"
   help_entry "ssh:remove" "❌ Remove server(s) from the SSH list"
   help_entry "ssh:list" "📜 List SSH entries"
@@ -108,7 +108,7 @@ case "$COMMAND" in
   config:set)  exec "${DEVTOOLS_DIR}/src/commands/config/set.sh" "$@" ;;
   config:list) exec "${DEVTOOLS_DIR}/src/commands/config/list.sh" "$@" ;;
   
-  ssh:connect) bash "${DEVTOOLS_DIR}/src/commands/ssh/connect.sh" "$@" ;;
+  ssh)         bash "${DEVTOOLS_DIR}/src/commands/ssh/hub.sh" "$@" ;;
   ssh:add)     bash "${DEVTOOLS_DIR}/src/commands/ssh/add.sh" "$@" ;;
   ssh:remove)  bash "${DEVTOOLS_DIR}/src/commands/ssh/remove.sh" "$@" ;;
   ssh:list)    bash "${DEVTOOLS_DIR}/src/commands/ssh/list.sh" "$@" ;;

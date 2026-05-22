@@ -29,7 +29,7 @@ _devv() {
         "env\:bootstrap:Setup + restore encrypted local secrets"
         "config\:set:Set configuration variable"
         "config\:list:List configuration variables"
-        "ssh\:connect:Quick connect to servers via fzf"
+        "ssh:Interactive SSH hub via fzf"
         "ssh\:add:Add a new server to the SSH list"
         "ssh\:remove:Remove server(s) from the SSH list"
         "ssh\:list:List SSH entries"
@@ -41,6 +41,23 @@ _devv() {
         "ui:Open devv desktop control center"
       )
       _describe -t commands 'devv commands' commands
+      ;;
+    args)
+      case "${words[2]:-}" in
+        workspace)
+          local -a openers
+          openers=(
+            "auto:Choose from available openers"
+            "cursor:Open with Cursor"
+            "code:Open with VS Code"
+            "vscode:Open with VS Code"
+            "opencode:Open with OpenCode"
+            "codex:Open with Codex"
+            "shell:Print the workspace path"
+          )
+          _describe -t workspace-openers 'workspace openers' openers
+          ;;
+      esac
       ;;
   esac
 }

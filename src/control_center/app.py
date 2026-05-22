@@ -294,7 +294,7 @@ class DevvControlCenter:
         return values[0], values[1]
 
     def ssh_add_entry(self) -> None:
-        name = simpledialog.askstring("Add SSH", "Server name (ex: elo-production):")
+        name = simpledialog.askstring("Add SSH", "Server name (ex: production-web):")
         if not name:
             return
 

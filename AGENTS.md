@@ -6,8 +6,9 @@ These rules document the local conventions for future agents and maintainers wor
 
 - User-facing CLI text, docs, help, fzf headers, autocomplete descriptions, and errors should be in English.
 - Keep output direct and practical. Prefer actionable command names and short descriptions.
-- Do not add global shell keybindings by default. They can conflict with terminals, shells, editors, and IDEs.
-- Prefer explicit `devv ...` commands. Personal shortcuts belong in the user's own shell config, not in `env:setup`.
+- Avoid global shell keybindings unless the project explicitly defines one. They can conflict with terminals, shells, editors, and IDEs.
+- The only project-managed shell shortcut is `Alt+S` for `devv ssh`.
+- Prefer explicit `devv ...` commands for everything else. Personal shortcuts belong in the user's own shell config, not in `env:setup`.
 
 ## Help And Command Lists
 
@@ -25,10 +26,11 @@ These rules document the local conventions for future agents and maintainers wor
 ## Shortcuts
 
 - Avoid `Ctrl-*` shortcuts for devv features. They commonly conflict with shells, terminal apps, VS Code, Cursor, and fzf defaults.
+- Do not use `Ctrl+S`; many terminals treat it as XOFF flow control and appear frozen.
 - For the workspace hub, use these local fzf shortcuts:
 
 ```text
-Enter  open/select/confirm
+Enter  open configured opener or choose from available openers
 Tab    multi-select or mark changes
 Alt-C  create workspace
 Alt-M  manage workspace projects
@@ -37,6 +39,31 @@ Esc    cancel/exit
 ```
 
 - Any fzf header should explicitly list the active shortcuts in English.
+- `Shift+Enter` should not be used unless the installed fzf version and target terminal are both proven to support it.
+- Do not update fzf just to chase a shortcut. Update it only when a feature is truly needed and existing devv bindings are verified against the new version.
+
+## SSH Surface
+
+- Public SSH commands are:
+
+```text
+devv ssh
+devv ssh:add
+devv ssh:remove
+devv ssh:list
+```
+
+- `devv ssh` is the interactive SSH hub.
+- Do not reintroduce `ssh:connect` as a public command.
+- SSH hub shortcuts should stay:
+
+```text
+Enter  connect in the current terminal
+Alt-A  add SSH entry
+Alt-R  remove selected SSH entry
+Alt-T  open selected SSH connection in a new terminal
+Esc    exit
+```
 
 ## Workspace Surface
 
@@ -51,6 +78,9 @@ devv workspace:list
 - Do not reintroduce public mutation commands such as `workspace:create`, `workspace:open`, `workspace:add-project`, `workspace:remove-project`, or `workspace:remove`.
 - Public command names and autocomplete remain `workspace`.
 - Internal implementation paths should keep the feature name explicit as `symlink-workspace-hub`.
+- `Enter` in the workspace hub should use `DEVT_WORKSPACE_OPENER` when configured.
+- When `DEVT_WORKSPACE_OPENER` is unset, `Enter` should list openers detected on the system and let the user choose.
+- Supported opener values are `cursor`, `code`, `vscode`, `opencode`, `codex`, and `shell`.
 
 ## Symlink Workspace Rules
 

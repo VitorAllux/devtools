@@ -283,9 +283,49 @@ workspace_menu_rows() {
   done < <(list_workspaces)
 }
 
+workspace_opener_rows() {
+  if command -v cursor >/dev/null 2>&1 || command -v cursor.exe >/dev/null 2>&1; then
+    printf 'cursor\tCursor\n'
+  fi
+
+  if command -v code >/dev/null 2>&1 || command -v code.exe >/dev/null 2>&1; then
+    printf 'code\tVS Code\n'
+  fi
+
+  if command -v opencode >/dev/null 2>&1; then
+    printf 'opencode\tOpenCode\n'
+  fi
+
+  if command -v codex >/dev/null 2>&1; then
+    printf 'codex\tCodex\n'
+  fi
+
+  printf 'shell\tPrint workspace path\n'
+}
+
+select_workspace_opener() {
+  local rows selected
+
+  need fzf
+
+  rows="$(workspace_opener_rows)"
+  selected="$(printf '%s\n' "$rows" | fzf \
+    --height=40% \
+    --layout=reverse \
+    --border \
+    --delimiter='\t' \
+    --with-nth=1,2 \
+    --prompt="Open With > " \
+    --header="Enter: open | Esc: cancel")" || return 1
+
+  [[ -n "$selected" ]] || return 1
+  printf '%s\n' "${selected%%$'\t'*}"
+}
+
 open_workspace_path() {
   local workspace="${1:-}"
   local tool="${2:-auto}"
+  local selected_tool
 
   [[ -d "$workspace" ]] || die "Workspace directory not found: ${workspace}"
 
@@ -299,12 +339,12 @@ open_workspace_path() {
   }
 
   case "$tool" in
-    auto)
-      exec_if_available cursor "$workspace"
-      exec_if_available cursor.exe "$workspace"
-      exec_if_available code "$workspace"
-      exec_if_available code.exe "$workspace"
-      info "Workspace path: ${workspace}"
+    auto|ask|select)
+      selected_tool="$(select_workspace_opener)" || {
+        warn "Open cancelled."
+        return 1
+      }
+      open_workspace_path "$workspace" "$selected_tool"
       ;;
     cursor)
       exec_if_available cursor "$workspace"
@@ -315,6 +355,14 @@ open_workspace_path() {
       exec_if_available code "$workspace"
       exec_if_available code.exe "$workspace"
       die "Command 'code' not found. Please install VS Code CLI."
+      ;;
+    vscode)
+      open_workspace_path "$workspace" "code"
+      ;;
+    opencode)
+      need opencode
+      cd "$workspace"
+      exec opencode
       ;;
     codex)
       need codex

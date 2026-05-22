@@ -32,7 +32,7 @@ ensure_servers_file
 title "Add SSH Server"
 
 if [[ -z "${server_name}" ]]; then
-  echo -n "Enter server name (e.g. elo-production): "
+  echo -n "Enter server name (e.g. production-web): "
   read -r server_name
 fi
 

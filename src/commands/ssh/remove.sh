@@ -68,8 +68,13 @@ if [[ -n "${server_line}" ]]; then
   exit 0
 fi
 
-# List servers via fzf with multi-select enabled
-selected_servers=$(list_servers_entries | fzf --multi --prompt="Select Server(s) to Remove (TAB to multi-select) > " --height=40% --layout=reverse)
+selected_servers=$(list_servers_entries | fzf \
+  --multi \
+  --prompt="Remove SSH > " \
+  --height=40% \
+  --layout=reverse \
+  --border \
+  --header="Tab: select multiple | Enter: remove | Esc: cancel")
 
 if [[ -z "$selected_servers" ]]; then
   echo "Operation canceled."
