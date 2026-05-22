@@ -17,47 +17,64 @@ fi
 source "${DEVTOOLS_DIR}/src/lib/ui.sh"
 source "${DEVTOOLS_DIR}/src/lib/config.sh"
 
+help_entry() {
+  local command="${1:-}"
+  local description="${2:-}"
+  printf "    ${BOLD}${CYA}%-18s${NC} %s\n" "$command" "$description"
+}
+
 show_help() {
   title "devv - Developer Tools"
   echo -e "  ${BOLD}Usage:${NC} devv <command> [args]\n"
   
   echo -e "  ${PUR}📦 Database Commands:${NC}"
-  echo -e "    ${BOLD}${CYA}db:create${NC}    ✨ Create a new database"
-  echo -e "    ${BOLD}${CYA}db:drop${NC}      🗑️  Drop an existing database"
-  echo -e "    ${BOLD}${CYA}db:truncate${NC}  🧹 Truncate all tables in a database"
-  echo -e "    ${BOLD}${CYA}db:import${NC}    📥 Import a dump locally or from Google Drive"
-  echo -e "    ${BOLD}${CYA}db:clean${NC}     🗑️  Clean dumps interactively from local storage"
-  echo -e "    ${BOLD}${CYA}db:ui${NC}        📊 Interactive Database TUI (LazySQL)\n"
+  help_entry "db:create" "✨ Create a new database"
+  help_entry "db:drop" "🗑️  Drop an existing database"
+  help_entry "db:truncate" "🧹 Truncate all tables in a database"
+  help_entry "db:import" "📥 Import a dump locally or from Google Drive"
+  help_entry "db:clean" "🗑️  Clean dumps interactively from local storage"
+  help_entry "db:ui" "📊 Interactive Database TUI (Harlequin)"
+  echo
   
   echo -e "  ${PUR}⚡ Environment & Tmux:${NC}"
-  echo -e "    ${BOLD}${CYA}tmux:up${NC}      🚀 Start development tmux session (API + Web)"
-  echo -e "    ${BOLD}${CYA}tmux:down${NC}    🛑 Kill development tmux session"
-  echo -e "    ${BOLD}${CYA}tmux:session${NC} 📂 Open a dir in a new Tmux Session via fzf (Ctrl+F)"
-  echo -e "    ${BOLD}${CYA}tmux:window${NC}  🪟 Open a dir in a new Tmux Window via fzf (Ctrl+W)"
-  echo -e "    ${BOLD}${CYA}api:restart${NC}  🔄 Restart the API backend and flush caches/horizon"
-  echo -e "    ${BOLD}${CYA}web:restart${NC}  🌐 Restart the Web frontend\n"
+  help_entry "tmux:up" "🚀 Start development tmux session (API + Web)"
+  help_entry "tmux:down" "🛑 Kill development tmux session"
+  help_entry "tmux:session" "📂 Open a dir in a new tmux session via fzf"
+  help_entry "tmux:window" "🪟 Open a dir in a new tmux window via fzf"
+  help_entry "api:restart" "🔄 Restart the API backend and flush caches/horizon"
+  help_entry "web:restart" "🌐 Restart the Web frontend"
+  echo
+
+  echo -e "  ${PUR}🧩 Workspaces:${NC}"
+  help_entry "workspace" "🧭 Interactive symlink workspace manager"
+  help_entry "workspace:list" "📜 List symlink workspaces"
+  echo
   
   echo -e "  ${PUR}🛠️  System:${NC}"
-  echo -e "    ${BOLD}${CYA}env:setup${NC}    ⚙️  Install dependencies and configure zsh autocompletion"
-  echo -e "    ${BOLD}${CYA}env:bootstrap${NC} ♻️  Setup + restore encrypted local secrets"
-  echo -e "    ${BOLD}${CYA}config:set${NC}   🛠️  Set configuration variable"
-  echo -e "    ${BOLD}${CYA}config:list${NC}  📄  List configuration variables\n"
+  help_entry "env:setup" "⚙️  Install dependencies and configure zsh autocompletion"
+  help_entry "env:bootstrap" "♻️  Setup + restore encrypted local secrets"
+  help_entry "config:set" "🛠️  Set configuration variable"
+  help_entry "config:list" "📄  List configuration variables"
+  echo
   
   echo -e "  ${PUR}🌐 Network & SSH:${NC}"
-  echo -e "    ${BOLD}${CYA}ssh:connect${NC}  🔌 Quick connect to servers via fzf"
-  echo -e "    ${BOLD}${CYA}ssh:add${NC}      ➕ Add a new server to the SSH list"
-  echo -e "    ${BOLD}${CYA}ssh:remove${NC}   ❌ Remove server(s) from the SSH list"
-  echo -e "    ${BOLD}${CYA}ssh:list${NC}     📜 List SSH entries\n"
+  help_entry "ssh:connect" "🔌 Quick connect to servers via fzf"
+  help_entry "ssh:add" "➕ Add a new server to the SSH list"
+  help_entry "ssh:remove" "❌ Remove server(s) from the SSH list"
+  help_entry "ssh:list" "📜 List SSH entries"
+  echo
 
   echo -e "  ${PUR}🐧 WSL:${NC}"
-  echo -e "    ${BOLD}${CYA}wsl:list${NC}     📋 List WSL distros"
-  echo -e "    ${BOLD}${CYA}wsl:status${NC}   🩺 Show WSL global status"
-  echo -e "    ${BOLD}${CYA}wsl:start${NC}    ▶️  Start a distro (devv wsl:start Ubuntu)"
-  echo -e "    ${BOLD}${CYA}wsl:stop${NC}     ⏹️  Stop a distro (devv wsl:stop Ubuntu)"
-  echo -e "    ${BOLD}${CYA}wsl:shutdown${NC} 🛑 Shutdown all WSL distros\n"
+  help_entry "wsl:list" "📋 List WSL distros"
+  help_entry "wsl:status" "🩺 Show WSL global status"
+  help_entry "wsl:start" "▶️  Start a distro (devv wsl:start Ubuntu)"
+  help_entry "wsl:stop" "⏹️  Stop a distro (devv wsl:stop Ubuntu)"
+  help_entry "wsl:shutdown" "🛑 Shutdown all WSL distros"
+  echo
 
   echo -e "  ${PUR}🖥️  Control Center:${NC}"
-  echo -e "    ${BOLD}${CYA}ui${NC}           🧭 Open devv desktop control center\n"
+  help_entry "ui" "🧭 Open devv desktop control center"
+  echo
 }
 
 if [[ $# -eq 0 || "$1" == "help" || "$1" == "--help" || "$1" == "-h" || "$1" == "-help" ]]; then
@@ -82,6 +99,9 @@ case "$COMMAND" in
   tmux:window) exec "${DEVTOOLS_DIR}/src/commands/tmux/window.sh" "$@" ;;
   api:restart) exec "${DEVTOOLS_DIR}/src/commands/tmux/api-restart.sh" "$@" ;;
   web:restart) exec "${DEVTOOLS_DIR}/src/commands/tmux/web-restart.sh" "$@" ;;
+
+  workspace)                exec "${DEVTOOLS_DIR}/src/commands/symlink-workspace-hub/hub.sh" "$@" ;;
+  workspace:list)           exec "${DEVTOOLS_DIR}/src/commands/symlink-workspace-hub/list.sh" "$@" ;;
   
   env:setup)   exec "${DEVTOOLS_DIR}/src/commands/setup.sh" "$@" ;;
   env:bootstrap) exec "${DEVTOOLS_DIR}/src/commands/env/bootstrap.sh" "$@" ;;
