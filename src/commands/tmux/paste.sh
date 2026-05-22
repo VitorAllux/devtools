@@ -4,7 +4,7 @@ set -euo pipefail
 source "${DEVTOOLS_DIR}/src/lib/ui.sh"
 
 if ! clipboard_content="$(get_system_clipboard)"; then
-  tmux display-message "Clipboard do sistema indisponivel."
+  tmux display-message "System clipboard unavailable."
   exit 0
 fi
 

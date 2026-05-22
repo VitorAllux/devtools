@@ -6,7 +6,7 @@ title "Setting up devtools Environment"
 
 info "Installing dependencies via apt (requires sudo)..."
 sudo apt-get update -y
-sudo apt-get install -y zsh htop curl wget git jq pv rclone mysql-client gzip fzf xclip wl-clipboard python3-pip pipx age
+sudo apt-get install -y zsh htop curl wget git jq pv rclone mysql-client gzip fzf xclip wl-clipboard python3-pip python3-tk pipx age
 
 if ! command -v bw >/dev/null 2>&1; then
   warn "Bitwarden CLI (bw) not found. It is optional, but recommended for secret restore during env:bootstrap."
@@ -58,16 +58,11 @@ sed -i '/compdef devv=just/d' ~/.zshrc 2>/dev/null || true
 sed -i '/_devv() { words=/d' ~/.zshrc 2>/dev/null || true
 sed -i '/compdef _devv devv/d' ~/.zshrc 2>/dev/null || true
 
-info "Configuring devv Keybindings (Tmux FZF)..."
-if ! grep -q "devv tmux:session" ~/.zshrc 2>/dev/null; then
-  echo 'bindkey -s ^f "devv tmux:session\n"' >> ~/.zshrc
-fi
-if ! grep -q "devv tmux:window" ~/.zshrc 2>/dev/null; then
-  echo 'bindkey -s ^w "devv tmux:window\n"' >> ~/.zshrc
-fi
-if ! grep -q "devv db:ui" ~/.zshrc 2>/dev/null; then
-  echo 'bindkey -s ^g "devv db:ui\n"' >> ~/.zshrc
-fi
+info "Removing legacy devv shell keybindings to avoid editor/terminal conflicts..."
+sed -i '/bindkey -s \^f "devv tmux:session\\n"/d' ~/.zshrc 2>/dev/null || true
+sed -i '/bindkey -s \^w "devv tmux:window\\n"/d' ~/.zshrc 2>/dev/null || true
+sed -i '/bindkey -s \^g "devv db:ui\\n"/d' ~/.zshrc 2>/dev/null || true
+info "No global devv keybindings are installed by default. Use explicit devv commands or configure local shortcuts manually."
 
 info "Ensuring global PATH access in .zshrc and .bashrc..."
 BIN_DIR="${HOME}/workspace/bin"

@@ -113,9 +113,8 @@ select_directory_tree() {
       --height=50% \
       --layout=reverse \
       --border \
-      --header="← sobe  → entra  Enter seleciona  Ctrl+Y seleciona" \
+      --header="Left: parent  Right: enter  Enter: select  Esc: cancel" \
       --expect=left,right \
-      --bind "ctrl-y:accept" \
       --bind "start:reload:${DEVTOOLS_DIR}/src/commands/tmux/browse-feed.sh \"$current_dir\" \"\" \"$search_root\"" \
       --bind "change:reload:${DEVTOOLS_DIR}/src/commands/tmux/browse-feed.sh \"$current_dir\" {q} \"$search_root\"" \
       > "$selection_file"; then
