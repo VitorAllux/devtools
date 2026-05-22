@@ -102,9 +102,11 @@ Optional configuration:
 DEVT_WORKSPACES_DIR="$HOME/workspace"
 DEVT_WORKSPACE_PROJECT_ROOTS="$HOME/workspace:$HOME/Work/Development"
 DEVT_WORKSPACE_PROJECT_SEARCH_DEPTH="4"
+DEVT_WORKSPACE_OPENER="opencode"
 ```
 
 `DEVT_WORKSPACE_PROJECT_ROOTS` controls where the project picker searches for Git repositories. Multiple roots are separated by `:`.
+`DEVT_WORKSPACE_OPENER` is optional. Leave it empty to choose from detected openers each time.
 
 ## Commands
 

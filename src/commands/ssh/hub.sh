@@ -48,33 +48,51 @@ connect_ssh_target() {
   exec ssh "${target}"
 }
 
+run_detached() {
+  if command -v setsid >/dev/null 2>&1; then
+    setsid -f "$@" >/dev/null 2>&1
+  else
+    nohup "$@" >/dev/null 2>&1 &
+  fi
+}
+
 open_ssh_target_in_terminal() {
   local target="${1:-}"
+  local name="${2:-ssh}"
+  local quoted_target
+
   [[ -n "${target}" ]] || return 1
 
-  if command -v x-terminal-emulator >/dev/null 2>&1; then
-    nohup x-terminal-emulator -e ssh "${target}" >/dev/null 2>&1 &
-    return 0
-  fi
-
-  if command -v gnome-terminal >/dev/null 2>&1; then
-    nohup gnome-terminal -- ssh "${target}" >/dev/null 2>&1 &
-    return 0
-  fi
-
-  if command -v konsole >/dev/null 2>&1; then
-    nohup konsole -e ssh "${target}" >/dev/null 2>&1 &
-    return 0
-  fi
-
-  if command -v xfce4-terminal >/dev/null 2>&1; then
-    nohup xfce4-terminal -e "ssh ${target}" >/dev/null 2>&1 &
+  if [[ -n "${TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
+    printf -v quoted_target '%q' "$target"
+    tmux new-window -n "ssh:${name}" "ssh ${quoted_target}"
     return 0
   fi
 
   if command -v wt.exe >/dev/null 2>&1; then
-    nohup wt.exe wsl.exe -e ssh "${target}" >/dev/null 2>&1 &
-    return 0
+    if [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
+      run_detached wt.exe wsl.exe -d "${WSL_DISTRO_NAME}" -e ssh "${target}" && return 0
+    else
+      run_detached wt.exe wsl.exe -e ssh "${target}" && return 0
+    fi
+  fi
+
+  if [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
+    if command -v x-terminal-emulator >/dev/null 2>&1; then
+      run_detached x-terminal-emulator -e ssh "${target}" && return 0
+    fi
+
+    if command -v gnome-terminal >/dev/null 2>&1; then
+      run_detached gnome-terminal -- ssh "${target}" && return 0
+    fi
+
+    if command -v konsole >/dev/null 2>&1; then
+      run_detached konsole -e ssh "${target}" && return 0
+    fi
+
+    if command -v xfce4-terminal >/dev/null 2>&1; then
+      run_detached xfce4-terminal -e "ssh ${target}" && return 0
+    fi
   fi
 
   return 1
@@ -166,10 +184,10 @@ while true; do
       ;;
     alt-t)
       [[ -n "${target}" ]] || continue
-      if open_ssh_target_in_terminal "${target}"; then
+      if open_ssh_target_in_terminal "${target}" "${name}"; then
         ok "Opened SSH connection in a new terminal: ${target}"
       else
-        warn "Could not open a new terminal automatically."
+        warn "Could not open a new terminal automatically. If you are inside tmux, check whether new-window is available."
         info "Run manually: ssh ${target}"
       fi
       ;;

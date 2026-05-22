@@ -300,7 +300,7 @@ workspace_opener_rows() {
     printf 'codex\tCodex\n'
   fi
 
-  printf 'shell\tPrint workspace path\n'
+  printf 'shell\tShell\n'
 }
 
 select_workspace_opener() {
@@ -326,6 +326,7 @@ open_workspace_path() {
   local workspace="${1:-}"
   local tool="${2:-auto}"
   local selected_tool
+  local shell_bin
 
   [[ -d "$workspace" ]] || die "Workspace directory not found: ${workspace}"
 
@@ -370,7 +371,13 @@ open_workspace_path() {
       exec codex
       ;;
     shell)
-      printf '%s\n' "$workspace"
+      shell_bin="${SHELL:-}"
+      if [[ -z "$shell_bin" || ! -x "$shell_bin" ]]; then
+        shell_bin="$(command -v zsh || command -v bash || command -v sh)" || die "Could not find a shell to open."
+      fi
+
+      cd "$workspace"
+      exec "$shell_bin"
       ;;
     *)
       die "Unknown workspace opener: ${tool}"
