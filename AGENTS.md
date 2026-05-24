@@ -7,7 +7,7 @@ These rules document the local conventions for future agents and maintainers wor
 - User-facing CLI text, docs, help, fzf headers, autocomplete descriptions, and errors should be in English.
 - Keep output direct and practical. Prefer actionable command names and short descriptions.
 - Avoid global shell keybindings unless the project explicitly defines one. They can conflict with terminals, shells, editors, and IDEs.
-- The only project-managed shell shortcut is `Alt+S` for `devv ssh`.
+- Project-managed shell shortcuts are `Ctrl+F` for `devv tmux:session` and `Alt+S` for `devv ssh`.
 - Prefer explicit `devv ...` commands for everything else. Personal shortcuts belong in the user's own shell config, not in `env:setup`.
 
 ## Help And Command Lists
@@ -25,7 +25,8 @@ These rules document the local conventions for future agents and maintainers wor
 
 ## Shortcuts
 
-- Avoid `Ctrl-*` shortcuts for devv features. They commonly conflict with shells, terminal apps, VS Code, Cursor, and fzf defaults.
+- Avoid new `Ctrl-*` shortcuts for devv features. They commonly conflict with shells, terminal apps, VS Code, Cursor, and fzf defaults.
+- Keep the existing `Ctrl+F` shortcut for `devv tmux:session`.
 - Do not use `Ctrl+S`; many terminals treat it as XOFF flow control and appear frozen.
 - For the workspace hub, use these local fzf shortcuts:
 
