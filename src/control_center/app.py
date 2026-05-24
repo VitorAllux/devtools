@@ -2,6 +2,7 @@
 
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -10,12 +11,19 @@ from tkinter import END, BOTH, LEFT, RIGHT, VERTICAL, X, Y, messagebox, simpledi
 from tkinter import ttk
 import tkinter as tk
 
+LIB_DIR = Path(__file__).resolve().parents[1] / "lib"
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+
+from resources import Resource, describe_resource, format_shell_command, list_resources, run_resource_action
+
 
 class DevvControlCenter:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("devv Control Center - Phase 1")
         self.root.geometry("980x680")
+        self.resources_by_id: dict[str, Resource] = {}
 
         self.devv_bin = os.environ.get("DEVT_DEVV_BIN")
         if not self.devv_bin:
@@ -40,16 +48,19 @@ class DevvControlCenter:
         self.overview_tab = ttk.Frame(notebook)
         self.wsl_tab = ttk.Frame(notebook)
         self.ssh_tab = ttk.Frame(notebook)
+        self.resources_tab = ttk.Frame(notebook)
         self.config_tab = ttk.Frame(notebook)
 
         notebook.add(self.overview_tab, text="Overview")
         notebook.add(self.wsl_tab, text="WSL")
         notebook.add(self.ssh_tab, text="SSH")
+        notebook.add(self.resources_tab, text="Resources")
         notebook.add(self.config_tab, text="Config")
 
         self._build_overview_tab()
         self._build_wsl_tab()
         self._build_ssh_tab()
+        self._build_resources_tab()
         self._build_config_tab()
 
     def _build_overview_tab(self) -> None:
@@ -62,6 +73,9 @@ class DevvControlCenter:
         self.overview_ssh_label = ttk.Label(top, text="SSH Entries: -")
         self.overview_ssh_label.pack(side=LEFT, padx=(0, 12))
 
+        self.overview_resources_label = ttk.Label(top, text="Resources: -")
+        self.overview_resources_label.pack(side=LEFT, padx=(0, 12))
+
         ttk.Button(top, text="Refresh All", command=self.refresh_all).pack(side=RIGHT)
 
         actions = ttk.LabelFrame(self.overview_tab, text="Quick Actions")
@@ -70,6 +84,7 @@ class DevvControlCenter:
         ttk.Button(actions, text="WSL Status", command=self.wsl_status).pack(side=LEFT, padx=6, pady=6)
         ttk.Button(actions, text="WSL Shutdown", command=self.wsl_shutdown).pack(side=LEFT, padx=6, pady=6)
         ttk.Button(actions, text="List SSH", command=self.refresh_ssh_entries).pack(side=LEFT, padx=6, pady=6)
+        ttk.Button(actions, text="List Resources", command=self.refresh_resources).pack(side=LEFT, padx=6, pady=6)
 
         logs_frame = ttk.LabelFrame(self.overview_tab, text="Activity")
         logs_frame.pack(fill=BOTH, expand=True, padx=8, pady=(0, 8))
@@ -132,6 +147,38 @@ class DevvControlCenter:
         scroll.pack(side=RIGHT, fill=Y)
         self.ssh_tree.configure(yscrollcommand=scroll.set)
 
+    def _build_resources_tab(self) -> None:
+        controls = ttk.Frame(self.resources_tab)
+        controls.pack(fill=X, padx=8, pady=8)
+
+        ttk.Button(controls, text="Refresh", command=self.refresh_resources).pack(side=LEFT, padx=4)
+        ttk.Button(controls, text="Details", command=self.resource_details_selected).pack(side=LEFT, padx=4)
+        ttk.Button(controls, text="Start", command=lambda: self.resource_action_selected("start")).pack(side=LEFT, padx=4)
+        ttk.Button(controls, text="Stop", command=lambda: self.resource_action_selected("stop")).pack(side=LEFT, padx=4)
+        ttk.Button(controls, text="Restart", command=lambda: self.resource_action_selected("restart")).pack(side=LEFT, padx=4)
+
+        table_frame = ttk.Frame(self.resources_tab)
+        table_frame.pack(fill=BOTH, expand=True, padx=8, pady=(0, 8))
+
+        cols = ("kind", "name", "state", "manager", "details")
+        self.resources_tree = ttk.Treeview(table_frame, columns=cols, show="headings", selectmode="browse")
+        self.resources_tree.heading("kind", text="Kind")
+        self.resources_tree.heading("name", text="Name")
+        self.resources_tree.heading("state", text="State")
+        self.resources_tree.heading("manager", text="Manager")
+        self.resources_tree.heading("details", text="Details")
+        self.resources_tree.column("kind", width=110)
+        self.resources_tree.column("name", width=200)
+        self.resources_tree.column("state", width=120, anchor="center")
+        self.resources_tree.column("manager", width=130)
+        self.resources_tree.column("details", width=420)
+        self.resources_tree.pack(side=LEFT, fill=BOTH, expand=True)
+        self.resources_tree.bind("<Double-1>", lambda _event: self.resource_details_selected())
+
+        scroll = ttk.Scrollbar(table_frame, orient=VERTICAL, command=self.resources_tree.yview)
+        scroll.pack(side=RIGHT, fill=Y)
+        self.resources_tree.configure(yscrollcommand=scroll.set)
+
     def _build_config_tab(self) -> None:
         top = ttk.Frame(self.config_tab)
         top.pack(fill=X, padx=8, pady=8)
@@ -165,6 +212,7 @@ class DevvControlCenter:
     def refresh_all(self) -> None:
         self.refresh_wsl_list()
         self.refresh_ssh_entries()
+        self.refresh_resources()
         self.refresh_config()
 
     def refresh_wsl_list(self) -> None:
@@ -256,6 +304,87 @@ class DevvControlCenter:
             self.append_log("[WSL] Failed to get status")
             if out:
                 self.append_log(out)
+
+    def refresh_resources(self) -> None:
+        self.resources_tree.delete(*self.resources_tree.get_children())
+
+        try:
+            resources = list_resources()
+        except Exception as exc:
+            self.resources_by_id = {}
+            self.overview_resources_label.configure(text="Resources: error")
+            self.append_log(f"[Resources] Failed to refresh: {exc}")
+            return
+
+        self.resources_by_id = {resource.id: resource for resource in resources}
+        for resource in resources:
+            self.resources_tree.insert(
+                "",
+                END,
+                iid=resource.id,
+                values=(resource.kind, resource.name, resource.state, resource.manager, resource.details),
+            )
+
+        self.overview_resources_label.configure(text=f"Resources: {len(resources)}")
+        self.append_log("[Resources] Resources refreshed")
+
+    def selected_resource(self) -> Resource | None:
+        selected = self.resources_tree.focus()
+        if not selected:
+            messagebox.showwarning("Resources", "Select a resource first.")
+            return None
+        resource = self.resources_by_id.get(selected)
+        if not resource:
+            messagebox.showwarning("Resources", "Selected resource is no longer available. Refresh resources.")
+            return None
+        return resource
+
+    def resource_details_selected(self) -> None:
+        resource = self.selected_resource()
+        if not resource:
+            return
+        messagebox.showinfo("Resources", describe_resource(resource))
+
+    def resource_action_selected(self, action: str) -> None:
+        resource = self.selected_resource()
+        if not resource:
+            return
+
+        if action not in resource.actions:
+            messagebox.showwarning("Resources", f"{resource.name} does not support {action}.")
+            return
+
+        if not resource.available:
+            messagebox.showwarning("Resources", f"{resource.name} is unavailable:\n{resource.details}")
+            return
+
+        result = run_resource_action(resource.id, action, use_sudo=False)
+        if result.requires_terminal and result.command:
+            command_text = format_shell_command(result.command)
+            if self._open_terminal_command(result.command):
+                self.append_log(f"[Resources] Opened terminal for: {command_text}")
+                return
+
+            self.root.clipboard_clear()
+            self.root.clipboard_append(command_text)
+            self.root.update()
+            messagebox.showinfo(
+                "Resources",
+                "Could not auto-open a terminal.\n"
+                f"Command copied to clipboard:\n{command_text}",
+            )
+            self.append_log(f"[Resources] Could not launch terminal for: {command_text}")
+            return
+
+        if result.success:
+            self.append_log(f"[Resources] {result.message}")
+        else:
+            self.append_log(f"[Resources] {result.message}")
+            if result.output:
+                self.append_log(result.output)
+            messagebox.showwarning("Resources", result.message)
+
+        self.refresh_resources()
 
     def refresh_ssh_entries(self) -> None:
         rc, out = self.run_devv(["ssh:list"])
@@ -362,6 +491,31 @@ class DevvControlCenter:
             terminal_variants.append(["xfce4-terminal", "-e", f"ssh {target}"])
         if shutil.which("wt.exe"):
             terminal_variants.append(["wt.exe", "wsl.exe", "-e", "ssh", target])
+
+        for cmd in terminal_variants:
+            try:
+                subprocess.Popen(cmd)
+                return True
+            except OSError:
+                continue
+
+        return False
+
+    def _open_terminal_command(self, command: tuple[str, ...]) -> bool:
+        command_text = format_shell_command(command)
+        shell_command = f"{command_text}; printf '\\n'; read -r -p 'Press Enter to close...'"
+        terminal_variants = []
+
+        if shutil.which("x-terminal-emulator"):
+            terminal_variants.append(["x-terminal-emulator", "-e", "bash", "-lc", shell_command])
+        if shutil.which("gnome-terminal"):
+            terminal_variants.append(["gnome-terminal", "--", "bash", "-lc", shell_command])
+        if shutil.which("konsole"):
+            terminal_variants.append(["konsole", "-e", "bash", "-lc", shell_command])
+        if shutil.which("xfce4-terminal"):
+            terminal_variants.append(["xfce4-terminal", "-e", f"bash -lc {shlex.quote(shell_command)}"])
+        if shutil.which("wt.exe"):
+            terminal_variants.append(["wt.exe", "wsl.exe", "-e", "bash", "-lc", shell_command])
 
         for cmd in terminal_variants:
             try:

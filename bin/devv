@@ -39,7 +39,7 @@ show_help() {
   echo -e "  ${PUR}⚡ Environment & Tmux:${NC}"
   help_entry "tmux:up" "🚀 Start development tmux session (API + Web)"
   help_entry "tmux:down" "🛑 Kill development tmux session"
-  help_entry "tmux:session" "📂 Open a dir in a new tmux session via fzf"
+  help_entry "tmux:session" "📂 Open a dir in a new tmux session via fzf (Ctrl+F)"
   help_entry "tmux:window" "🪟 Open a dir in a new tmux window via fzf"
   help_entry "api:restart" "🔄 Restart the API backend and flush caches/horizon"
   help_entry "web:restart" "🌐 Restart the Web frontend"
@@ -48,6 +48,11 @@ show_help() {
   echo -e "  ${PUR}🧩 Workspaces:${NC}"
   help_entry "workspace" "🧭 Interactive symlink workspace manager"
   help_entry "workspace:list" "📜 List symlink workspaces"
+  echo
+
+  echo -e "  ${PUR}🧰 Resources:${NC}"
+  help_entry "resources" "🧭 Interactive local resources hub"
+  help_entry "resources:list" "📜 List detected local resources"
   echo
   
   echo -e "  ${PUR}🛠️  System:${NC}"
@@ -102,6 +107,9 @@ case "$COMMAND" in
 
   workspace)                exec "${DEVTOOLS_DIR}/src/commands/symlink-workspace-hub/hub.sh" "$@" ;;
   workspace:list)           exec "${DEVTOOLS_DIR}/src/commands/symlink-workspace-hub/list.sh" "$@" ;;
+
+  resources)                exec "${DEVTOOLS_DIR}/src/commands/resources/hub.sh" "$@" ;;
+  resources:list)           exec "${DEVTOOLS_DIR}/src/commands/resources/list.sh" "$@" ;;
   
   env:setup)   exec "${DEVTOOLS_DIR}/src/commands/setup.sh" "$@" ;;
   env:bootstrap) exec "${DEVTOOLS_DIR}/src/commands/env/bootstrap.sh" "$@" ;;

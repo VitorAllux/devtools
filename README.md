@@ -2,17 +2,20 @@
 
 Personal developer CLI for local automation: tmux, MySQL, SSH, WSL, symlink workspaces, and small system utilities.
 
-Current version: `1.1.0`
+Current version: `1.1.2`
 
-## What's New In 1.1.0
+## What's New In 1.1.2
 
 - New `devv ssh` hub for connecting, adding, and removing SSH entries from one fzf screen.
 - `ssh:connect` was removed from the public command surface; use `devv ssh`.
 - `env:setup` configures `Alt+S` as the shell shortcut for `devv ssh`.
+- `env:setup` keeps `Ctrl+F` available for the tmux session fzf picker.
 - New `devv workspace` hub for creating, opening, managing, and deleting symlink workspaces.
 - New `devv workspace:list` command for quick workspace inspection.
+- New `devv resources` hub for inspecting and controlling local services, Docker containers, and Compose projects.
+- New `devv resources:list` command for quick resource inspection.
 - Main help and zsh completions now match the current command surface.
-- Legacy `Ctrl-*` shell keybindings are cleaned up instead of installed by default.
+- Legacy `Ctrl+W` and `Ctrl+G` shell keybindings are cleaned up instead of installed by default.
 - Project-specific conventions for future agents and maintainers are documented in `AGENTS.md`.
 
 ## Quick Install
@@ -31,6 +34,7 @@ exec zsh
 ```bash
 devv help
 devv workspace
+devv resources
 devv tmux:up
 devv ssh
 devv db:ui
@@ -135,7 +139,7 @@ DEVT_WORKSPACE_OPENER="opencode"
 - `devv api:restart`
 - `devv web:restart`
 
-`tmux:session` creates or switches to a tmux session for the selected directory. `tmux:window` creates a new window in the current tmux session.
+`tmux:session` creates or switches to a tmux session for the selected directory. After running `devv env:setup`, `Ctrl+F` opens this fzf picker from zsh. `tmux:window` creates a new window in the current tmux session.
 
 ### Workspaces
 
@@ -143,6 +147,23 @@ DEVT_WORKSPACE_OPENER="opencode"
 - `devv workspace:list`
 
 Workspace creation, project management, opening, and deletion live inside the interactive hub.
+
+### Resources
+
+- `devv resources`
+- `devv resources:list`
+
+`devv resources` opens an fzf hub for detected local services, Docker containers, and Docker Compose projects.
+
+Hub shortcuts:
+
+- `Enter`: show details for the selected resource.
+- `Alt-S`: start the selected resource.
+- `Alt-R`: restart the selected resource.
+- `Alt-X`: stop the selected resource.
+- `Esc`: exit.
+
+Some service actions may require sudo. The terminal hub can prompt for sudo directly; the desktop control center opens a terminal for privileged actions.
 
 ### SSH
 
@@ -173,7 +194,7 @@ Workspace creation, project management, opening, and deletion live inside the in
 
 - `devv ui`
 
-Opens the Tkinter Control Center for WSL, SSH, and configuration. Requires `python3-tk`.
+Opens the Tkinter Control Center for WSL, SSH, resources, and configuration. Requires `python3-tk`.
 
 ### Config
 
@@ -223,7 +244,9 @@ Expected result:
 - `bin/devv`: main command router and help output.
 - `completions/_devv`: zsh completion.
 - `src/commands`: CLI command implementations.
+- `src/commands/resources`: local resources hub and list command.
 - `src/commands/symlink-workspace-hub`: internal symlink workspace hub commands.
+- `src/lib/resources.py`: shared local resource detection and action backend.
 - `src/lib/symlink-workspace-hub.sh`: shared symlink workspace hub functions.
 - `src/lib/config.sh`: configuration read/write helpers.
 - `src/lib/secrets.sh`: local secret and encrypted backup workflow.
@@ -236,5 +259,5 @@ Expected result:
 - `db:*` commands operate on local MySQL databases.
 - `workspace:remove` and other direct workspace mutation commands are not public commands; use `devv workspace`.
 - Workspace deletion refuses directories that contain non-symlink content.
-- `env:setup` installs only one project-managed shell shortcut: `Alt+S` for `devv ssh`.
+- `env:setup` installs two project-managed shell shortcuts: `Ctrl+F` for `devv tmux:session` and `Alt+S` for `devv ssh`.
 - Other shortcuts should stay personal and outside this project.
