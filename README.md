@@ -1,22 +1,23 @@
 # devv
 
-Personal developer CLI for local automation: tmux, MySQL, SSH, WSL, symlink workspaces, and small system utilities.
+Personal developer CLI for local automation: tmux, MySQL, SSH, WSL, git worktree workspaces, and small system utilities.
 
-Current version: `1.1.2`
+Current version: `1.3.0`
 
-## What's New In 1.1.2
+## What's New In 1.3.0
 
-- New `devv ssh` hub for connecting, adding, and removing SSH entries from one fzf screen.
-- `ssh:connect` was removed from the public command surface; use `devv ssh`.
-- `env:setup` configures `Alt+S` as the shell shortcut for `devv ssh`.
-- `env:setup` keeps `Ctrl+F` available for the tmux session fzf picker.
-- New `devv workspace` hub for creating, opening, managing, and deleting symlink workspaces.
-- New `devv workspace:list` command for quick workspace inspection.
-- New `devv resources` hub for inspecting and controlling local services, Docker containers, and Compose projects.
-- New `devv resources:list` command for quick resource inspection.
-- Main help and zsh completions now match the current command surface.
-- Legacy `Ctrl+W` and `Ctrl+G` shell keybindings are cleaned up instead of installed by default.
-- Project-specific conventions for future agents and maintainers are documented in `AGENTS.md`.
+- `devv tmux` now opens an interactive environment panel for default config and workspaces.
+- `tmux:up`, `tmux:down`, `api:restart`, and `web:restart` choose the target environment through the panel.
+- `tmux:session` and `tmux:window` remain direct directory pickers.
+- New workspaces copy `.codex` local project context and sync `.agents` targets during bootstrap when present.
+
+## What's New In 1.2.0
+
+- `devv workspace` creates real git worktrees.
+- Each selected repository gets a `workspace-<name>` branch based on its detected default branch.
+- New worktrees automatically copy local project configuration and install detected dependencies.
+- Workspace project removal is blocked when local changes exist.
+- New workspaces open automatically with the configured or selected opener.
 
 ## Quick Install
 
@@ -35,12 +36,12 @@ exec zsh
 devv help
 devv workspace
 devv resources
-devv tmux:up
+devv tmux
 devv ssh
 devv db:ui
 ```
 
-## Symlink Workspaces
+## Worktree Workspaces
 
 Use the hub:
 
@@ -51,12 +52,12 @@ devv workspace
 Hub shortcuts:
 
 - `Enter`: open the selected workspace.
-- `Alt-C`: create a workspace, ask for its name, then open a multi-select project picker.
-- `Alt-M`: manage the selected workspace projects.
-- `Alt-D`: delete the selected workspace and its project symlinks.
+- `Alt-C`: create a workspace, select base repositories, create worktrees, bootstrap them, and open the workspace.
+- `Alt-M`: add or remove project worktrees.
+- `Alt-D`: safely remove all clean worktrees and the workspace directory.
 - `Esc`: exit.
 
-In manage mode, projects already linked to the workspace are shown with `[x]`; absent projects are shown with `[ ]`. Use `Tab` to select changes and `Enter` to apply them.
+In manage mode, projects already included in the workspace are shown with `[x]`; absent projects are shown with `[ ]`. Use `Tab` to select changes and `Enter` to apply them.
 
 Useful workspace commands:
 
@@ -98,7 +99,19 @@ TMUX_DEFAULT_DIR
 ~/workspace
 ```
 
-Workspaces are created as `workspace-<name>` directories containing only symlinks to the real project directories. The original repositories are not moved or copied.
+Workspaces are created as `workspace-<name>` directories. Each selected base repository gets a git worktree inside the workspace and a local branch with the same `workspace-<name>` name. Base repositories are never moved or copied.
+
+The base ref is detected automatically from `origin/HEAD`, `origin/main`, `origin/master`, `main`, `master`, or the current branch. If the workspace branch already exists and is not checked out elsewhere, it is reused.
+
+After each worktree is created, bootstrap runs automatically:
+
+- Copies missing `.env`, `src/environments/environment.ts`, `.phpactor.json`, `.cursor`, `.codex`, `.claude`, and `.agents` from the base checkout.
+- Runs `composer install` when `composer.json` exists.
+- Runs `pnpm install`, `yarn install`, `npm ci`, or `npm install` based on detected project files.
+- Creates `storage/app/tmp` and runs `php artisan config:cache` for Laravel projects.
+- Runs `composer run sync-agents` for `.cursor`, `.claude`, and `.codex` when `.agents` exists and the project defines that Composer script.
+
+Bootstrap failures are reported without deleting a successfully created worktree.
 
 Optional configuration:
 
@@ -107,10 +120,19 @@ DEVT_WORKSPACES_DIR="$HOME/workspace"
 DEVT_WORKSPACE_PROJECT_ROOTS="$HOME/workspace:$HOME/Work/Development"
 DEVT_WORKSPACE_PROJECT_SEARCH_DEPTH="4"
 DEVT_WORKSPACE_OPENER="opencode"
+DEVT_WORKSPACE_BOOTSTRAP="1"
+DEVT_WORKSPACE_INSTALL_DEPS="1"
+DEVT_WORKSPACE_COPY_PATHS=".env:src/environments/environment.ts:.phpactor.json:.cursor:.codex:.claude:.agents"
+DEVT_WORKSPACE_SYNC_AGENTS="1"
+DEVT_WORKSPACE_AGENT_TARGETS=".cursor:.claude:.codex"
+API_DIR="$HOME/workspace/projects/api-app"
+WEB_DIR="$HOME/workspace/projects/web-app"
 ```
 
 `DEVT_WORKSPACE_PROJECT_ROOTS` controls where the project picker searches for Git repositories. Multiple roots are separated by `:`.
 `DEVT_WORKSPACE_OPENER` is optional. Leave it empty to choose from detected openers each time.
+Set `DEVT_WORKSPACE_BOOTSTRAP=0` to disable all bootstrap actions, or `DEVT_WORKSPACE_INSTALL_DEPS=0` to copy local configuration without installing dependencies.
+Set `DEVT_WORKSPACE_SYNC_AGENTS=0` to skip agent generation. `DEVT_WORKSPACE_AGENT_TARGETS` controls which generated agent targets are synced.
 
 ## Commands
 
@@ -132,6 +154,7 @@ DEVT_WORKSPACE_OPENER="opencode"
 
 ### Tmux
 
+- `devv tmux`
 - `devv tmux:up`
 - `devv tmux:down`
 - `devv tmux:session`
@@ -139,7 +162,13 @@ DEVT_WORKSPACE_OPENER="opencode"
 - `devv api:restart`
 - `devv web:restart`
 
-`tmux:session` creates or switches to a tmux session for the selected directory. After running `devv env:setup`, `Ctrl+F` opens this fzf picker from zsh. `tmux:window` creates a new window in the current tmux session.
+`devv tmux` opens the environment panel. `Enter` starts or opens the selected environment, `Alt-D` stops it, `Alt-A` restarts API/Horizon, and `Alt-W` restarts the Web frontend.
+
+The `Default config` target uses `API_DIR` and `WEB_DIR` from `devv config:set`. Workspace targets are discovered from `devv workspace` and resolve API/Web projects by placing the configured default project basenames inside each `workspace-*` directory.
+
+Before starting or restarting a target, the panel verifies that the API directory exists and has `artisan`, and that the Web directory exists and has `package.json`. Valid targets run `php artisan serve`, `php artisan horizon`, and `npm run serve`.
+
+`tmux:up`, `tmux:down`, `api:restart`, and `web:restart` open the same panel with that action as the `Enter` action. `tmux:session` creates or switches to a tmux session for the selected directory. After running `devv env:setup`, `Ctrl+F` opens this fzf picker from zsh. `tmux:window` creates a new window in the current tmux session.
 
 ### Workspaces
 
@@ -244,10 +273,12 @@ Expected result:
 - `bin/devv`: main command router and help output.
 - `completions/_devv`: zsh completion.
 - `src/commands`: CLI command implementations.
+- `src/commands/tmux`: tmux environment panel and directory/session helpers.
 - `src/commands/resources`: local resources hub and list command.
-- `src/commands/symlink-workspace-hub`: internal symlink workspace hub commands.
+- `src/commands/workspace-hub`: internal workspace hub commands.
 - `src/lib/resources.py`: shared local resource detection and action backend.
-- `src/lib/symlink-workspace-hub.sh`: shared symlink workspace hub functions.
+- `src/lib/tmux-env.sh`: shared tmux environment target and action helpers.
+- `src/lib/workspace-hub.sh`: shared workspace hub functions.
 - `src/lib/config.sh`: configuration read/write helpers.
 - `src/lib/secrets.sh`: local secret and encrypted backup workflow.
 - `src/control_center/app.py`: desktop UI.
@@ -258,6 +289,7 @@ Expected result:
 - This project does not use its own database for persistence.
 - `db:*` commands operate on local MySQL databases.
 - `workspace:remove` and other direct workspace mutation commands are not public commands; use `devv workspace`.
-- Workspace deletion refuses directories that contain non-symlink content.
+- Workspace and project deletion refuse dirty worktrees.
+- Workspace deletion refuses directories containing content that is not a registered git worktree.
 - `env:setup` installs two project-managed shell shortcuts: `Ctrl+F` for `devv tmux:session` and `Alt+S` for `devv ssh`.
 - Other shortcuts should stay personal and outside this project.

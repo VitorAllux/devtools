@@ -78,7 +78,7 @@ devv workspace:list
 - Workspace creation, opening, project management, and deletion should stay inside the interactive hub.
 - Do not reintroduce public mutation commands such as `workspace:create`, `workspace:open`, `workspace:add-project`, `workspace:remove-project`, or `workspace:remove`.
 - Public command names and autocomplete remain `workspace`.
-- Internal implementation paths should keep the feature name explicit as `symlink-workspace-hub`.
+- Internal implementation paths should keep the feature name explicit as `workspace-hub`.
 - `Enter` in the workspace hub should use `DEVT_WORKSPACE_OPENER` when configured.
 - When `DEVT_WORKSPACE_OPENER` is unset, `Enter` should list openers detected on the system and let the user choose.
 - Supported opener values are `cursor`, `code`, `vscode`, `opencode`, `codex`, and `shell`.
@@ -86,9 +86,9 @@ devv workspace:list
 ## Symlink Workspace Rules
 
 - Workspaces are directories named `workspace-<name>`.
-- Workspaces should contain only symlinks to real project directories.
+- Workspaces should contain only git worktrees for selected project directories.
 - Never move or copy the real repositories when creating or managing a workspace.
-- Deleting a workspace must refuse to remove directories containing non-symlink content.
+- Deleting a workspace must refuse to remove directories containing non-worktree content.
 - Project discovery should search Git repositories from `DEVT_WORKSPACE_PROJECT_ROOTS` when set.
 
 ## Shell Style

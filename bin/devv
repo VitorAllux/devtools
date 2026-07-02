@@ -37,17 +37,18 @@ show_help() {
   echo
   
   echo -e "  ${PUR}⚡ Environment & Tmux:${NC}"
-  help_entry "tmux:up" "🚀 Start development tmux session (API + Web)"
-  help_entry "tmux:down" "🛑 Kill development tmux session"
+  help_entry "tmux" "🧭 Interactive tmux environment panel"
+  help_entry "tmux:up" "🚀 Choose and start/open a tmux environment"
+  help_entry "tmux:down" "🛑 Choose and stop a tmux environment"
   help_entry "tmux:session" "📂 Open a dir in a new tmux session via fzf (Ctrl+F)"
   help_entry "tmux:window" "🪟 Open a dir in a new tmux window via fzf"
-  help_entry "api:restart" "🔄 Restart the API backend and flush caches/horizon"
-  help_entry "web:restart" "🌐 Restart the Web frontend"
+  help_entry "api:restart" "🔄 Choose and restart API/Horizon"
+  help_entry "web:restart" "🌐 Choose and restart Web frontend"
   echo
 
   echo -e "  ${PUR}🧩 Workspaces:${NC}"
-  help_entry "workspace" "🧭 Interactive symlink workspace manager"
-  help_entry "workspace:list" "📜 List symlink workspaces"
+  help_entry "workspace" "🧭 Interactive git worktree workspace manager"
+  help_entry "workspace:list" "📜 List git worktree workspaces"
   echo
 
   echo -e "  ${PUR}🧰 Resources:${NC}"
@@ -98,6 +99,7 @@ case "$COMMAND" in
   db:clean)    exec "${DEVTOOLS_DIR}/src/commands/db/clean.sh" "$@" ;;
   db:ui)       exec "${DEVTOOLS_DIR}/src/commands/db/ui.sh" "$@" ;;
   
+  tmux)        exec "${DEVTOOLS_DIR}/src/commands/tmux/hub.sh" "$@" ;;
   tmux:up)     exec "${DEVTOOLS_DIR}/src/commands/tmux/up.sh" "$@" ;;
   tmux:down)   exec "${DEVTOOLS_DIR}/src/commands/tmux/down.sh" "$@" ;;
   tmux:session)exec "${DEVTOOLS_DIR}/src/commands/tmux/session.sh" "$@" ;;
@@ -105,8 +107,8 @@ case "$COMMAND" in
   api:restart) exec "${DEVTOOLS_DIR}/src/commands/tmux/api-restart.sh" "$@" ;;
   web:restart) exec "${DEVTOOLS_DIR}/src/commands/tmux/web-restart.sh" "$@" ;;
 
-  workspace)                exec "${DEVTOOLS_DIR}/src/commands/symlink-workspace-hub/hub.sh" "$@" ;;
-  workspace:list)           exec "${DEVTOOLS_DIR}/src/commands/symlink-workspace-hub/list.sh" "$@" ;;
+  workspace)                exec "${DEVTOOLS_DIR}/src/commands/workspace-hub/hub.sh" "$@" ;;
+  workspace:list)           exec "${DEVTOOLS_DIR}/src/commands/workspace-hub/list.sh" "$@" ;;
 
   resources)                exec "${DEVTOOLS_DIR}/src/commands/resources/hub.sh" "$@" ;;
   resources:list)           exec "${DEVTOOLS_DIR}/src/commands/resources/list.sh" "$@" ;;

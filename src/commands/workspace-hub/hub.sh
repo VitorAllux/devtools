@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source "${DEVTOOLS_DIR}/src/lib/symlink-workspace-hub.sh"
+source "${DEVTOOLS_DIR}/src/lib/workspace-hub.sh"
 
 usage() {
   echo "Usage: devv workspace [auto|cursor|code|vscode|opencode|codex|shell]"
@@ -22,7 +22,10 @@ while true; do
 
   if [[ -z "$rows" ]]; then
     warn "No workspaces found."
-    workspace_create_interactive
+    if workspace_create_interactive; then
+      open_workspace_path "$DEVT_CREATED_WORKSPACE" "$tool"
+      exit 0
+    fi
     continue
   fi
 
@@ -50,7 +53,10 @@ while true; do
 
   case "$key" in
     alt-c)
-      workspace_create_interactive
+      if workspace_create_interactive; then
+        open_workspace_path "$DEVT_CREATED_WORKSPACE" "$tool"
+        exit 0
+      fi
       ;;
     alt-m)
       [[ -n "$selected" ]] || continue
@@ -58,7 +64,7 @@ while true; do
       ;;
     alt-d)
       [[ -n "$selected" ]] || continue
-      if confirm "Remove workspace '$(basename "$workspace")' and its project symlinks? [y/N]"; then
+      if confirm "Remove workspace '$(basename "$workspace")' and all clean worktrees? [y/N]"; then
         remove_workspace_dir "$workspace"
       else
         warn "Operation cancelled."
