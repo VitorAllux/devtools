@@ -83,13 +83,14 @@ devv workspace:list
 - When `DEVT_WORKSPACE_OPENER` is unset, `Enter` should list openers detected on the system and let the user choose.
 - Supported opener values are `cursor`, `code`, `vscode`, `opencode`, `codex`, and `shell`.
 
-## Symlink Workspace Rules
+## Worktree Workspace Rules
 
 - Workspaces are directories named `workspace-<name>`.
 - Workspaces should contain only git worktrees for selected project directories.
 - Never move or copy the real repositories when creating or managing a workspace.
 - Deleting a workspace must refuse to remove directories containing non-worktree content.
 - Project discovery should search Git repositories from `DEVT_WORKSPACE_PROJECT_ROOTS` when set.
+- Workspace creation should ask for the base type: `Bug` prefers `prod`, `Issue` prefers `master`, and `Other` uses default branch detection.
 
 ## Shell Style
 

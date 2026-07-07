@@ -14,7 +14,7 @@ Current version: `1.3.0`
 ## What's New In 1.2.0
 
 - `devv workspace` creates real git worktrees.
-- Each selected repository gets a `workspace-<name>` branch based on its detected default branch.
+- Each selected repository gets a branch named from the workspace slug, based on its detected default branch.
 - New worktrees automatically copy local project configuration and install detected dependencies.
 - Workspace project removal is blocked when local changes exist.
 - New workspaces open automatically with the configured or selected opener.
@@ -52,9 +52,9 @@ devv workspace
 Hub shortcuts:
 
 - `Enter`: open the selected workspace.
-- `Alt-C`: create a workspace, select base repositories, create worktrees, bootstrap them, and open the workspace.
+- `Alt-C`: create a workspace, choose the base type, select base repositories, create worktrees, bootstrap them, and open the workspace.
 - `Alt-M`: add or remove project worktrees.
-- `Alt-D`: safely remove all clean worktrees and the workspace directory.
+- `Alt-D`: remove all clean worktrees and delete the workspace directory when it becomes empty.
 - `Esc`: exit.
 
 In manage mode, projects already included in the workspace are shown with `[x]`; absent projects are shown with `[ ]`. Use `Tab` to select changes and `Enter` to apply them.
@@ -99,9 +99,9 @@ TMUX_DEFAULT_DIR
 ~/workspace
 ```
 
-Workspaces are created as `workspace-<name>` directories. Each selected base repository gets a git worktree inside the workspace and a local branch with the same `workspace-<name>` name. Base repositories are never moved or copied.
+Workspaces are created as `workspace-<name>` directories. Each selected base repository gets a git worktree inside the workspace and a local branch named from the workspace slug, without the `workspace-` prefix. Base repositories are never moved or copied.
 
-The base ref is detected automatically from `origin/HEAD`, `origin/main`, `origin/master`, `main`, `master`, or the current branch. If the workspace branch already exists and is not checked out elsewhere, it is reused.
+Workspace creation asks for a base type before creating worktrees. `Bug` prefers `origin/prod` or `prod`; `Issue` prefers `origin/master` or `master`; `Other` asks for the source branch to use and requires that branch to exist in each selected repository. For the predefined base types, if the preferred ref is unavailable, devv falls back to `origin/HEAD`, `origin/main`, `origin/master`, `main`, `master`, or the current branch. If the workspace branch already exists and is not checked out elsewhere, it is reused.
 
 After each worktree is created, bootstrap runs automatically:
 
@@ -289,7 +289,7 @@ Expected result:
 - This project does not use its own database for persistence.
 - `db:*` commands operate on local MySQL databases.
 - `workspace:remove` and other direct workspace mutation commands are not public commands; use `devv workspace`.
-- Workspace and project deletion refuse dirty worktrees.
+- Project deletion refuses dirty worktrees. Workspace deletion removes only clean worktrees and keeps the workspace when dirty worktrees remain.
 - Workspace deletion refuses directories containing content that is not a registered git worktree.
 - `env:setup` installs two project-managed shell shortcuts: `Ctrl+F` for `devv tmux:session` and `Alt+S` for `devv ssh`.
 - Other shortcuts should stay personal and outside this project.

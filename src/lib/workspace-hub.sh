@@ -48,7 +48,7 @@ workspace_path() {
 }
 
 workspace_branch() {
-  workspace_dir_name "${1:-}"
+  workspace_slug "${1:-}"
 }
 
 ensure_workspace_root() {
@@ -161,6 +161,40 @@ select_workspace_projects() {
   done <<< "$selected"
 }
 
+select_workspace_base_kind() {
+  local rows selected
+
+  need fzf
+  rows="$(
+    printf 'bug\tBug\tUse prod as the first base candidate\n'
+    printf 'issue\tIssue\tUse master as the first base candidate\n'
+    printf 'other\tOther\tAsk for the source branch\n'
+  )"
+
+  selected="$(printf '%s\n' "$rows" | fzf \
+    --height=40% \
+    --layout=reverse \
+    --border \
+    --delimiter='\t' \
+    --with-nth=2,3 \
+    --prompt="Base > " \
+    --header="Enter: confirm | Esc: cancel")" || return 1
+
+  [[ -n "$selected" ]] || return 1
+  printf '%s\n' "${selected%%$'\t'*}"
+}
+
+select_workspace_base_ref() {
+  local base_kind="${1:-other}"
+  local base_ref
+
+  [[ "$base_kind" == "other" ]] || return 0
+
+  base_ref="$(prompt_input "Source branch")"
+  [[ -n "$base_ref" ]] || die "Source branch cannot be empty when base type is Other."
+  printf '%s\n' "$base_ref"
+}
+
 git_branch_exists() {
   local project="${1:-}"
   local branch="${2:-}"
@@ -175,10 +209,45 @@ git_ref_exists() {
 
 detect_base_ref() {
   local project="${1:-}"
+  local base_kind="${2:-other}"
+  local preferred_ref="${3:-}"
   local candidate remote_head current_branch
+  local -a candidates=()
+
+  if [[ -n "$preferred_ref" ]]; then
+    if [[ "$preferred_ref" == origin/* ]]; then
+      candidates+=("$preferred_ref" "${preferred_ref#origin/}")
+    else
+      candidates+=("origin/$preferred_ref" "$preferred_ref")
+    fi
+
+    for candidate in "${candidates[@]}"; do
+      [[ -n "$candidate" ]] || continue
+      if git_ref_exists "$project" "$candidate"; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+    done
+
+    return 1
+  fi
+
+  candidates=()
 
   remote_head="$(git -C "$project" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)"
-  for candidate in "$remote_head" origin/main origin/master main master; do
+
+  case "$base_kind" in
+    bug)
+      candidates+=(origin/prod prod)
+      ;;
+    issue)
+      candidates+=(origin/master master)
+      ;;
+  esac
+
+  candidates+=("$remote_head" origin/main origin/master main master)
+
+  for candidate in "${candidates[@]}"; do
     [[ -n "$candidate" ]] || continue
     if git_ref_exists "$project" "$candidate"; then
       printf '%s\n' "$candidate"
@@ -364,6 +433,8 @@ bootstrap_workspace_project() {
 workspace_add_project() {
   local workspace="${1:-}"
   local project="${2:-}"
+  local base_kind="${3:-${DEVT_WORKSPACE_BASE_KIND:-other}}"
+  local preferred_ref="${4:-}"
   local project_dir project_name destination branch base_ref
 
   need git
@@ -385,7 +456,12 @@ workspace_add_project() {
     info "Adding ${project_name} from existing branch ${branch}"
     git -C "$project_dir" worktree add "$destination" "$branch"
   else
-    base_ref="$(detect_base_ref "$project_dir")" || die "Could not detect a base branch for ${project_name}."
+    base_ref="$(detect_base_ref "$project_dir" "$base_kind" "$preferred_ref")" || {
+      if [[ -n "$preferred_ref" ]]; then
+        die "Base branch '${preferred_ref}' not found for ${project_name}."
+      fi
+      die "Could not detect a base branch for ${project_name}."
+    }
     info "Creating ${project_name} from ${base_ref} on branch ${branch}"
     git -C "$project_dir" worktree add -b "$branch" "$destination" "$base_ref"
   fi
@@ -417,6 +493,7 @@ remove_workspace_dir() {
   local workspace="${1:-}"
   local worktree unexpected
   local blocked=0
+  local removed=0
 
   [[ -d "$workspace" ]] || die "Workspace directory not found: ${workspace}"
 
@@ -428,17 +505,20 @@ remove_workspace_dir() {
   while IFS= read -r worktree; do
     [[ -n "$worktree" ]] || continue
     if [[ -n "$(git -C "$worktree" status --porcelain)" ]]; then
-      warn "Local changes: ${worktree}"
+      warn "Kept dirty worktree: ${worktree}"
       blocked=1
+      continue
+    fi
+    if workspace_remove_project "$worktree"; then
+      removed=1
     fi
   done < <(workspace_worktrees "$workspace")
 
-  [[ "$blocked" -eq 0 ]] || die "Workspace removal blocked. Commit, stash, or discard local changes first."
-
-  while IFS= read -r worktree; do
-    [[ -n "$worktree" ]] || continue
-    workspace_remove_project "$worktree"
-  done < <(workspace_worktrees "$workspace")
+  if [[ "$blocked" -eq 1 ]]; then
+    warn "Workspace kept because dirty worktrees still exist. Commit, stash, or discard local changes to remove it completely."
+    [[ "$removed" -eq 0 ]] || ok "Removed all clean worktrees from: $(basename "$workspace")"
+    return 0
+  fi
 
   rmdir "$workspace"
   ok "Removed workspace: $(basename "$workspace")"
@@ -571,11 +651,18 @@ open_workspace_path() {
 }
 
 workspace_create_interactive() {
-  local name workspace selected_projects project
+  local name workspace base_kind base_ref selected_projects project
 
   title "Create Worktree Workspace"
   name="$(prompt_input "Workspace name")"
   [[ -n "$name" ]] || die "Workspace name cannot be empty."
+
+  base_kind="$(select_workspace_base_kind)" || {
+    warn "No base selected."
+    return 1
+  }
+
+  base_ref="$(select_workspace_base_ref "$base_kind")"
 
   info "Select base repositories..."
   selected_projects="$(select_workspace_projects)" || {
@@ -588,7 +675,7 @@ workspace_create_interactive() {
 
   while IFS= read -r project; do
     [[ -n "$project" ]] || continue
-    workspace_add_project "$workspace" "$project"
+    workspace_add_project "$workspace" "$project" "$base_kind" "$base_ref"
   done <<< "$selected_projects"
 
   DEVT_CREATED_WORKSPACE="$workspace"
@@ -632,7 +719,7 @@ workspace_manage_rows() {
 
 workspace_manage_projects() {
   local workspace="${1:-}"
-  local rows selected row status project worktree
+  local rows selected row status project worktree base_kind base_ref needs_base_kind=0
 
   [[ -d "$workspace" ]] || die "Workspace directory not found: ${workspace}"
   need fzf
@@ -655,13 +742,30 @@ workspace_manage_projects() {
   while IFS= read -r row; do
     [[ -n "$row" ]] || continue
     status="${row%%$'\t'*}"
+    if [[ "$status" != "[x]" ]]; then
+      needs_base_kind=1
+      break
+    fi
+  done <<< "$selected"
+
+  if [[ "$needs_base_kind" -eq 1 ]]; then
+    base_kind="$(select_workspace_base_kind)" || {
+      warn "No base selected."
+      return 1
+    }
+    base_ref="$(select_workspace_base_ref "$base_kind")"
+  fi
+
+  while IFS= read -r row; do
+    [[ -n "$row" ]] || continue
+    status="${row%%$'\t'*}"
     project="${row##*$'\t'}"
 
     if [[ "$status" == "[x]" ]]; then
       worktree="${workspace}/$(basename "$project")"
       workspace_remove_project "$worktree" || true
     else
-      workspace_add_project "$workspace" "$project"
+      workspace_add_project "$workspace" "$project" "$base_kind" "$base_ref"
     fi
   done <<< "$selected"
 }

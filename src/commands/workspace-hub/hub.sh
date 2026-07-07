@@ -64,7 +64,7 @@ while true; do
       ;;
     alt-d)
       [[ -n "$selected" ]] || continue
-      if confirm "Remove workspace '$(basename "$workspace")' and all clean worktrees? [y/N]"; then
+      if confirm "Remove clean worktrees from '$(basename "$workspace")' and delete the workspace if it becomes empty? [y/N]"; then
         remove_workspace_dir "$workspace"
       else
         warn "Operation cancelled."
