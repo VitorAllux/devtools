@@ -1,0 +1,14 @@
+{
+  "theme": {
+    "name": "royal-noir"
+  },
+  "ssh": {
+    "hub": {
+      "shortcuts": {
+        "add": "shift+a",
+        "remove": "shift+r",
+        "newTerminal": "shift+t"
+      }
+    }
+  }
+}

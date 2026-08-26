@@ -1,0 +1,3 @@
+# name target
+production deploy@example.com
+staging deploy@staging.example.com

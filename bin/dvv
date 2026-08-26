@@ -1,0 +1,39 @@
+#!/usr/bin/env node
+
+const childProcess = require("node:child_process");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+
+const root = path.resolve(__dirname, "..");
+const binaryName = process.platform === "win32" ? "dvv.exe" : "dvv";
+const binaryPath = path.join(root, "dist", binaryName);
+const args = process.argv.slice(2);
+const env = { ...process.env, DVV_DIR: root };
+if (!env.GOCACHE) {
+  env.GOCACHE = path.join(os.tmpdir(), "dvv-go-build-cache");
+}
+
+let command = binaryPath;
+let commandArgs = args;
+
+if (!fs.existsSync(binaryPath)) {
+  command = "go";
+  commandArgs = ["run", "-buildvcs=false", "./cmd/dvv", ...args];
+}
+
+const result = childProcess.spawnSync(command, commandArgs, {
+  cwd: root,
+  env,
+  stdio: "inherit",
+  windowsHide: false,
+});
+
+if (result.error) {
+  console.error("dvv could not start.");
+  console.error("Run `npm run build` from the project root, or install Go for source execution.");
+  console.error(result.error.message);
+  process.exit(127);
+}
+
+process.exit(result.status ?? 1);

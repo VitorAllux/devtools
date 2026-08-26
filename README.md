@@ -1,336 +1,119 @@
-# devv
+# dvv
 
-Personal developer CLI for local automation: tmux, MySQL, SSH, WSL, git worktree workspaces, and small system utilities.
+Personal developer CLI for local automation.
 
-Current version: `1.4.0`
+Current version: `2.0.0-alpha.1`
 
-## What's New In 1.4.0
+## Current Scope
 
-- `devv db` now opens an interactive database manager for create, import, truncate, drop, and dump cleanup actions.
-- `db:ui` is now an alias for `devv db`; Harlequin integration was removed.
-- `devv config` now opens an interactive configuration manager with known settings, status, editing, clearing, and validation.
-- Long-running menu scans and actions now show loaders with elapsed time across the CLI.
-- MySQL database actions now ask for connection credentials once per flow and reuse them for download, validation, create, truncate, drop, and import steps.
+This branch starts the Go rewrite. The current public surface is intentionally small:
 
-## What's New In 1.3.5
+```bash
+dvv ssh
+```
 
-- Workspace deletion can now optionally remove all remaining content inside the workspace directory after worktrees and workspace metadata are gone, which allows issue workspaces to be deleted completely without touching the base repository.
+`dvv ssh` opens the SSH hub. The direct SSH actions are available as nested actions:
 
-## What's New In 1.3.4
+```bash
+dvv ssh add
+dvv ssh remove
+dvv ssh list
+dvv ssh help
+```
 
-- Batch delete in `devv workspace` now asks once per phase for all selected workspaces: initial removal, force-removing dirty worktrees, and removing remaining workspace metadata.
+Other modules from the previous `main` implementation are being ported in this order:
 
-## What's New In 1.3.3
+```text
+ssh -> workspace -> tmux -> db -> systemconfig -> resources -> wsl
+```
 
-- Workspace deletion now treats top-level workspace metadata such as `.agents`, `.codex`, `.cursor`, `.claude`, `.opencode`, and accidental root `.git` as removable after an extra confirmation.
-
-## What's New In 1.3.2
-
-- `devv workspace` now supports `Tab` multi-select for batch deletion with `Alt-D`.
-- Multi-select is limited to delete, and the hub warns when multiple selections are used with open or manage.
-- Workspace deletion can now remove top-level workspace metadata after an extra confirmation so empty workspaces can be deleted completely.
-
-## What's New In 1.3.1
-
-- `devv workspace` can now force-remove dirty worktrees after an extra confirmation when deleting a workspace.
-- Workspace deletion still refuses to remove the workspace directory when non-worktree content such as a top-level `.agents` folder remains, but it now removes worktrees first so disk space is recovered.
-
-## What's New In 1.3.0
-
-- `devv tmux` now opens an interactive environment panel for default config and workspaces.
-- `tmux:up`, `tmux:down`, `api:restart`, and `web:restart` choose the target environment through the panel.
-- `tmux:session` and `tmux:window` remain direct directory pickers.
-- New workspaces copy `.codex` local project context and sync `.agents` targets during bootstrap when present.
-
-## What's New In 1.2.0
-
-- `devv workspace` creates real git worktrees.
-- Each selected repository gets a branch named from the workspace slug, based on its detected default branch.
-- New worktrees automatically copy local project configuration and install detected dependencies.
-- Workspace project removal is blocked when local changes exist.
-- New workspaces open automatically with the configured or selected opener.
-
-## Quick Install
+## Install
 
 ```bash
 git clone git@github.com:VitorAllux/devtools.git
 cd devtools
-./bin/devv env:setup
-exec zsh
+git checkout go-version
+npm install -g .
 ```
 
-`env:setup` installs dependencies, configures zsh completion, and creates the global symlink at `~/workspace/bin/devv`.
+`npm install -g .` runs the package `postinstall` build and exposes:
 
-## Quick Use
-
-```bash
-devv help
-devv workspace
-devv resources
-devv tmux
-devv ssh
-devv db
-devv config
+```text
+dvv
 ```
 
-## Worktree Workspaces
+If your shell still opens an older `dvv`, refresh the shell command cache with `hash -r` or open a new terminal.
 
-Use the hub:
+## Run Without Installing
 
 ```bash
-devv workspace
+./bin/dvv help
+./bin/dvv ssh
+```
+
+## SSH Hub
+
+```bash
+dvv ssh
 ```
 
 Hub shortcuts:
 
-- `Enter`: open the selected workspace.
-- `Tab`: select one or more workspaces for batch deletion with `Alt-D`.
-- `Alt-C`: create a workspace, choose the base type, select base repositories, create worktrees, bootstrap them, and open the workspace.
-- `Alt-M`: add or remove project worktrees.
-- `Alt-D`: remove all clean worktrees from the selected workspace or selected workspaces, offer one extra confirmation to force-remove dirty worktrees when needed, offer one confirmation to remove top-level workspace metadata when needed, and offer one last confirmation to remove any remaining content still inside the workspace directory.
+- `Enter`: open the selected server in a new tmux window or session.
+- `Shift+A`: add a new SSH entry.
+- `Shift+R`: remove the selected SSH entry.
+- `Shift+T`: open the selected SSH connection in a system terminal when a compatible terminal launcher is available.
 - `Esc`: exit.
 
-In manage mode, projects already included in the workspace are shown with `[x]`; absent projects are shown with `[ ]`. Use `Tab` to select changes and `Enter` to apply them.
+The hub action shortcuts are configured in `dvv.config.json`.
 
-Useful workspace commands:
+The SSH hub uses the shared `FZFHub` component: fixed table columns, Royal Noir accents, a compact target profile, and a separate command deck in the side panel.
 
-```bash
-devv workspace
-devv workspace cursor
-devv workspace code
-devv workspace vscode
-devv workspace opencode
-devv workspace codex
-devv workspace shell
-devv workspace:list
-```
+When connecting, `dvv` shows the branded loader while it prepares the SSH handoff and probes the resolved host/port. The loader stops before the interactive SSH session takes over the terminal.
 
-If `DEVT_WORKSPACE_OPENER` is configured, `Enter` opens the workspace with that opener. If it is not configured, `Enter` lists the openers found on the system and lets you choose.
-
-Supported opener values:
+Direct actions:
 
 ```bash
-cursor
-code
-vscode
-opencode
-codex
-shell
+dvv ssh add --name production --conn deploy@example.com
+dvv ssh add production deploy@example.com
+dvv ssh remove --name production
+dvv ssh remove production
+dvv ssh list
 ```
 
-Example:
+Direct connect:
 
 ```bash
-devv config:set DEVT_WORKSPACE_OPENER opencode
+dvv ssh production
+dvv ssh --name production
+dvv ssh --target deploy@example.com
 ```
 
-Workspace root priority:
+## Theme
 
-```bash
-DEVT_WORKSPACES_DIR
-TMUX_DEFAULT_DIR
-~/workspace
-```
+`dvv` uses a custom `Royal Noir` terminal theme: black surfaces, royal purple interactive accents, and restrained gold brand/status accents.
 
-Workspaces are created as `workspace-<name>` directories. Each selected base repository gets a git worktree inside the workspace and a local branch named from the workspace slug, without the `workspace-` prefix. Base repositories are never moved or copied.
-
-Workspace creation asks for a base type before creating worktrees. `Bug` prefers `origin/prod` or `prod`; `Issue` prefers `origin/master` or `master`; `Other` asks for the source branch to use and requires that branch to exist in each selected repository. For the predefined base types, if the preferred ref is unavailable, devv falls back to `origin/HEAD`, `origin/main`, `origin/master`, `main`, `master`, or the current branch. If the workspace branch already exists and is not checked out elsewhere, it is reused.
-
-After each worktree is created, bootstrap runs automatically:
-
-- Copies missing `.env`, `src/environments/environment.ts`, `.phpactor.json`, `.cursor`, `.codex`, `.claude`, and `.agents` from the base checkout.
-- Runs `composer install` when `composer.json` exists.
-- Runs `pnpm install`, `yarn install`, `npm ci`, or `npm install` based on detected project files.
-- Creates `storage/app/tmp` and runs `php artisan config:cache` for Laravel projects.
-- Runs `composer run sync-agents` for `.cursor`, `.claude`, and `.codex` when `.agents` exists and the project defines that Composer script.
-
-Bootstrap failures are reported without deleting a successfully created worktree.
-
-Optional configuration:
-
-```bash
-DEVT_WORKSPACES_DIR="$HOME/workspace"
-DEVT_WORKSPACE_PROJECT_ROOTS="$HOME/workspace:$HOME/Work/Development"
-DEVT_WORKSPACE_PROJECT_SEARCH_DEPTH="4"
-DEVT_WORKSPACE_OPENER="opencode"
-DEVT_WORKSPACE_BOOTSTRAP="1"
-DEVT_WORKSPACE_INSTALL_DEPS="1"
-DEVT_WORKSPACE_COPY_PATHS=".env:src/environments/environment.ts:.phpactor.json:.cursor:.codex:.claude:.agents"
-DEVT_WORKSPACE_SYNC_AGENTS="1"
-DEVT_WORKSPACE_AGENT_TARGETS=".cursor:.claude:.codex"
-API_DIR="$HOME/workspace/projects/api-app"
-WEB_DIR="$HOME/workspace/projects/web-app"
-```
-
-`DEVT_WORKSPACE_PROJECT_ROOTS` controls where the project picker searches for Git repositories. Multiple roots are separated by `:`.
-`DEVT_WORKSPACE_OPENER` is optional. Leave it empty to choose from detected openers each time.
-Set `DEVT_WORKSPACE_BOOTSTRAP=0` to disable all bootstrap actions, or `DEVT_WORKSPACE_INSTALL_DEPS=0` to copy local configuration without installing dependencies.
-Set `DEVT_WORKSPACE_SYNC_AGENTS=0` to skip agent generation. `DEVT_WORKSPACE_AGENT_TARGETS` controls which generated agent targets are synced.
-
-## Commands
-
-### Environment
-
-- `devv env:setup`
-- `devv env:bootstrap`
-
-### Database
-
-- `devv db`
-- `devv db:create`
-- `devv db:drop`
-- `devv db:truncate`
-- `devv db:import`
-- `devv db:clean`
-- `devv db:ui`
-
-`devv db` opens the interactive database manager. It supports creating databases, importing dumps, truncating or dropping databases, and cleaning local dump files. `db:ui` is kept as an alias for the same manager.
-
-### Tmux
-
-- `devv tmux`
-- `devv tmux:up`
-- `devv tmux:down`
-- `devv tmux:session`
-- `devv tmux:window`
-- `devv api:restart`
-- `devv web:restart`
-
-`devv tmux` opens the environment panel. `Enter` starts or opens the selected environment, `Alt-D` stops it, `Alt-A` restarts API/Horizon, and `Alt-W` restarts the Web frontend.
-
-The `Default config` target uses `API_DIR` and `WEB_DIR` from `devv config:set`. Workspace targets are discovered from `devv workspace` and resolve API/Web projects by placing the configured default project basenames inside each `workspace-*` directory.
-
-Before starting or restarting a target, the panel verifies that the API directory exists and has `artisan`, and that the Web directory exists and has `package.json`. Valid targets run `php artisan serve`, `php artisan horizon`, and `npm run serve`.
-
-`tmux:up`, `tmux:down`, `api:restart`, and `web:restart` open the same panel with that action as the `Enter` action. `tmux:session` creates or switches to a tmux session for the selected directory. After running `devv env:setup`, `Ctrl+F` opens this fzf picker from zsh. `tmux:window` creates a new window in the current tmux session.
-
-### Workspaces
-
-- `devv workspace`
-- `devv workspace:list`
-
-Workspace creation, project management, opening, and deletion live inside the interactive hub.
-
-### Resources
-
-- `devv resources`
-- `devv resources:list`
-
-`devv resources` opens an fzf hub for detected local services, Docker containers, and Docker Compose projects.
-
-Hub shortcuts:
-
-- `Enter`: show details for the selected resource.
-- `Alt-S`: start the selected resource.
-- `Alt-R`: restart the selected resource.
-- `Alt-X`: stop the selected resource.
-- `Esc`: exit.
-
-Some service actions may require sudo. The terminal hub can prompt for sudo directly; the desktop control center opens a terminal for privileged actions.
-
-### SSH
-
-- `devv ssh`
-- `devv ssh:add`
-- `devv ssh:remove`
-- `devv ssh:list`
-
-`devv ssh` opens the SSH hub:
-
-- `Enter`: connect to the selected server in the current terminal.
-- `Alt-A`: add a new SSH entry.
-- `Alt-R`: remove the selected SSH entry.
-- `Alt-T`: open the selected SSH connection in a new terminal when a compatible terminal launcher is available.
-- `Esc`: exit.
-
-`Alt+S` opens `devv ssh` from zsh after running `devv env:setup`.
-
-### WSL
-
-- `devv wsl:list`
-- `devv wsl:status`
-- `devv wsl:start <distro>`
-- `devv wsl:stop <distro>`
-- `devv wsl:shutdown`
-
-### UI
-
-- `devv ui`
-
-Opens the Tkinter Control Center for WSL, SSH, resources, and configuration. Requires `python3-tk`.
-
-### Config
-
-- `devv config`
-- `devv config:set <KEY> <VALUE>`
-- `devv config:list`
-
-`devv config` opens the interactive configuration manager. It shows known settings with `[x]` for configured values, `[d]` for defaults, and `[ ]` for empty values. Use `Enter` to edit, `Alt-A` to add a custom key, `Alt-C` to clear a key, and `Alt-V` to validate paths and simple value types.
-
-The config hub also shows secret backup status with `Alt-S`. devv does not store MySQL passwords in config; DB commands ask for the password when needed and reuse it only for that process.
+Set `NO_COLOR=1` to disable colors or `DVV_NO_LOADER=1` to disable animated loaders.
 
 ## Files And Data
+
+Existing local data paths are preserved for compatibility:
 
 - Local config: `~/.config/devv/config.env`
 - Local SSH list: `~/.config/devv/servers.list`
 - Local age private key: `~/.config/devv/keys/age.key`
-- Encrypted SSH backup: `secrets/servers.list.age`
-- Public age recipients: `secrets/age-recipients.txt`
-- Local dumps: `dumps/` (ignored by Git)
+- Encrypted SSH backup: `~/.config/devv/servers.list.age`
+- Public age recipients: `~/.config/devv/age-recipients.txt`
 
-The old `config/servers.list` file is deprecated and replaced by `config/servers.list.example`.
+Use `examples/servers.list` for documentation/examples, not a real server list.
 
-## Secrets
-
-devv uses Bitwarden only to restore the local AGE private key when `DEVT_BW_AGE_KEY_ITEM` is configured. SSH entries are stored locally in `~/.config/devv/servers.list` and backed up as an AGE-encrypted file at `secrets/servers.list.age`. 1Password is not used by this project.
-
-First machine:
+## Development
 
 ```bash
-devv env:setup
-bw login
-export BW_SESSION="$(bw unlock --raw)"
-bw sync
-devv env:bootstrap
+npm run build
+npm test
+npm run vet
+npm run check
 ```
 
-New machine restore:
-
-```bash
-devv env:setup
-bw login
-export BW_SESSION="$(bw unlock --raw)"
-bw sync
-devv env:bootstrap --force
-```
-
-Expected result:
-
-- `~/.config/devv/keys/age.key` exists.
-- `~/.config/devv/servers.list` is restored when an encrypted backup exists.
-
-## Project Structure
-
-- `bin/devv`: main command router and help output.
-- `completions/_devv`: zsh completion.
-- `src/commands`: CLI command implementations.
-- `src/commands/tmux`: tmux environment panel and directory/session helpers.
-- `src/commands/resources`: local resources hub and list command.
-- `src/commands/workspace-hub`: internal workspace hub commands.
-- `src/lib/resources.py`: shared local resource detection and action backend.
-- `src/lib/tmux-env.sh`: shared tmux environment target and action helpers.
-- `src/lib/workspace-hub.sh`: shared workspace hub functions.
-- `src/lib/config.sh`: configuration read/write helpers.
-- `src/lib/secrets.sh`: local secret and encrypted backup workflow.
-- `src/control_center/app.py`: desktop UI.
-- `AGENTS.md`: project conventions for agents and maintainers.
-
-## Notes
-
-- This project does not use its own database for persistence.
-- `db:*` commands operate on local MySQL databases.
-- `workspace:remove` and other direct workspace mutation commands are not public commands; use `devv workspace`.
-- Project deletion refuses dirty worktrees unless workspace deletion is explicitly force-confirmed.
-- Workspace deletion removes clean worktrees first, supports `Tab` multi-select with `Alt-D`, offers an extra confirmation before removing dirty worktrees, removes top-level workspace metadata only after an extra confirmation, and can remove all remaining content inside the workspace directory after one final confirmation.
-- `env:setup` installs two project-managed shell shortcuts: `Ctrl+F` for `devv tmux:session` and `Alt+S` for `devv ssh`.
-- Other shortcuts should stay personal and outside this project.
+The Go entrypoint is `cmd/dvv`. Shared CLI theme helpers live in `internal/ui`. SSH behavior lives in `internal/ssh`.

@@ -6,14 +6,17 @@ These rules document the local conventions for future agents and maintainers wor
 
 - User-facing CLI text, docs, help, fzf headers, autocomplete descriptions, and errors should be in English.
 - Keep output direct and practical. Prefer actionable command names and short descriptions.
+- The CLI visual identity is `Royal Noir`: black foundation, royal purple interaction, and restrained gold status.
+- Use shared theme helpers and the `FZFHub` component from `internal/ui`; do not add one-off color palettes in feature packages.
+- Loaders should use the shared short bar loader from `internal/ui.RunWithRoyalLoader` and write to stderr.
+- For interactive processes such as SSH, show loaders before terminal handoff and stop them before the child process owns the terminal.
 - Avoid global shell keybindings unless the project explicitly defines one. They can conflict with terminals, shells, editors, and IDEs.
-- Project-managed shell shortcuts are `Ctrl+F` for `devv tmux:session` and `Alt+S` for `devv ssh`.
-- Prefer explicit `devv ...` commands for everything else. Personal shortcuts belong in the user's own shell config, not in `env:setup`.
+- Prefer explicit `dvv ...` commands. Personal shell shortcuts belong in the user's own shell config.
 
 ## Help And Command Lists
 
-- Main help lives in `bin/devv`.
-- Use the `help_entry` helper for command rows so command names and descriptions stay aligned.
+- Main help for the Go rewrite lives in `cmd/dvv` and the `bin/dvv` launcher.
+- Use shared help helpers so command names and descriptions stay aligned.
 - Keep command descriptions in this shape:
 
 ```text
@@ -21,66 +24,70 @@ These rules document the local conventions for future agents and maintainers wor
 ```
 
 - Keep help, zsh completion, README command lists, and the router command surface in sync.
-- If a command name changes in help, update `completions/_devv` in the same change.
+- If a command name changes in help, update `completions/_dvv` in the same change.
 
 ## Shortcuts
 
-- Avoid new `Ctrl-*` shortcuts for devv features. They commonly conflict with shells, terminal apps, VS Code, Cursor, and fzf defaults.
-- Keep the existing `Ctrl+F` shortcut for `devv tmux:session`.
+- Avoid new `Ctrl-*` shortcuts for dvv features. They commonly conflict with shells, terminal apps, VS Code, Cursor, and fzf defaults.
 - Do not use `Ctrl+S`; many terminals treat it as XOFF flow control and appear frozen.
-- For the workspace hub, use these local fzf shortcuts:
+- Interactive hubs should use local `Shift+letter` shortcuts for hub actions by default.
+- Hub shortcuts must be configurable in `dvv.config.json` before a hub is exposed.
+- New fzf-based hubs should use `internal/ui.FZFHub` for border labels, headers, shortcut badges, previews, and hidden raw selection values.
+- In fzf, `Shift+letter` is represented by the uppercase letter key, such as `A` for `Shift+A`.
+- For the planned workspace hub, use these default local fzf shortcuts:
 
 ```text
 Enter  open configured opener or choose from available openers
 Tab    multi-select or mark changes
-Alt-C  create workspace
-Alt-M  manage workspace projects
-Alt-D  delete workspace
+Shift+C  create workspace
+Shift+M  manage workspace projects
+Shift+D  delete workspace
 Esc    cancel/exit
 ```
 
-- Any fzf header should explicitly list the active shortcuts in English.
+- Hubs should keep the top header clean. Put detailed shortcuts in the `FZFHub` preview command deck unless the hub has no preview.
 - `Shift+Enter` should not be used unless the installed fzf version and target terminal are both proven to support it.
-- Do not update fzf just to chase a shortcut. Update it only when a feature is truly needed and existing devv bindings are verified against the new version.
+- Do not update fzf just to chase a shortcut. Update it only when a feature is truly needed and existing dvv bindings are verified against the new version.
 
 ## SSH Surface
 
-- Public SSH commands are:
+- Public SSH entrypoint and actions are:
 
 ```text
-devv ssh
-devv ssh:add
-devv ssh:remove
-devv ssh:list
+dvv ssh
+dvv ssh add
+dvv ssh remove
+dvv ssh list
 ```
 
-- `devv ssh` is the interactive SSH hub.
-- Do not reintroduce `ssh:connect` as a public command.
-- SSH hub shortcuts should stay:
+- `dvv ssh` is the interactive SSH hub.
+- Do not reintroduce colon-shaped public SSH commands or `ssh:connect`.
+- Hub action shortcuts are configured in `dvv.config.json`.
+- Default SSH hub shortcuts are:
 
 ```text
-Enter  connect in the current terminal
-Alt-A  add SSH entry
-Alt-R  remove selected SSH entry
-Alt-T  open selected SSH connection in a new terminal
+Enter  open selected SSH entry in tmux
+Shift+A  add SSH entry
+Shift+R  remove selected SSH entry
+Shift+T  open selected SSH connection in a system terminal
 Esc    exit
 ```
 
 ## Workspace Surface
 
-- Public workspace commands stay intentionally small:
+- Planned public workspace commands stay intentionally small and nested:
 
 ```text
-devv workspace
-devv workspace:list
+dvv workspace
+dvv workspace list
 ```
 
 - Workspace creation, opening, project management, and deletion should stay inside the interactive hub.
 - Do not reintroduce public mutation commands such as `workspace:create`, `workspace:open`, `workspace:add-project`, `workspace:remove-project`, or `workspace:remove`.
-- Public command names and autocomplete remain `workspace`.
+- Public command names and autocomplete remain rooted under `workspace`.
 - Internal implementation paths should keep the feature name explicit as `workspace-hub`.
-- `Enter` in the workspace hub should use `DEVT_WORKSPACE_OPENER` when configured.
-- When `DEVT_WORKSPACE_OPENER` is unset, `Enter` should list openers detected on the system and let the user choose.
+- `Enter` in the workspace hub should use `DVV_WORKSPACE_OPENER` when configured, with `DEVT_WORKSPACE_OPENER` as compatibility fallback.
+- When no workspace opener is configured, `Enter` should list openers detected on the system and let the user choose.
 - Supported opener values are `cursor`, `code`, `vscode`, `opencode`, `codex`, and `shell`.
 
 ## Worktree Workspace Rules
@@ -88,30 +95,51 @@ devv workspace:list
 - Workspaces are directories named `workspace-<name>`.
 - Workspaces should contain only git worktrees for selected project directories.
 - Never move or copy the real repositories when creating or managing a workspace.
-- Deleting a workspace must refuse to remove directories containing non-worktree content.
-- Project discovery should search Git repositories from `DEVT_WORKSPACE_PROJECT_ROOTS` when set.
-- Workspace creation should ask for the base type: `Bug` prefers `prod`, `Issue` prefers `master`, and `Other` uses default branch detection.
+- Deleting a workspace must not remove non-worktree content without a separate explicit confirmation.
+- Project discovery should search Git repositories from `DVV_WORKSPACE_PROJECT_ROOTS` when set, with `DEVT_WORKSPACE_PROJECT_ROOTS` as compatibility fallback.
+- Workspace creation should ask for the base type: `Bug` prefers `prod`, `Issue` prefers `master`, and `Other` asks for the source branch.
 
-## Shell Style
+## Go Version Rewrite
 
-- Command scripts should use Bash with `set -euo pipefail`.
-- Source shared helpers instead of duplicating UI/config behavior:
+- The Go rewrite branch is `go-version`.
+- Before implementing Go rewrite work, read:
 
-```bash
-source "${DEVTOOLS_DIR}/src/lib/ui.sh"
-source "${DEVTOOLS_DIR}/src/lib/config.sh"
+```text
+docs/go-version/architecture.md
+docs/go-version/configuration.md
+docs/go-version/theme.md
+docs/go-version/migration-roadmap.md
+docs/plans/active
+docs/agents.md
 ```
 
-- Use existing helper functions such as `need`, `title`, `info`, `ok`, `warn`, `die`, `prompt_input`, and `confirm`.
+- Use `main`, README, and this file as the primary source of existing dvv behavior while porting features.
+- Use `https://github.com/EnzoJ0se/code-grove` as an architecture reference for Go package layout, config shape, workspace metadata, bootstrap rules, hooks, safety checks, and agent planning discipline.
+- Do not copy `code-grove` behavior blindly when it conflicts with dvv's command surface or local conventions.
+- The public command for the Go rewrite is `dvv`.
+- Do not keep legacy Bash commands as fallback in this branch. Port intentionally from `main`.
+- Initial migration order is `ssh`, `workspace`, `tmux`, `db`, `systemconfig`, `resources`, then optional `wsl`.
+- The Python desktop control center is out of scope for the rewrite.
+- User-facing CLI text, generated help, autocomplete descriptions, errors, README content, and docs must remain in English.
+- Go code, package names, structs, config fields, command names, events, and tests must be in English.
+- Keep business logic out of Cobra command files when practical; prefer small packages under `internal/`.
+- Run external commands with argument arrays, not interpolated shell strings, unless shell behavior is explicitly required.
+- Preserve the safety posture for workspace deletion: only direct workspace children, no symlink targets, dirty worktree checks, and separate confirmation for leftover content.
+- Preserve existing local data paths such as `~/.config/devv`, SSH server files, AGE keys, repository `.env`, and encrypted backups until an explicit migration plan replaces them.
+
+## Go Style
+
+- Keep business logic out of command routing when practical; prefer small packages under `internal/`.
+- Run external commands with argument arrays, not interpolated shell strings, unless shell behavior is explicitly required.
 - Use `rg` first when searching the repo.
 - Keep edits scoped; avoid unrelated rewrites.
 
 ## Secrets And Local Data
 
 - Do not commit private local data, dumps, `.env` changes, or machine-specific config.
-- `dumps/` and local config under `~/.config/devv` are runtime data.
-- `secrets/servers.list.age` is the encrypted SSH backup; do not replace it unless the task explicitly requires updating that backup.
-- Use `config/servers.list.example` for documentation/examples, not a real server list.
+- `dumps/`, `secrets/`, `secrets.local/`, and local config under `~/.config/devv` are runtime data kept out of NPM packaging.
+- Do not commit private local data, dumps, `.env` changes, machine-specific config, SSH targets, AGE private keys, or encrypted backups.
+- Use `examples/servers.list` for documentation/examples, not a real server list.
 
 ## Documentation
 

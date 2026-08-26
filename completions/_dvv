@@ -1,0 +1,66 @@
+#compdef dvv
+
+_dvv() {
+  local state
+
+  _arguments -C \
+    "1: :->cmds" \
+    "2: :->ssh_actions" \
+    "*::arg:->args"
+
+  case "$state" in
+    cmds)
+      local -a commands
+      commands=(
+        "ssh:Open the SSH hub"
+      )
+      _describe -t commands 'dvv commands' commands
+      ;;
+    ssh_actions)
+      if [[ "${words[2]:-}" == "ssh" ]]; then
+        local -a actions
+        actions=(
+          "add:Add a new SSH entry"
+          "remove:Remove SSH entries"
+          "list:List SSH entries"
+          "help:Show SSH help"
+        )
+        _describe -t ssh-actions 'ssh actions' actions
+      fi
+      ;;
+    args)
+      if [[ "${words[2]:-}" == "ssh" ]]; then
+        case "${words[3]:-}" in
+          add)
+          local -a ssh_add_flags
+          ssh_add_flags=(
+            "--name:SSH entry name"
+            "--conn:SSH target"
+            "--target:SSH target"
+          )
+          _describe -t ssh-add-flags 'ssh add flags' ssh_add_flags
+          ;;
+          remove)
+          local -a ssh_remove_flags
+          ssh_remove_flags=(
+            "--name:SSH entry name"
+            "--line:Exact SSH entry line"
+          )
+          _describe -t ssh-remove-flags 'ssh remove flags' ssh_remove_flags
+          ;;
+          "")
+          local -a ssh_flags
+          ssh_flags=(
+            "--name:Connect by SSH entry name"
+            "--target:Connect to a raw SSH target"
+            "--new-terminal:Open in a system terminal"
+          )
+          _describe -t ssh-flags 'ssh flags' ssh_flags
+          ;;
+        esac
+      fi
+      ;;
+  esac
+}
+
+_dvv "$@"

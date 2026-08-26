@@ -1,0 +1,74 @@
+package ui
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestFZFHubArgsBuildsBrandedHub(t *testing.T) {
+	hub := FZFHub{
+		Prompt:       "ssh> ",
+		Title:        "dvv ssh",
+		Subtitle:     "2 configured target(s)",
+		BorderLabel:  "dvv ssh ",
+		Preview:      "printf test",
+		PreviewLabel: "selected target",
+		Shortcuts: []FZFShortcut{
+			{Label: "Enter", Description: "connect"},
+			{Key: "A", Label: "Shift+A", Description: "add"},
+			{Key: "R", Label: "Shift+R", Description: "remove"},
+		},
+		ExtraArgs: FZFHiddenRowArgs(),
+	}
+
+	args := strings.Join(hub.Args(), "\n")
+	expected := []string{
+		"--prompt=ssh> ",
+		"--border-label=",
+		"--header=",
+		"--header-first",
+		"--expect=A,R",
+		"--preview=printf test",
+		"--preview-window=right,44%,border-rounded,wrap",
+		"--preview-label=",
+		"--with-nth=2..",
+	}
+
+	for _, value := range expected {
+		if !strings.Contains(args, value) {
+			t.Fatalf("FZFHub Args missing %q in %s", value, args)
+		}
+	}
+}
+
+func TestFZFHubKeepsShortcutsOutOfHeaderByDefault(t *testing.T) {
+	hub := FZFHub{
+		Title: "dvv ssh",
+		Shortcuts: []FZFShortcut{
+			{Key: "A", Label: "Shift+A", Description: "add"},
+		},
+	}
+
+	header := hub.Header()
+	if strings.Contains(header, "Shift+A") {
+		t.Fatalf("header should not include shortcut deck by default: %s", header)
+	}
+
+	hub.ShortcutsInHeader = true
+	header = hub.Header()
+	if !strings.Contains(header, "Shift+A") {
+		t.Fatalf("header should include shortcut deck when enabled: %s", header)
+	}
+}
+
+func TestFZFSelectedRaw(t *testing.T) {
+	raw := FZFSelectedRaw("api root@example.com\tstyled display")
+	if raw != "api root@example.com" {
+		t.Fatalf("raw = %q, want api root@example.com", raw)
+	}
+
+	raw = FZFSelectedRaw("api root@example.com")
+	if raw != "api root@example.com" {
+		t.Fatalf("raw = %q, want api root@example.com", raw)
+	}
+}

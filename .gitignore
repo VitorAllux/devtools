@@ -1,19 +1,24 @@
-# dumps e artefatos locais
+# Local dumps and build artifacts
 dumps/
+dist/
+tmp/
+node_modules/
+secrets/
+secrets.local/
 *.sql
 *.sql.gz
 *.log
 
-# environment
+# Environment
 .env
 
-# local sensitive files
+# Local sensitive files
 config/servers.list
 
 # OS/editor
 .DS_Store
 .vscode/
 
-# python
+# Python
 __pycache__/
 *.pyc
