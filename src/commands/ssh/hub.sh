@@ -121,7 +121,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-prepare_ssh_servers
+run_with_loader "Preparing SSH server list..." prepare_ssh_servers
 
 if [[ -n "${target}" ]]; then
   connect_ssh_target "${target}"

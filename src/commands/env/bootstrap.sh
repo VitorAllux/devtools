@@ -30,6 +30,7 @@ fi
 
 if [[ -f "${DEVV_ENCRYPTED_SERVERS_FILE}" ]]; then
   if ! age_key_exists; then
+    info "Restoring AGE key from Bitwarden if available..."
     if restore_age_key_from_bitwarden; then
       ok "AGE private key restored from Bitwarden."
     else
@@ -40,7 +41,7 @@ if [[ -f "${DEVV_ENCRYPTED_SERVERS_FILE}" ]]; then
 
   if age_key_exists; then
     if [[ "$FORCE_RESTORE" -eq 1 || ! -s "${DEVV_SERVERS_FILE}" ]]; then
-      if decrypt_encrypted_servers_file; then
+      if run_with_loader "Decrypting SSH backup..." decrypt_encrypted_servers_file; then
         if servers_file_has_entries; then
           ok "Restored SSH servers from encrypted backup."
         else
@@ -54,7 +55,7 @@ if [[ -f "${DEVV_ENCRYPTED_SERVERS_FILE}" ]]; then
     fi
   fi
 else
-  if generate_age_key_if_missing; then
+  if run_with_loader "Preparing local AGE key..." generate_age_key_if_missing; then
     ok "Generated local AGE key at ${DEVV_AGE_KEY_FILE}."
     public_key="$(get_public_key_from_private_key)"
     if [[ -n "${public_key}" ]]; then
@@ -68,7 +69,7 @@ fi
 
 ensure_servers_file
 
-if sync_encrypted_servers_file; then
+if run_with_loader "Updating encrypted SSH backup..." sync_encrypted_servers_file; then
   ok "Encrypted SSH backup updated at ${DEVV_ENCRYPTED_SERVERS_FILE}."
 else
   if servers_file_has_entries; then

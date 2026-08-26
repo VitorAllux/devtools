@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -euo pipefail
+
 source "${DEVTOOLS_DIR}/src/lib/ui.sh"
 
 need fzf
@@ -11,7 +13,8 @@ if [[ ! -d "${DEFAULT_DUMPS_DIR}" ]]; then
   die "Dumps directory does not exist: ${DEFAULT_DUMPS_DIR}"
 fi
 
-LOCAL_DUMPS=$(find "${DEFAULT_DUMPS_DIR}" -maxdepth 1 -type f 2>/dev/null | sed "s|^${DEFAULT_DUMPS_DIR}/||")
+capture_with_loader LOCAL_DUMPS "Scanning local dumps..." find "${DEFAULT_DUMPS_DIR}" -maxdepth 1 -type f
+LOCAL_DUMPS="$(printf '%s\n' "$LOCAL_DUMPS" | sed "s|^${DEFAULT_DUMPS_DIR}/||")"
 
 if [[ -z "${LOCAL_DUMPS}" ]]; then
   info "No dumps found in ${DEFAULT_DUMPS_DIR}"

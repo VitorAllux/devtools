@@ -2,7 +2,38 @@
 
 Personal developer CLI for local automation: tmux, MySQL, SSH, WSL, git worktree workspaces, and small system utilities.
 
-Current version: `1.3.0`
+Current version: `1.4.0`
+
+## What's New In 1.4.0
+
+- `devv db` now opens an interactive database manager for create, import, truncate, drop, and dump cleanup actions.
+- `db:ui` is now an alias for `devv db`; Harlequin integration was removed.
+- `devv config` now opens an interactive configuration manager with known settings, status, editing, clearing, and validation.
+- Long-running menu scans and actions now show loaders with elapsed time across the CLI.
+- MySQL database actions now ask for connection credentials once per flow and reuse them for download, validation, create, truncate, drop, and import steps.
+
+## What's New In 1.3.5
+
+- Workspace deletion can now optionally remove all remaining content inside the workspace directory after worktrees and workspace metadata are gone, which allows issue workspaces to be deleted completely without touching the base repository.
+
+## What's New In 1.3.4
+
+- Batch delete in `devv workspace` now asks once per phase for all selected workspaces: initial removal, force-removing dirty worktrees, and removing remaining workspace metadata.
+
+## What's New In 1.3.3
+
+- Workspace deletion now treats top-level workspace metadata such as `.agents`, `.codex`, `.cursor`, `.claude`, `.opencode`, and accidental root `.git` as removable after an extra confirmation.
+
+## What's New In 1.3.2
+
+- `devv workspace` now supports `Tab` multi-select for batch deletion with `Alt-D`.
+- Multi-select is limited to delete, and the hub warns when multiple selections are used with open or manage.
+- Workspace deletion can now remove top-level workspace metadata after an extra confirmation so empty workspaces can be deleted completely.
+
+## What's New In 1.3.1
+
+- `devv workspace` can now force-remove dirty worktrees after an extra confirmation when deleting a workspace.
+- Workspace deletion still refuses to remove the workspace directory when non-worktree content such as a top-level `.agents` folder remains, but it now removes worktrees first so disk space is recovered.
 
 ## What's New In 1.3.0
 
@@ -38,7 +69,8 @@ devv workspace
 devv resources
 devv tmux
 devv ssh
-devv db:ui
+devv db
+devv config
 ```
 
 ## Worktree Workspaces
@@ -52,9 +84,10 @@ devv workspace
 Hub shortcuts:
 
 - `Enter`: open the selected workspace.
+- `Tab`: select one or more workspaces for batch deletion with `Alt-D`.
 - `Alt-C`: create a workspace, choose the base type, select base repositories, create worktrees, bootstrap them, and open the workspace.
 - `Alt-M`: add or remove project worktrees.
-- `Alt-D`: remove all clean worktrees and delete the workspace directory when it becomes empty.
+- `Alt-D`: remove all clean worktrees from the selected workspace or selected workspaces, offer one extra confirmation to force-remove dirty worktrees when needed, offer one confirmation to remove top-level workspace metadata when needed, and offer one last confirmation to remove any remaining content still inside the workspace directory.
 - `Esc`: exit.
 
 In manage mode, projects already included in the workspace are shown with `[x]`; absent projects are shown with `[ ]`. Use `Tab` to select changes and `Enter` to apply them.
@@ -143,6 +176,7 @@ Set `DEVT_WORKSPACE_SYNC_AGENTS=0` to skip agent generation. `DEVT_WORKSPACE_AGE
 
 ### Database
 
+- `devv db`
 - `devv db:create`
 - `devv db:drop`
 - `devv db:truncate`
@@ -150,7 +184,7 @@ Set `DEVT_WORKSPACE_SYNC_AGENTS=0` to skip agent generation. `DEVT_WORKSPACE_AGE
 - `devv db:clean`
 - `devv db:ui`
 
-`db:ui` opens Harlequin. It tries to read credentials from `API_DIR/.env`; if credentials are unavailable, it opens Harlequin without a preselected connection.
+`devv db` opens the interactive database manager. It supports creating databases, importing dumps, truncating or dropping databases, and cleaning local dump files. `db:ui` is kept as an alias for the same manager.
 
 ### Tmux
 
@@ -227,8 +261,13 @@ Opens the Tkinter Control Center for WSL, SSH, resources, and configuration. Req
 
 ### Config
 
+- `devv config`
 - `devv config:set <KEY> <VALUE>`
 - `devv config:list`
+
+`devv config` opens the interactive configuration manager. It shows known settings with `[x]` for configured values, `[d]` for defaults, and `[ ]` for empty values. Use `Enter` to edit, `Alt-A` to add a custom key, `Alt-C` to clear a key, and `Alt-V` to validate paths and simple value types.
+
+The config hub also shows secret backup status with `Alt-S`. devv does not store MySQL passwords in config; DB commands ask for the password when needed and reuse it only for that process.
 
 ## Files And Data
 
@@ -242,6 +281,8 @@ Opens the Tkinter Control Center for WSL, SSH, resources, and configuration. Req
 The old `config/servers.list` file is deprecated and replaced by `config/servers.list.example`.
 
 ## Secrets
+
+devv uses Bitwarden only to restore the local AGE private key when `DEVT_BW_AGE_KEY_ITEM` is configured. SSH entries are stored locally in `~/.config/devv/servers.list` and backed up as an AGE-encrypted file at `secrets/servers.list.age`. 1Password is not used by this project.
 
 First machine:
 
@@ -289,7 +330,7 @@ Expected result:
 - This project does not use its own database for persistence.
 - `db:*` commands operate on local MySQL databases.
 - `workspace:remove` and other direct workspace mutation commands are not public commands; use `devv workspace`.
-- Project deletion refuses dirty worktrees. Workspace deletion removes only clean worktrees and keeps the workspace when dirty worktrees remain.
-- Workspace deletion refuses directories containing content that is not a registered git worktree.
+- Project deletion refuses dirty worktrees unless workspace deletion is explicitly force-confirmed.
+- Workspace deletion removes clean worktrees first, supports `Tab` multi-select with `Alt-D`, offers an extra confirmation before removing dirty worktrees, removes top-level workspace metadata only after an extra confirmation, and can remove all remaining content inside the workspace directory after one final confirmation.
 - `env:setup` installs two project-managed shell shortcuts: `Ctrl+F` for `devv tmux:session` and `Alt+S` for `devv ssh`.
 - Other shortcuts should stay personal and outside this project.

@@ -28,12 +28,13 @@ show_help() {
   echo -e "  ${BOLD}Usage:${NC} devv <command> [args]\n"
   
   echo -e "  ${PUR}📦 Database Commands:${NC}"
+  help_entry "db" "🧭 Interactive database manager"
   help_entry "db:create" "✨ Create a new database"
   help_entry "db:drop" "🗑️  Drop an existing database"
   help_entry "db:truncate" "🧹 Truncate all tables in a database"
   help_entry "db:import" "📥 Import a dump locally or from Google Drive"
   help_entry "db:clean" "🗑️  Clean dumps interactively from local storage"
-  help_entry "db:ui" "📊 Interactive Database TUI (Harlequin)"
+  help_entry "db:ui" "🧭 Alias for interactive database manager"
   echo
   
   echo -e "  ${PUR}⚡ Environment & Tmux:${NC}"
@@ -59,6 +60,7 @@ show_help() {
   echo -e "  ${PUR}🛠️  System:${NC}"
   help_entry "env:setup" "⚙️  Install dependencies and configure zsh autocompletion"
   help_entry "env:bootstrap" "♻️  Setup + restore encrypted local secrets"
+  help_entry "config" "🧭 Interactive configuration manager"
   help_entry "config:set" "🛠️  Set configuration variable"
   help_entry "config:list" "📄  List configuration variables"
   echo
@@ -92,6 +94,7 @@ COMMAND="$1"
 shift
 
 case "$COMMAND" in
+  db)          exec "${DEVTOOLS_DIR}/src/commands/db/hub.sh" "$@" ;;
   db:create)   exec "${DEVTOOLS_DIR}/src/commands/db/create.sh" "$@" ;;
   db:drop)     exec "${DEVTOOLS_DIR}/src/commands/db/drop.sh" "$@" ;;
   db:truncate) exec "${DEVTOOLS_DIR}/src/commands/db/truncate.sh" "$@" ;;
@@ -115,6 +118,7 @@ case "$COMMAND" in
   
   env:setup)   exec "${DEVTOOLS_DIR}/src/commands/setup.sh" "$@" ;;
   env:bootstrap) exec "${DEVTOOLS_DIR}/src/commands/env/bootstrap.sh" "$@" ;;
+  config)      exec "${DEVTOOLS_DIR}/src/commands/config/hub.sh" "$@" ;;
   config:set)  exec "${DEVTOOLS_DIR}/src/commands/config/set.sh" "$@" ;;
   config:list) exec "${DEVTOOLS_DIR}/src/commands/config/list.sh" "$@" ;;
   

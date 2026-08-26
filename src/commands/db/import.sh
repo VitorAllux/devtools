@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -o pipefail
 
-source "${DEVTOOLS_DIR}/src/lib/ui.sh"
+source "${DEVTOOLS_DIR}/src/lib/db.sh"
 
 need rclone
 need gzip
@@ -83,6 +83,10 @@ sanitize_sql_stream() {
   '
 }
 
+gzip_is_valid() {
+  gzip -t "${1:-}" 2>/dev/null
+}
+
 DEFAULT_REMOTE="${DEVT_RCLONE_REMOTE:-gdrive}"
 DEFAULT_DUMPS_DIR="${DEVT_DUMPS_DIR:-${DEVTOOLS_DIR}/dumps}"
 
@@ -90,20 +94,20 @@ title "Import Dump (.sql.gz)"
 
 mkdir -p "${DEFAULT_DUMPS_DIR}"
 GDRIVE_OPTION="[+] Download from Google Drive"
-LOCAL_DUMPS=$(find "${DEFAULT_DUMPS_DIR}" -maxdepth 1 -type f 2>/dev/null | sed "s|^${DEFAULT_DUMPS_DIR}/||")
+capture_with_loader LOCAL_DUMPS "Scanning local dumps..." find "${DEFAULT_DUMPS_DIR}" -maxdepth 1 -type f
+LOCAL_DUMPS="$(printf '%s\n' "$LOCAL_DUMPS" | sed "s|^${DEFAULT_DUMPS_DIR}/||")"
 if [[ -n "${LOCAL_DUMPS}" ]]; then
   MENU_OPTIONS="$GDRIVE_OPTION"$'\n'"$LOCAL_DUMPS"
 else
   MENU_OPTIONS="$GDRIVE_OPTION"
 fi
 
-info "Scanning local dumps..."
 DUMP_SELECTION=$(select_with_fzf "Select a local dump or download from Google Drive" "$MENU_OPTIONS")
 
 if [[ "$DUMP_SELECTION" == "$GDRIVE_OPTION" ]]; then
-  REMOTE_OPTIONS="$(rclone listremotes 2>/dev/null | sed 's/:$//' | sed '/^$/d')"
+  capture_with_loader REMOTE_OPTIONS "Listing configured rclone remotes..." rclone listremotes
+  REMOTE_OPTIONS="$(printf '%s\n' "$REMOTE_OPTIONS" | sed 's/:$//' | sed '/^$/d')"
   if [[ -n "$REMOTE_OPTIONS" ]]; then
-    info "Listing configured rclone remotes..."
     if echo "$REMOTE_OPTIONS" | grep -Fxq "$DEFAULT_REMOTE"; then
       REMOTE_OTHERS="$(echo "$REMOTE_OPTIONS" | grep -Fvx "$DEFAULT_REMOTE" || true)"
       if [[ -n "$REMOTE_OTHERS" ]]; then
@@ -156,7 +160,8 @@ if [[ "$DUMP_SELECTION" == "$GDRIVE_OPTION" ]]; then
     title "Discovering file name from Drive"
     info "Scanning for ID inside: ${BOLD}${REMOTE}:${DRIVE_SCAN_PATH}${NC}"
 
-    FOUND_NAME="$(rclone lsjson -R "${REMOTE}:${DRIVE_SCAN_PATH}" 2>/dev/null \
+    capture_with_loader FOUND_JSON "Scanning Drive folder..." rclone lsjson -R "${REMOTE}:${DRIVE_SCAN_PATH}"
+    FOUND_NAME="$(printf '%s\n' "$FOUND_JSON" \
       | jq -r --arg id "$FILE_ID" '.[] | select(.ID == $id) | .Name' \
       | head -n 1 || true)"
 
@@ -185,13 +190,13 @@ else
 fi
 
 # Interactive Target DB Selection
-DBS=$(get_user_databases)
+db_prepare_mysql_auth
+capture_with_loader DBS "Fetching databases..." db_list_user_databases
 NEW_DB_OPTION="[+] Create New Database"
 
 # Prepend the "Create new" option to the list
 MENU_OPTIONS="$NEW_DB_OPTION"$'\n'"$DBS"
 
-info "Fetching databases..."
 DB_SELECTION=$(select_with_fzf "Select the Target Database for Import" "$MENU_OPTIONS")
 
 if [[ "$DB_SELECTION" == "$NEW_DB_OPTION" ]]; then
@@ -217,14 +222,13 @@ fi
 
 if [[ -z "$SKIP_DOWNLOAD" ]]; then
   title "Download"
-  info "Downloading via rclone copyid..."
-  rclone backend copyid "${REMOTE}:" "${FILE_ID}" "${DEST}"
+  run_with_loader "Downloading via rclone copyid..." rclone backend copyid "${REMOTE}:" "${FILE_ID}" "${DEST}" || die "Download failed."
   ok "Download completed."
 else
   info "Using local file ${DEST}"
 fi
 IS_GZIP=0
-if gzip -t "${DEST}" 2>/dev/null; then
+if run_with_loader "Validating gzip..." gzip_is_valid "${DEST}"; then
   IS_GZIP=1
   title "Gzip Validation"
   ok "Gzip is valid."
@@ -244,23 +248,23 @@ else
 fi
 
 title "Create DB"
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;"
+run_with_loader "Creating/verifying database '${DB_NAME}'..." db_create_database "$DB_NAME" || die "Could not create or verify database '${DB_NAME}'."
 ok "Database verified: ${BOLD}${DB_NAME}${NC}"
 
 title "Importing"
 if [[ "${IS_GZIP}" == "1" ]]; then
   info "Importing with progress (pv | gunzip | sanitize | mysql)..."
   if [[ -t 2 ]]; then
-    pv "${DEST}" 2>/dev/tty | gunzip -c | sanitize_sql_stream | mysql -u root -p --default-character-set=utf8mb4 "${DB_NAME}"
+    pv "${DEST}" 2>/dev/tty | gunzip -c | sanitize_sql_stream | db_mysql --default-character-set=utf8mb4 "${DB_NAME}"
   else
-    pv "${DEST}" 2>/dev/null | gunzip -c | sanitize_sql_stream | mysql -u root -p --default-character-set=utf8mb4 "${DB_NAME}"
+    pv "${DEST}" 2>/dev/null | gunzip -c | sanitize_sql_stream | db_mysql --default-character-set=utf8mb4 "${DB_NAME}"
   fi
 else
   info "Importing plain SQL with progress (pv | sanitize | mysql)..."
   if [[ -t 2 ]]; then
-    pv "${DEST}" 2>/dev/tty | sanitize_sql_stream | mysql -u root -p --default-character-set=utf8mb4 "${DB_NAME}"
+    pv "${DEST}" 2>/dev/tty | sanitize_sql_stream | db_mysql --default-character-set=utf8mb4 "${DB_NAME}"
   else
-    pv "${DEST}" 2>/dev/null | sanitize_sql_stream | mysql -u root -p --default-character-set=utf8mb4 "${DB_NAME}"
+    pv "${DEST}" 2>/dev/null | sanitize_sql_stream | db_mysql --default-character-set=utf8mb4 "${DB_NAME}"
   fi
 fi
 

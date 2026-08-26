@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-source "${DEVTOOLS_DIR}/src/lib/ui.sh"
+set -euo pipefail
+
+source "${DEVTOOLS_DIR}/src/lib/db.sh"
 
 title "Create New Database"
 
@@ -10,6 +12,7 @@ if [[ -z "$DB" ]]; then
 fi
 
 info "Creating database '${DB}'..."
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS \`${DB}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+db_prepare_mysql_auth
+run_with_loader "Creating database '${DB}'..." db_create_database "$DB"
 
 ok "Database '${DB}' created successfully (or already existed)."

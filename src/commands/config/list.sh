@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# devv config:list
-# Lists all configuration variables from ~/.config/devv/config.env
+set -euo pipefail
 
-CONFIG_FILE="$HOME/.config/devv/config.env"
+source "${DEVTOOLS_DIR}/src/lib/ui.sh"
+source "${DEVTOOLS_DIR}/src/lib/config.sh"
 
 if [[ -f "$CONFIG_FILE" ]]; then
-  echo "Current devv configuration ($CONFIG_FILE):"
-  cat "$CONFIG_FILE"
+  title "devv Configuration"
+  info "File: ${CONFIG_FILE}"
+  echo
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    printf '%s\n' "$line"
+  done < "$CONFIG_FILE"
 else
-  echo "No configuration file found at $CONFIG_FILE"
+  info "No configuration file found at ${CONFIG_FILE}"
 fi

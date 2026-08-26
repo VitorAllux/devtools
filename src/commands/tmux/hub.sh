@@ -34,7 +34,7 @@ header="Enter: ${enter_label} | Alt-U: start/open | Alt-D: stop | Alt-A: restart
 win="$(tmux_window_name)"
 
 while true; do
-  rows="$(tmux_target_rows)"
+  capture_with_loader rows "Checking tmux environments..." tmux_target_rows
 
   selection_file="$(mktemp)"
   if ! printf '%s\n' "$rows" | fzf \

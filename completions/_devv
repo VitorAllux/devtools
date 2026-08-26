@@ -11,12 +11,13 @@ _devv() {
     cmds)
       local -a commands
       commands=(
+        "db:Interactive database manager"
         "db\:create:Create a new database"
         "db\:drop:Drop an existing database"
         "db\:truncate:Truncate all tables in a database"
         "db\:import:Import a dump locally or from Google Drive"
         "db\:clean:Clean dumps interactively from local storage"
-        "db\:ui:Interactive Database TUI (Harlequin)"
+        "db\:ui:Alias for interactive database manager"
         "tmux:Interactive tmux environment panel"
         "tmux\:up:Choose and start/open a tmux environment"
         "tmux\:down:Choose and stop a tmux environment"
@@ -30,6 +31,7 @@ _devv() {
         "resources\:list:List detected local resources"
         "env\:setup:Install dependencies and configure zsh autocompletion"
         "env\:bootstrap:Setup + restore encrypted local secrets"
+        "config:Interactive configuration manager"
         "config\:set:Set configuration variable"
         "config\:list:List configuration variables"
         "ssh:Interactive SSH hub via fzf"

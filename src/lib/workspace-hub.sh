@@ -28,8 +28,9 @@ workspace_slug() {
 
   raw="${raw#workspace-}"
   printf '%s\n' "$raw" \
-    | tr '[:upper:]' '[:lower:]' \
-    | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//'
+    | LC_ALL=C tr '[:upper:]' '[:lower:]' \
+    | LC_ALL=C tr -d '\200-\377' \
+    | LC_ALL=C sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//'
 }
 
 workspace_dir_name() {
@@ -48,6 +49,7 @@ workspace_path() {
 }
 
 workspace_branch() {
+  # Keep the workspace directory prefix out of git branch names.
   workspace_slug "${1:-}"
 }
 
@@ -135,7 +137,7 @@ select_workspace_projects() {
   local candidates rows selected row
 
   need fzf
-  candidates="$(workspace_project_candidates)"
+  capture_with_loader candidates "Discovering git repositories..." workspace_project_candidates
   [[ -n "$candidates" ]] || die "No base git repositories found. Configure DEVT_WORKSPACE_PROJECT_ROOTS."
 
   rows="$(
@@ -290,6 +292,60 @@ workspace_non_worktree_content() {
       printf '%s\n' "$entry"
     fi
   done < <(find "$workspace" -mindepth 1 -maxdepth 1 | sort)
+}
+
+workspace_is_removable_metadata_path() {
+  local path="${1:-}"
+
+  case "$(basename "$path")" in
+    .agents|.claude|.codex|.cursor|.git|.opencode)
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
+workspace_has_only_removable_metadata() {
+  local workspace="${1:-}"
+  local entry
+  local found=0
+
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] || continue
+    workspace_is_removable_metadata_path "$entry" || return 1
+    found=1
+  done < <(workspace_non_worktree_content "$workspace")
+
+  [[ "$found" -eq 1 ]]
+}
+
+remove_workspace_metadata() {
+  local workspace="${1:-}"
+  local entry
+
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] || continue
+    workspace_is_removable_metadata_path "$entry" || continue
+    rm -rf -- "$entry"
+    ok "Removed workspace metadata: $(basename "$entry")"
+  done < <(workspace_non_worktree_content "$workspace")
+}
+
+remove_workspace_remaining_content() {
+  local workspace="${1:-}"
+  local entry
+
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] || continue
+    rm -rf -- "$entry"
+    ok "Removed workspace content: $(basename "$entry")"
+  done < <(workspace_non_worktree_content "$workspace")
+}
+
+workspace_has_local_changes() {
+  local worktree="${1:-}"
+  [[ -n "$(git -C "$worktree" status --porcelain)" ]]
 }
 
 copy_workspace_item() {
@@ -472,44 +528,47 @@ workspace_add_project() {
 
 workspace_remove_project() {
   local worktree="${1:-}"
+  local force="${2:-0}"
   local common_dir base_project
 
   [[ -d "$worktree" ]] || die "Worktree not found: ${worktree}"
   is_linked_git_worktree "$worktree" || die "Not a linked git worktree: ${worktree}"
 
-  if [[ -n "$(git -C "$worktree" status --porcelain)" ]]; then
+  if [[ "$force" != "1" ]] && workspace_has_local_changes "$worktree"; then
     warn "Blocked removal; local changes detected: ${worktree}"
     return 1
   fi
 
   common_dir="$(git -C "$worktree" rev-parse --path-format=absolute --git-common-dir)"
   base_project="$(dirname "$common_dir")"
-  git -C "$base_project" worktree remove "$worktree"
+  if [[ "$force" == "1" ]]; then
+    git -C "$base_project" worktree remove --force "$worktree"
+  else
+    git -C "$base_project" worktree remove "$worktree"
+  fi
   git -C "$base_project" worktree prune
   ok "Removed worktree: $(basename "$worktree")"
 }
 
 remove_workspace_dir() {
   local workspace="${1:-}"
+  local force_dirty="${2:-0}"
+  local remove_metadata="${3:-0}"
+  local remove_remaining="${4:-0}"
   local worktree unexpected
   local blocked=0
   local removed=0
 
   [[ -d "$workspace" ]] || die "Workspace directory not found: ${workspace}"
 
-  unexpected="$(workspace_non_worktree_content "$workspace")"
-  if [[ -n "$unexpected" ]]; then
-    die "Workspace contains non-worktree content and will not be removed: $(printf '%s' "$unexpected" | head -n 1)"
-  fi
-
   while IFS= read -r worktree; do
     [[ -n "$worktree" ]] || continue
-    if [[ -n "$(git -C "$worktree" status --porcelain)" ]]; then
+    if [[ "$force_dirty" != "1" ]] && workspace_has_local_changes "$worktree"; then
       warn "Kept dirty worktree: ${worktree}"
       blocked=1
       continue
     fi
-    if workspace_remove_project "$worktree"; then
+    if workspace_remove_project "$worktree" "$force_dirty"; then
       removed=1
     fi
   done < <(workspace_worktrees "$workspace")
@@ -517,7 +576,28 @@ remove_workspace_dir() {
   if [[ "$blocked" -eq 1 ]]; then
     warn "Workspace kept because dirty worktrees still exist. Commit, stash, or discard local changes to remove it completely."
     [[ "$removed" -eq 0 ]] || ok "Removed all clean worktrees from: $(basename "$workspace")"
-    return 0
+    return 2
+  fi
+
+  if [[ "$remove_metadata" == "1" ]]; then
+    remove_workspace_metadata "$workspace"
+  fi
+
+  if [[ "$remove_remaining" == "1" ]]; then
+    remove_workspace_remaining_content "$workspace"
+  fi
+
+  unexpected="$(workspace_non_worktree_content "$workspace")"
+  if [[ -n "$unexpected" ]]; then
+    [[ "$removed" -eq 0 ]] || ok "Removed all worktrees from: $(basename "$workspace")"
+    if workspace_has_only_removable_metadata "$workspace"; then
+      warn "Workspace kept because it contains workspace metadata: $(printf '%s' "$unexpected" | head -n 1)"
+      warn "Confirm again to remove that metadata and delete the workspace directory completely."
+      return 3
+    fi
+    warn "Workspace kept because it contains remaining content: $(printf '%s' "$unexpected" | head -n 1)"
+    warn "Confirm again to remove that remaining content and delete the workspace directory completely."
+    return 4
   fi
 
   rmdir "$workspace"
@@ -535,7 +615,8 @@ workspace_dirty_count() {
 
   while IFS= read -r worktree; do
     [[ -n "$worktree" ]] || continue
-    [[ -z "$(git -C "$worktree" status --porcelain)" ]] || count=$((count + 1))
+    workspace_has_local_changes "$worktree" || continue
+    count=$((count + 1))
   done < <(workspace_worktrees "$workspace")
 
   printf '%s\n' "$count"
@@ -724,7 +805,7 @@ workspace_manage_projects() {
   [[ -d "$workspace" ]] || die "Workspace directory not found: ${workspace}"
   need fzf
 
-  rows="$(workspace_manage_rows "$workspace")"
+  capture_with_loader rows "Loading workspace projects..." workspace_manage_rows "$workspace"
   [[ -n "$rows" ]] || die "No git projects found. Configure DEVT_WORKSPACE_PROJECT_ROOTS."
 
   selected="$(printf '%s\n' "$rows" | fzf \

@@ -23,6 +23,81 @@ need() {
   command -v "$cmd" >/dev/null 2>&1 || die "Command '${BOLD}$cmd${NC}' not found. Please install it."
 }
 
+loader_wait() {
+  local pid="${1:-}"
+  local message="${2:-Loading}"
+  local start elapsed frame_index frame status
+  local -a frames=('|' '/' '-' '\\')
+
+  if [[ -z "$pid" ]]; then
+    return 1
+  fi
+
+  if [[ ! -t 2 || "${DEVV_NO_LOADER:-0}" == "1" ]]; then
+    wait "$pid"
+    return $?
+  fi
+
+  start="$(date +%s)"
+  frame_index=0
+  while kill -0 "$pid" 2>/dev/null; do
+    elapsed=$(($(date +%s) - start))
+    frame="${frames[$((frame_index % ${#frames[@]}))]}"
+    printf '\r%s %s %ss' "$frame" "$message" "$elapsed" >&2
+    frame_index=$((frame_index + 1))
+    sleep 0.12
+  done
+
+  wait "$pid"
+  status=$?
+  printf '\r%-80s\r' '' >&2
+  return "$status"
+}
+
+run_with_loader() {
+  local message="${1:-Loading}"
+  shift || true
+
+  [[ $# -gt 0 ]] || die "run_with_loader requires a command."
+
+  if [[ ! -t 2 || "${DEVV_NO_LOADER:-0}" == "1" ]]; then
+    printf '%b\n' "${BOLD}${BLU} 🔹 ${NC} ${message}" >&2
+    "$@"
+    return $?
+  fi
+
+  "$@" &
+  loader_wait "$!" "$message"
+}
+
+capture_with_loader() {
+  local var_name="${1:-}"
+  local message="${2:-Loading}"
+  local output_file error_file status
+  shift 2 || true
+
+  [[ -n "$var_name" ]] || die "capture_with_loader requires a variable name."
+  [[ $# -gt 0 ]] || die "capture_with_loader requires a command."
+
+  output_file="$(mktemp)"
+  error_file="$(mktemp)"
+
+  "$@" >"$output_file" 2>"$error_file" &
+  if loader_wait "$!" "$message"; then
+    status=0
+  else
+    status=$?
+  fi
+
+  printf -v "$var_name" '%s' "$(<"$output_file")"
+  if [[ -s "$error_file" ]]; then
+    printf '%s\n' "$(<"$error_file")" >&2
+  fi
+
+  rm -f "$output_file" "$error_file"
+  return "$status"
+}
+
 confirm() {
   local prompt="${1:-Are you sure? [y/N]: }"
   echo ""
@@ -196,8 +271,4 @@ get_system_clipboard() {
   fi
 
   return 1
-}
-
-get_user_databases() {
-  mysql -u root -p -e "SHOW DATABASES;" 2>/dev/null | grep -Ev "^(Database|information_schema|performance_schema|mysql|sys)$" || true
 }

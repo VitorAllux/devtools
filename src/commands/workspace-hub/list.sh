@@ -8,7 +8,7 @@ title "Worktree Workspaces"
 root="$(workspace_root)"
 info "Root: ${root}"
 
-workspaces="$(list_workspaces)"
+capture_with_loader workspaces "Scanning workspaces..." list_workspaces
 if [[ -z "$workspaces" ]]; then
   info "No workspaces found."
   exit 0

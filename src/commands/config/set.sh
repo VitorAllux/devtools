@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# devv config:set <KEY> <VALUE>
-# Sets a configuration variable in ~/.config/devv/config.env
+set -euo pipefail
 
-# Load config helper
+source "${DEVTOOLS_DIR}/src/lib/ui.sh"
 source "${DEVTOOLS_DIR}/src/lib/config.sh"
 
 if [[ $# -lt 2 ]]; then
@@ -11,12 +10,14 @@ if [[ $# -lt 2 ]]; then
 fi
 
 KEY="${1:-}"
-VALUE="${2:-}"
+shift
+VALUE="$*"
 
 if [[ -z "$KEY" ]]; then
   die "Key cannot be empty."
 fi
 
+config_valid_key "$KEY" || die "Invalid config key: ${KEY}"
 config_set "$KEY" "$VALUE"
 
-echo "Set $KEY=$VALUE in $(printf "%s" "$HOME/.config/devv/config.env")"
+ok "Set ${KEY} in ${CONFIG_FILE}"

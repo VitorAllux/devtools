@@ -15,4 +15,4 @@ fi
 [[ $# -eq 0 ]] || die "resources:list does not accept arguments."
 
 need python3
-python3 "${DEVTOOLS_DIR}/src/lib/resources.py" list
+run_with_loader "Detecting local resources..." python3 "${DEVTOOLS_DIR}/src/lib/resources.py" list

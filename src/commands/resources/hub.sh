@@ -27,7 +27,7 @@ resources_py="${DEVTOOLS_DIR}/src/lib/resources.py"
 header="Enter: details | Alt-S: start | Alt-R: restart | Alt-X: stop | Esc: exit"
 
 while true; do
-  rows="$(python3 "$resources_py" rows)"
+  capture_with_loader rows "Detecting local resources..." python3 "$resources_py" rows
 
   if [[ -z "$rows" ]]; then
     warn "No resources detected."
@@ -61,19 +61,22 @@ while true; do
 
   case "$key" in
     alt-s)
+      info "Starting resource..."
       python3 "$resources_py" action --sudo start "$resource_id" || true
       pause_for_user
       ;;
     alt-r)
+      info "Restarting resource..."
       python3 "$resources_py" action --sudo restart "$resource_id" || true
       pause_for_user
       ;;
     alt-x)
+      info "Stopping resource..."
       python3 "$resources_py" action --sudo stop "$resource_id" || true
       pause_for_user
       ;;
     "")
-      python3 "$resources_py" details "$resource_id" || true
+      run_with_loader "Loading resource details..." python3 "$resources_py" details "$resource_id" || true
       pause_for_user
       ;;
   esac

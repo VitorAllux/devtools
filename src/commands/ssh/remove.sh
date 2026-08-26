@@ -43,7 +43,7 @@ if [[ -n "${server_name}" ]]; then
   chmod 600 "${DEVV_SERVERS_FILE}" 2>/dev/null || true
   ok "Removed entries for '${server_name}'."
 
-  if sync_encrypted_servers_file; then
+  if run_with_loader "Updating encrypted SSH backup..." sync_encrypted_servers_file; then
     info "Encrypted SSH secret updated in ${DEVV_ENCRYPTED_SERVERS_FILE}."
   else
     warn "Could not update encrypted SSH secret automatically. Run env:bootstrap after configuring key/recipients."
@@ -59,7 +59,7 @@ if [[ -n "${server_line}" ]]; then
   chmod 600 "${DEVV_SERVERS_FILE}" 2>/dev/null || true
   ok "Removed entry '${server_line}'."
 
-  if sync_encrypted_servers_file; then
+  if run_with_loader "Updating encrypted SSH backup..." sync_encrypted_servers_file; then
     info "Encrypted SSH secret updated in ${DEVV_ENCRYPTED_SERVERS_FILE}."
   else
     warn "Could not update encrypted SSH secret automatically. Run env:bootstrap after configuring key/recipients."
@@ -88,7 +88,7 @@ echo "$selected_servers" | while read -r line; do
   info "Removed: $line"
 done
 
-if sync_encrypted_servers_file; then
+if run_with_loader "Updating encrypted SSH backup..." sync_encrypted_servers_file; then
   info "Encrypted SSH secret updated in ${DEVV_ENCRYPTED_SERVERS_FILE}."
 else
   warn "Could not update encrypted SSH secret automatically. Run env:bootstrap after configuring key/recipients."

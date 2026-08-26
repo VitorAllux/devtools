@@ -54,7 +54,7 @@ fi
 echo "$server_name $server_conn" >> "${DEVV_SERVERS_FILE}"
 chmod 600 "${DEVV_SERVERS_FILE}" 2>/dev/null || true
 
-if sync_encrypted_servers_file; then
+if run_with_loader "Updating encrypted SSH backup..." sync_encrypted_servers_file; then
   info "Encrypted SSH secret updated in ${DEVV_ENCRYPTED_SERVERS_FILE}."
 else
   warn "Could not update encrypted SSH secret automatically. Run env:bootstrap after configuring key/recipients."

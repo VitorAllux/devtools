@@ -31,14 +31,13 @@ if [[ -n "$COOKIE" ]]; then
   cookie_header="Cookie: ${COOKIE}"
 fi
 
-info "Downloading report from cursor.com..."
 cmd=(curl -sS -L)
 if [[ -n "$cookie_header" ]]; then
   cmd+=(-H "$cookie_header")
 fi
 cmd+=("$URL" -o "$FILE")
 
-"${cmd[@]}"
+run_with_loader "Downloading report from cursor.com..." "${cmd[@]}"
 
 if [[ ! -f "$FILE" ]] || ! grep -q "Cost" "$FILE"; then
   err "Failed to download or invalid CSV format. The API might require a SESSION COOKIE."
