@@ -162,32 +162,40 @@ func (m *Manager) sessionSearchRoot() string {
 }
 
 func sessionFZFArgs(currentDir string, searchRoot string, depth int, executable string) []string {
-	shortcuts := []ui.FZFShortcut{
-		{Label: "Enter", Description: "open session"},
-		{Key: "left", Label: "Left", Description: "parent"},
-		{Key: "right", Label: "Right", Description: "enter dir"},
-		{Label: "Esc", Description: "exit"},
-	}
 	startCommand := browseFeedCommand(executable, currentDir, "", searchRoot, depth)
 	changeCommand := browseFeedCommand(executable, currentDir, "{q}", searchRoot, depth)
-	return ui.FZFHub{
-		Prompt:        ui.Crown("session") + ui.Muted("> "),
-		BorderLabel:   "dvv tmux:session",
-		BorderTag:     ui.Muted(" directory picker "),
-		HeaderLines:   []string{ui.Muted("Current ") + ui.Accent(currentDir) + ui.Muted(" | Search root ") + ui.Accent(searchRoot)},
-		Preview:       browsePreviewCommand(shortcuts),
-		PreviewLabel:  "directory panel",
-		PreviewWindow: "right,34%,border-rounded,wrap",
-		Shortcuts:     shortcuts,
-		ExtraArgs: []string{
-			"--delimiter=\\|",
-			"--with-nth=4",
-			"--nth=3,4",
-			"--disabled",
-			"--bind=start:reload:" + startCommand,
-			"--bind=change:reload:" + changeCommand,
-		},
-	}.Args()
+	args := sessionPickerThemeArgs(ui.Crown("session") + ui.Muted("> "))
+	args = append(args,
+		"--border-label="+ui.Crown(" dvv tmux:session ")+ui.Muted(" directory picker "),
+		"--border-label-pos=2",
+		"--header="+ui.Muted("Left: parent  Right: enter  Enter: select  Esc: cancel"),
+		"--header-first",
+		"--expect=left,right",
+		"--query=",
+		"--delimiter=\\|",
+		"--with-nth=4",
+		"--nth=3,4",
+		"--disabled",
+		"--bind=start:reload:"+startCommand,
+		"--bind=change:reload:"+changeCommand,
+	)
+	return args
+}
+
+func sessionPickerThemeArgs(prompt string) []string {
+	args := ui.FZFThemeArgs(prompt)
+	filtered := make([]string, 0, len(args))
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--height=") ||
+			strings.HasPrefix(arg, "--min-height=") ||
+			strings.HasPrefix(arg, "--margin=") ||
+			strings.HasPrefix(arg, "--padding=") ||
+			strings.HasPrefix(arg, "--separator=") {
+			continue
+		}
+		filtered = append(filtered, arg)
+	}
+	return append([]string{"--height=50%", "--min-height=12"}, filtered...)
 }
 
 func browseFeedCommand(executable string, currentDir string, query string, searchRoot string, depth int) string {
@@ -327,37 +335,6 @@ func browseLabel(entry BrowseEntry) string {
 		}
 		return entry.Name + "/"
 	}
-}
-
-func browsePreviewCommand(shortcuts []ui.FZFShortcut) string {
-	shortcutArgs := make([]string, 0, len(shortcuts)*2)
-	for _, shortcut := range shortcuts {
-		label := strings.TrimSpace(shortcut.Label)
-		if label == "" {
-			label = strings.TrimSpace(shortcut.Key)
-		}
-		description := strings.TrimSpace(shortcut.Description)
-		if label == "" || description == "" {
-			continue
-		}
-		shortcutArgs = append(shortcutArgs, shellQuote(label), shellQuote(description))
-	}
-	return `sh -c 'line=$1
-shift
-path=$(printf "%s" "$line" | cut -d "|" -f1)
-kind=$(printf "%s" "$line" | cut -d "|" -f2)
-name=$(printf "%s" "$line" | cut -d "|" -f3)
-printf "\033[1;38;2;212;175;55mDirectory\033[0m\n"
-printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Name" "$name"
-printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Kind" "$kind"
-printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Path" "$path"
-printf "\n\033[38;2;139;126;163m--------------------------------\033[0m\n"
-printf "\033[1;38;2;212;175;55mCommands\033[0m\n"
-while [ "$#" -gt 1 ]; do
-  printf "  \033[38;2;212;175;55m[%-7s]\033[0m \033[38;2;139;126;163m%s\033[0m\n" "$1" "$2"
-  shift 2
-done
-' sh {} ` + strings.Join(shortcutArgs, " ")
 }
 
 func parseBrowseSelection(selection string) (BrowseEntry, error) {

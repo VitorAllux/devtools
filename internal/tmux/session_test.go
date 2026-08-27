@@ -78,6 +78,15 @@ func TestSelectDirectoryBuildsReloadingFZFCommand(t *testing.T) {
 	if !runner.hasArg("--delimiter=\\|") || !runner.hasArg("--with-nth=4") {
 		t.Fatalf("fzf args should use the legacy pipe display rule: %#v", runner.fzfArgs)
 	}
+	if !runner.hasArg("--query=") {
+		t.Fatalf("fzf args should clear inherited query state: %#v", runner.fzfArgs)
+	}
+	if !runner.hasArg("--height=50%") || !runner.hasArg("--min-height=12") {
+		t.Fatalf("fzf args should use the legacy fixed height rule: %#v", runner.fzfArgs)
+	}
+	if runner.hasArgPrefix("--preview=") || runner.hasArgPrefix("--margin=") || runner.hasArgPrefix("--padding=") {
+		t.Fatalf("session picker should not use preview, margin, or padding: %#v", runner.fzfArgs)
+	}
 }
 
 func TestOpenSessionCreatesUniqueDetachedSessionAndAttaches(t *testing.T) {
