@@ -48,10 +48,10 @@ func showHelp(cfg *config.Config) {
 	helpEntry("dvv ssh --target <user@host>", "Connect to a raw SSH target")
 	fmt.Println()
 	helpSection("Hub Shortcuts")
-	helpEntry("Enter", "Open selected SSH entry in a new terminal tmux session")
+	helpEntry("Enter", "Open selected SSH entry in a new terminal tab")
 	helpEntry(keys.Add.Label, "Add SSH entry")
 	helpEntry(keys.Remove.Label, "Remove selected SSH entry")
-	helpEntry(keys.NewTerminal.Label, "Open selected SSH entry in a new terminal tmux session")
+	helpEntry(keys.NewTerminal.Label, "Open selected SSH entry in a new terminal tab")
 	helpEntry("Esc", "Exit")
 	fmt.Println()
 	helpSection("Shortcut Config")
@@ -316,7 +316,7 @@ func parseSSHArgs(args []string) (string, string, bool, error) {
 	fs.SetOutput(io.Discard)
 	name := fs.String("name", "", "SSH entry name")
 	target := fs.String("target", "", "SSH target")
-	newTerminal := fs.Bool("new-terminal", false, "Open in a system terminal")
+	newTerminal := fs.Bool("new-terminal", false, "Open in a new terminal tab when supported")
 	if err := fs.Parse(args); err != nil {
 		return "", "", false, err
 	}

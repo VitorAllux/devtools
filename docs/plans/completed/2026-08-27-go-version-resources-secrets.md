@@ -13,7 +13,7 @@ This phase ports the previous resources detector and the encrypted local secrets
 - Added `internal/resources` for local service, Docker daemon, Docker container, and Docker Compose project detection.
 - Added the `dvv resources` hub with Royal Noir fzf styling, side preview, and configurable action shortcuts.
 - Preserved resource actions for `start`, `stop`, and `restart`.
-- Added `dvv resources list` and `dvv resources:list` for script-friendly listing.
+- Kept resources listing inside the hub instead of exposing a separate list command.
 - Added `internal/secrets` for `dvv bootstrap`.
 - Preserved `dvv env:bootstrap` as the compatibility route.
 - Restored AGE private key lookup from Bitwarden through `DVV_BW_AGE_KEY_ITEM` and legacy `DEVT_BW_AGE_KEY_ITEM`.
@@ -31,8 +31,6 @@ dvv bootstrap
 ## Compatibility Commands
 
 ```text
-dvv resources list
-dvv resources:list
 dvv env:bootstrap
 ```
 

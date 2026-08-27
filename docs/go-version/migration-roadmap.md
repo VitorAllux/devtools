@@ -94,12 +94,7 @@ Current Go command surface:
 dvv resources
 ```
 
-Compatibility/list route:
-
-```text
-dvv resources list
-dvv resources:list
-```
+Listing and actions are owned by the interactive hub instead of separate public commands.
 
 ## Phase 7: WSL
 

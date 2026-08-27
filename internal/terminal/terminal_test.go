@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestLauncherUsesWindowsTerminalWithWSLWhenAvailable(t *testing.T) {
+func TestLauncherUsesWindowsTerminalTabWithWSLWhenAvailable(t *testing.T) {
 	t.Setenv("WSL_DISTRO_NAME", "Ubuntu")
 	runner := &fakeRunner{paths: map[string]bool{"wt.exe": true}}
 
@@ -16,7 +16,21 @@ func TestLauncherUsesWindowsTerminalWithWSLWhenAvailable(t *testing.T) {
 		t.Fatalf("Open returned error: %v", err)
 	}
 
-	want := "wt.exe wsl.exe -d Ubuntu -e tmux attach -t space"
+	want := "wt.exe -w 0 new-tab wsl.exe -d Ubuntu -e tmux attach -t space"
+	if got := runner.started; got != want {
+		t.Fatalf("started = %q, want %q", got, want)
+	}
+}
+
+func TestLauncherUsesLinuxTerminalTabWhenSupported(t *testing.T) {
+	runner := &fakeRunner{paths: map[string]bool{"gnome-terminal": true}}
+
+	err := (Launcher{Runner: runner}).Open(context.Background(), "tmux", "attach", "-t", "space")
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	want := "gnome-terminal --tab -- tmux attach -t space"
 	if got := runner.started; got != want {
 		t.Fatalf("started = %q, want %q", got, want)
 	}

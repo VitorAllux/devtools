@@ -72,10 +72,10 @@ dvv ssh
 - Default SSH hub shortcuts are:
 
 ```text
-Enter  open selected SSH entry in a new terminal attached to a dedicated tmux session
+Enter  open selected SSH entry in a new terminal tab attached to a dedicated tmux session
 Shift+A  add SSH entry
 Shift+R  remove selected SSH entry
-Shift+T  open selected SSH connection in a new terminal attached to tmux
+Shift+T  open selected SSH connection in a new terminal tab attached to tmux
 Esc    exit
 ```
 
@@ -144,12 +144,7 @@ dvv bootstrap
 - `dvv resources` is the interactive local resources hub.
 - `dvv bootstrap` restores AGE/Bitwarden secret state and encrypted SSH backups.
 - Keep `dvv env:bootstrap` as a compatibility route for the previous Bash command.
-- Script-friendly compatibility routes may exist, but should not make root help noisy:
-
-```text
-dvv resources list
-dvv resources:list
-```
+- Do not advertise a separate resources list command; listing belongs inside the hub.
 
 ## Go Version Rewrite
 

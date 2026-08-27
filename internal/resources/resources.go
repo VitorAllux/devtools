@@ -72,8 +72,6 @@ func Run(ctx context.Context, cfg *config.Config, runner run.Runner, args []stri
 	case "help", "--help", "-h":
 		showHelp(cfg)
 		return nil
-	case "list":
-		return manager.CommandList(ctx)
 	case "details":
 		return manager.CommandDetails(ctx, args[1:])
 	case "start", "stop", "restart":
@@ -1022,7 +1020,6 @@ func showHelp(cfg *config.Config) {
 	fmt.Printf("  %s dvv resources\n\n", ui.Bold("Usage:"))
 	helpSection("Hub")
 	helpEntry("dvv resources", "Open the interactive local resources hub")
-	helpEntry("dvv resources list", "List detected resources")
 	fmt.Println()
 	helpSection("Hub Shortcuts")
 	helpEntry("Enter", "Show selected resource details")

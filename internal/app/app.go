@@ -94,8 +94,6 @@ func Run(args []string) int {
 			return 1
 		}
 		return 0
-	case "resources:list":
-		return runCommand(ctx, cfg, runner, "resources", append([]string{"list"}, commandArgs...))
 	case "ssh":
 		if err := sshcmd.Run(ctx, cfg, runner, commandArgs); err != nil {
 			ui.Error("%v", err)

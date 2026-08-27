@@ -52,19 +52,12 @@ _dvv() {
           )
           _describe -t bootstrap-flags 'bootstrap flags' bootstrap_flags
           ;;
-        resources)
-          local -a resources_actions
-          resources_actions=(
-            "list:List detected resources"
-          )
-          _describe -t resources-actions 'resources actions' resources_actions
-          ;;
         ssh)
           local -a ssh_flags
           ssh_flags=(
             "--name:Connect by SSH entry name"
             "--target:Connect to a raw SSH target"
-            "--new-terminal:Open in a system terminal"
+            "--new-terminal:Open in a new terminal tab when supported"
           )
           _describe -t ssh-flags 'ssh flags' ssh_flags
           ;;

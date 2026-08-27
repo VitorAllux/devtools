@@ -123,10 +123,10 @@ dvv ssh
 
 Hub shortcuts:
 
-- `Enter`: open the selected server in a new terminal attached to a dedicated tmux SSH session.
+- `Enter`: open the selected server in a new terminal tab attached to a dedicated tmux SSH session.
 - `Shift+A`: add a new SSH entry.
 - `Shift+R`: remove the selected SSH entry.
-- `Shift+T`: open the selected SSH connection in a new terminal attached to tmux.
+- `Shift+T`: open the selected SSH connection in a new terminal tab attached to tmux.
 - `Esc`: exit.
 
 The hub action shortcuts are configured in `dvv.config.json`.
@@ -181,7 +181,7 @@ Each workspace stores metadata in `.workspace/config.json`. Bootstrap copy rules
 dvv tmux
 ```
 
-The tmux hub detects the default API/Web environment from `API_DIR` and `WEB_DIR`, plus workspace-specific project folders when they exist. Starting an environment creates or reuses a tmux session and opens it in a new terminal when a compatible terminal launcher is available.
+The tmux hub detects the default API/Web environment from `API_DIR` and `WEB_DIR`, plus workspace-specific project folders when they exist. Starting an environment creates or reuses a tmux session and opens it in a new terminal tab when a compatible terminal launcher is available.
 
 Hub shortcuts:
 
@@ -208,7 +208,7 @@ dvv tmux:session
 dvv tmux:session ~/workspace/my-project
 ```
 
-This is the command behind `Ctrl+F`. It searches directories from the configured tmux session roots, creates a detached tmux session, and opens it in a new terminal. If no compatible terminal launcher is available and the command is already inside tmux, it switches the current client.
+This is the command behind `Ctrl+F`. It searches directories from the configured tmux session roots, creates a detached tmux session, and opens it in a new terminal tab when supported. If no compatible terminal launcher is available and the command is already inside tmux, it switches the current client.
 
 Picker shortcuts:
 
@@ -302,12 +302,6 @@ Hub shortcuts:
 - `Alt+R`: restart selected resource.
 - `Alt+X`: stop selected resource.
 - `Esc`: exit.
-
-Script-friendly action:
-
-```bash
-dvv resources list
-```
 
 ## Theme
 

@@ -277,7 +277,7 @@ func sshHubShortcuts(keys config.SSHHubKeyBindings) []ui.FZFShortcut {
 		{Label: "Enter", Description: "open terminal"},
 		{Key: keys.Add.FZFKey, Label: keys.Add.Label, Description: "add SSH entry"},
 		{Key: keys.Remove.FZFKey, Label: keys.Remove.Label, Description: "remove selected"},
-		{Key: keys.NewTerminal.FZFKey, Label: keys.NewTerminal.Label, Description: "open system terminal"},
+		{Key: keys.NewTerminal.FZFKey, Label: keys.NewTerminal.Label, Description: "open terminal tab"},
 		{Label: "Esc", Description: "exit hub"},
 	}
 }

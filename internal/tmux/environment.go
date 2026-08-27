@@ -551,7 +551,7 @@ func showTmuxHelp(_ *config.Config) {
 	helpEntry("dvv tmux web-restart", "Restart Web pane")
 	fmt.Println()
 	helpSection("Hub Shortcuts")
-	helpEntry("Enter", "Start/open selected environment in a new terminal")
+	helpEntry("Enter", "Start/open selected environment in a new terminal tab")
 	helpEntry("Alt+U", "Start/open selected environment")
 	helpEntry("Alt+D", "Stop selected environment")
 	helpEntry("Alt+A", "Restart API and Horizon")

@@ -36,7 +36,7 @@ func (m *Manager) OpenInNewTerminal(ctx context.Context, entry Entry) error {
 		return err
 	}
 	if !commandExists(m, "tmux") {
-		return fmt.Errorf("tmux is required to open SSH targets in a new terminal session")
+		return fmt.Errorf("tmux is required to open SSH targets in a new terminal tab")
 	}
 	if err := m.runConnectLoader(ctx, entry); err != nil {
 		return err

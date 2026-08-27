@@ -18,7 +18,7 @@ func (l Launcher) Open(ctx context.Context, command string, args ...string) erro
 		return fmt.Errorf("terminal command is required")
 	}
 	if l.exists("wt.exe") {
-		launchArgs := []string{"wsl.exe"}
+		launchArgs := []string{"-w", "0", "new-tab", "wsl.exe"}
 		if distro := os.Getenv("WSL_DISTRO_NAME"); distro != "" {
 			launchArgs = append(launchArgs, "-d", distro)
 		}
@@ -31,11 +31,11 @@ func (l Launcher) Open(ctx context.Context, command string, args ...string) erro
 		Command string
 		Args    []string
 	}{
+		{"gnome-terminal", append([]string{"--tab", "--", command}, args...)},
+		{"konsole", append([]string{"--new-tab", "-e", command}, args...)},
+		{"xfce4-terminal", []string{"--tab", "-e", shellCommand(command, args...)}},
 		{"x-terminal-emulator", append([]string{"-e", command}, args...)},
-		{"gnome-terminal", append([]string{"--", command}, args...)},
-		{"konsole", append([]string{"-e", command}, args...)},
 		{"alacritty", append([]string{"-e", command}, args...)},
-		{"xfce4-terminal", []string{"-e", shellCommand(command, args...)}},
 	}
 
 	for _, launcher := range launchers {
