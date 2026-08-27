@@ -228,9 +228,31 @@ func TestVSCodeOpenerUsesNewWindow(t *testing.T) {
 		t.Fatalf("Open returned error: %v", err)
 	}
 
-	want := "code --new-window " + workspacePath
+	want := "code --new-window --folder-uri " + fileURI(workspacePath)
 	if !runner.hasRun(want) {
 		t.Fatalf("VS Code should open in a new window, runs = %#v", runner.runs)
+	}
+}
+
+func TestVSCodeExeOpenerUsesWSLUNCPath(t *testing.T) {
+	t.Setenv("WSL_DISTRO_NAME", "Ubuntu")
+
+	root := t.TempDir()
+	workspacePath := filepath.Join(root, "workspace-alpha")
+	mustMkdir(t, workspacePath)
+
+	runner := newWorkspaceRunner()
+	runner.paths["code.exe"] = true
+	manager := NewManager(testWorkspaceConfig(root), runner)
+
+	err := manager.Open(context.Background(), Workspace{Name: "alpha", DirName: "workspace-alpha", Path: workspacePath}, "code")
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	want := `code.exe --new-window \\wsl.localhost\Ubuntu` + strings.ReplaceAll(workspacePath, "/", `\`)
+	if !runner.hasRun(want) {
+		t.Fatalf("VS Code exe should open WSL folders through UNC paths, runs = %#v", runner.runs)
 	}
 }
 
