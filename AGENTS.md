@@ -17,6 +17,7 @@ These rules document the local conventions for future agents and maintainers wor
 ## Help And Command Lists
 
 - Main help for the Go rewrite lives in `cmd/dvv` and the `bin/dvv` launcher.
+- `dvv build` is the developer-facing rebuild command and must work from any working directory.
 - `npm run build` should only rebuild project artifacts inside the repository.
 - `dvv setup` is the explicit command for shell integration. It may update zsh completion and managed shortcuts.
 - `dvv doctor` checks local dependencies and integration state without changing files.

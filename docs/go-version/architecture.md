@@ -69,6 +69,7 @@ Only hub-first Go-ready features should be advertised in public help. The curren
 ```text
 dvv setup
 dvv bootstrap
+dvv build
 dvv doctor
 dvv ssh
 dvv workspace

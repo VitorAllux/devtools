@@ -74,6 +74,12 @@ func Run(args []string) int {
 			return 1
 		}
 		return 0
+	case "build":
+		if err := setupcmd.RunBuild(ctx, cfg, runner, commandArgs); err != nil {
+			ui.Error("%v", err)
+			return 1
+		}
+		return 0
 	case "doctor":
 		if err := setupcmd.RunDoctor(ctx, cfg, runner, commandArgs); err != nil {
 			ui.Error("%v", err)
@@ -196,6 +202,7 @@ func showHelp() {
 	helpEntry("tmux", ">", "Open the tmux environment hub")
 	fmt.Println()
 	helpSection("System")
+	helpEntry("build", "*", "Rebuild the local dvv binary")
 	helpEntry("setup", "*", "Install zsh completion and shell shortcuts")
 	helpEntry("bootstrap", "*", "Restore AGE/Bitwarden secrets and SSH backup")
 	helpEntry("doctor", "?", "Check local dependencies and integration")

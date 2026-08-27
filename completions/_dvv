@@ -12,6 +12,7 @@ _dvv() {
       local -a commands
       commands=(
         "bootstrap:Restore AGE/Bitwarden secrets and SSH backup"
+        "build:Rebuild the local dvv binary"
         "config:Open the configuration hub"
         "db:Open the database hub"
         "doctor:Check local dependencies and integration"

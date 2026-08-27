@@ -11,6 +11,7 @@ This branch is the Go rewrite. The current public surface is hub-first:
 ```bash
 dvv setup
 dvv bootstrap
+dvv build
 dvv doctor
 dvv ssh
 dvv workspace
@@ -20,7 +21,7 @@ dvv resources
 dvv config
 ```
 
-`dvv setup` installs optional shell integration. `dvv bootstrap` restores local encrypted secrets. `dvv doctor` checks the local environment. `dvv ssh`, `dvv workspace`, `dvv tmux`, `dvv db`, `dvv resources`, and `dvv config` open the interactive hubs for each topic.
+`dvv setup` installs optional shell integration. `dvv bootstrap` restores local encrypted secrets. `dvv build` rebuilds the local binary from any directory. `dvv doctor` checks the local environment. `dvv ssh`, `dvv workspace`, `dvv tmux`, `dvv db`, `dvv resources`, and `dvv config` open the interactive hubs for each topic.
 
 `Ctrl+F` opens the tmux directory picker preserved from the previous shell version.
 
@@ -66,13 +67,15 @@ If your shell still opens an older `dvv`, refresh the shell command cache with `
 
 ## Development Build
 
-After changing the project, run build from this repository:
+After changing the project, run:
 
 ```bash
-npm run build
+dvv build
 ```
 
-That command only rebuilds `dist/dvv`. It does not edit shell files.
+That command rebuilds `dist/dvv` from any working directory. It does not edit shell files.
+
+`npm run build` is also valid, but only when your current directory is this repository root. Running `npm run build` from `~` makes npm look for `/root/package.json`, which is expected npm behavior.
 
 When using `npm link`, the `bin/dvv` launcher also rebuilds automatically if Go source files are newer than `dist/dvv`. Set `DVV_AUTO_BUILD=0` to disable that development behavior.
 
@@ -324,6 +327,7 @@ Use `examples/servers.list` for documentation/examples, not a real server list.
 ## Development
 
 ```bash
+dvv build
 npm run build
 npm test
 npm run vet

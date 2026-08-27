@@ -123,7 +123,7 @@ The `tmux.session` section contains the standalone directory session picker used
 
 Default search root priority mirrors the previous Bash implementation: `TMUX_DEFAULT_DIR`, then the configured `searchRoots` defaults `~/workspace`, `~/Work/Development/dev`, `~/Work/Development`, and `~/Development`, then the common parent of `API_DIR` and `WEB_DIR`, then `$HOME`.
 
-Shortcut changes are applied by running `dvv setup`; `npm run build` does not edit shell files.
+Shortcut changes are applied by running `dvv setup`; `dvv build` and `npm run build` do not edit shell files.
 
 ## Workspace Config
 

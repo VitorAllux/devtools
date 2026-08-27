@@ -36,6 +36,27 @@ func RunDoctor(ctx context.Context, cfg *config.Config, runner run.Runner, args 
 	return manager.Doctor(ctx)
 }
 
+func RunBuild(ctx context.Context, cfg *config.Config, runner run.Runner, args []string) error {
+	if len(args) > 0 && isHelpArg(args[0]) {
+		showBuildHelp()
+		return nil
+	}
+	if len(args) > 0 {
+		return fmt.Errorf("build does not accept arguments")
+	}
+	manager := Manager{Config: cfg, Runner: runner}
+	return manager.Build(ctx)
+}
+
+func (m Manager) Build(ctx context.Context) error {
+	ui.Title("Build")
+	if err := m.Runner.Run(ctx, m.Config.RootDir, "node", "scripts/build.js"); err != nil {
+		return err
+	}
+	ui.OK("Build complete. Run `dvv setup` only when completion or shell shortcuts changed.")
+	return nil
+}
+
 func (m Manager) Setup(ctx context.Context) error {
 	ui.Title("Setup")
 	if err := m.Runner.Run(ctx, m.Config.RootDir, "node", "scripts/setup.js"); err != nil {
@@ -164,6 +185,14 @@ func showDoctorHelp() {
 	helpSection("Checks")
 	helpEntry("commands", "dvv, node, git, ssh, tmux, fzf, MySQL, rclone, AGE, Bitwarden, Docker, and service tools")
 	helpEntry("files", "dist binary, SSH/secrets files, workspace root, dumps dir, completion, and shortcuts")
+}
+
+func showBuildHelp() {
+	ui.Title("Build")
+	fmt.Printf("  %s dvv build\n\n", ui.Bold("Usage:"))
+	helpSection("Actions")
+	helpEntry("dvv build", "Rebuild the local Go binary from any working directory")
+	helpEntry("dvv setup", "Refresh completion and shell shortcuts when those files changed")
 }
 
 func helpSection(title string) {

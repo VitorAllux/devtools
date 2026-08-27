@@ -14,21 +14,13 @@ if (!env.GOCACHE) {
   env.GOCACHE = path.join(os.tmpdir(), "dvv-go-build-cache");
 }
 
+if (args[0] === "build" && args.length === 1) {
+  runBuild();
+  process.exit(0);
+}
+
 if (shouldRebuild(binaryPath)) {
-  const build = childProcess.spawnSync(process.execPath, [path.join(root, "scripts", "build.js")], {
-    cwd: root,
-    env,
-    stdio: "inherit",
-    windowsHide: false,
-  });
-  if (build.error) {
-    console.error("dvv could not rebuild.");
-    console.error(build.error.message);
-    process.exit(127);
-  }
-  if ((build.status ?? 1) !== 0) {
-    process.exit(build.status ?? 1);
-  }
+  runBuild();
 }
 
 let command = binaryPath;
@@ -48,12 +40,29 @@ const result = childProcess.spawnSync(command, commandArgs, {
 
 if (result.error) {
   console.error("dvv could not start.");
-  console.error("Run `npm run build` from the project root, or install Go for source execution.");
+  console.error("Run `dvv build`, or install Go for source execution.");
   console.error(result.error.message);
   process.exit(127);
 }
 
 process.exit(result.status ?? 1);
+
+function runBuild() {
+  const build = childProcess.spawnSync(process.execPath, [path.join(root, "scripts", "build.js")], {
+    cwd: root,
+    env,
+    stdio: "inherit",
+    windowsHide: false,
+  });
+  if (build.error) {
+    console.error("dvv could not rebuild.");
+    console.error(build.error.message);
+    process.exit(127);
+  }
+  if ((build.status ?? 1) !== 0) {
+    process.exit(build.status ?? 1);
+  }
+}
 
 function shouldRebuild(binary) {
   if (process.env.DVV_AUTO_BUILD === "0") {
