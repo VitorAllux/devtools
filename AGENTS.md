@@ -12,10 +12,14 @@ These rules document the local conventions for future agents and maintainers wor
 - For interactive processes such as SSH, show loaders before terminal handoff and stop them before the child process owns the terminal.
 - Avoid global shell keybindings unless the project explicitly defines one. They can conflict with terminals, shells, editors, and IDEs.
 - Prefer explicit `dvv ...` commands. Personal shell shortcuts belong in the user's own shell config.
+- Project-managed zsh shortcuts are `Ctrl+F` for `dvv tmux:session` and `Alt+S` for `dvv ssh`.
 
 ## Help And Command Lists
 
 - Main help for the Go rewrite lives in `cmd/dvv` and the `bin/dvv` launcher.
+- `npm run build` should only rebuild project artifacts inside the repository.
+- `dvv setup` is the explicit command for shell integration. It may update zsh completion and managed shortcuts.
+- `dvv doctor` checks local dependencies and integration state without changing files.
 - Use shared help helpers so command names and descriptions stay aligned.
 - Keep command descriptions in this shape:
 
@@ -25,16 +29,19 @@ These rules document the local conventions for future agents and maintainers wor
 
 - Keep help, zsh completion, README command lists, and the router command surface in sync.
 - If a command name changes in help, update `completions/_dvv` in the same change.
+- Support routes used by shell shortcuts or compatibility scripts may exist without being advertised in root help.
 
 ## Shortcuts
 
 - Avoid new `Ctrl-*` shortcuts for dvv features. They commonly conflict with shells, terminal apps, VS Code, Cursor, and fzf defaults.
+- `Ctrl+F` is the only approved global `Ctrl-*` shortcut, preserved from the previous Bash implementation for the tmux directory session picker.
+- Root help should present the tmux hub as `dvv tmux` and the directory picker as the `Ctrl+F` shortcut.
 - Do not use `Ctrl+S`; many terminals treat it as XOFF flow control and appear frozen.
 - Interactive hubs should use local `Shift+letter` shortcuts for hub actions by default.
 - Hub shortcuts must be configurable in `dvv.config.json` before a hub is exposed.
 - New fzf-based hubs should use `internal/ui.FZFHub` for border labels, headers, shortcut badges, previews, and hidden raw selection values.
 - In fzf, `Shift+letter` is represented by the uppercase letter key, such as `A` for `Shift+A`.
-- For the planned workspace hub, use these default local fzf shortcuts:
+- For the workspace hub, use these default local fzf shortcuts:
 
 ```text
 Enter  open configured opener or choose from available openers
@@ -51,40 +58,38 @@ Esc    cancel/exit
 
 ## SSH Surface
 
-- Public SSH entrypoint and actions are:
+- Public SSH entrypoint is:
 
 ```text
 dvv ssh
-dvv ssh add
-dvv ssh remove
-dvv ssh list
 ```
 
 - `dvv ssh` is the interactive SSH hub.
-- Do not reintroduce colon-shaped public SSH commands or `ssh:connect`.
+- Do not advertise SSH mutation commands in root help or autocomplete while the hub owns add/remove flows.
+- Compatibility routes such as `ssh:add`, `ssh:remove`, and `ssh:list` may exist during migration, but they are not the primary user surface.
+- Do not reintroduce `ssh:connect` as a public command.
 - Hub action shortcuts are configured in `dvv.config.json`.
 - Default SSH hub shortcuts are:
 
 ```text
-Enter  open selected SSH entry in tmux
+Enter  open selected SSH entry in a new terminal attached to a dedicated tmux session
 Shift+A  add SSH entry
 Shift+R  remove selected SSH entry
-Shift+T  open selected SSH connection in a system terminal
+Shift+T  open selected SSH connection in a new terminal attached to tmux
 Esc    exit
 ```
 
 ## Workspace Surface
 
-- Planned public workspace commands stay intentionally small and nested:
+- Public workspace commands stay intentionally small:
 
 ```text
 dvv workspace
-dvv workspace list
 ```
 
 - Workspace creation, opening, project management, and deletion should stay inside the interactive hub.
 - Do not reintroduce public mutation commands such as `workspace:create`, `workspace:open`, `workspace:add-project`, `workspace:remove-project`, or `workspace:remove`.
-- Public command names and autocomplete remain rooted under `workspace`.
+- Root help and autocomplete should advertise `workspace` only unless the user explicitly asks for script commands.
 - Internal implementation paths should keep the feature name explicit as `workspace-hub`.
 - `Enter` in the workspace hub should use `DVV_WORKSPACE_OPENER` when configured, with `DEVT_WORKSPACE_OPENER` as compatibility fallback.
 - When no workspace opener is configured, `Enter` should list openers detected on the system and let the user choose.
@@ -95,9 +100,37 @@ dvv workspace list
 - Workspaces are directories named `workspace-<name>`.
 - Workspaces should contain only git worktrees for selected project directories.
 - Never move or copy the real repositories when creating or managing a workspace.
+- Adopting an existing workspace may only write missing `.workspace/config.json` metadata. It must not move, rename, clean, or remove existing workspace files.
 - Deleting a workspace must not remove non-worktree content without a separate explicit confirmation.
 - Project discovery should search Git repositories from `DVV_WORKSPACE_PROJECT_ROOTS` when set, with `DEVT_WORKSPACE_PROJECT_ROOTS` as compatibility fallback.
 - Workspace creation should ask for the base type: `Bug` prefers `prod`, `Issue` prefers `master`, and `Other` asks for the source branch.
+
+## Tmux, DB, And Config Surface
+
+- Root help should advertise these hub commands:
+
+```text
+dvv tmux
+dvv db
+dvv config
+```
+
+- `dvv tmux:session` is kept for the managed `Ctrl+F` shortcut.
+- Script-friendly compatibility routes may exist, but should not make root help noisy:
+
+```text
+dvv tmux up
+dvv tmux down
+dvv tmux api-restart
+dvv tmux web-restart
+dvv db create
+dvv db import
+dvv db clean
+dvv db truncate
+dvv db drop
+dvv config list
+dvv config set
+```
 
 ## Go Version Rewrite
 
@@ -116,6 +149,7 @@ docs/agents.md
 - Use `main`, README, and this file as the primary source of existing dvv behavior while porting features.
 - Use `https://github.com/EnzoJ0se/code-grove` as an architecture reference for Go package layout, config shape, workspace metadata, bootstrap rules, hooks, safety checks, and agent planning discipline.
 - Do not copy `code-grove` behavior blindly when it conflicts with dvv's command surface or local conventions.
+- Adopt the useful `code-grove` discipline around readable config, focused agent guides, lifecycle hooks, workspace metadata, safety packages, and plan/build/execute flows.
 - The public command for the Go rewrite is `dvv`.
 - Do not keep legacy Bash commands as fallback in this branch. Port intentionally from `main`.
 - Initial migration order is `ssh`, `workspace`, `tmux`, `db`, `systemconfig`, `resources`, then optional `wsl`.
@@ -131,6 +165,9 @@ docs/agents.md
 
 - Keep business logic out of command routing when practical; prefer small packages under `internal/`.
 - Run external commands with argument arrays, not interpolated shell strings, unless shell behavior is explicitly required.
+- Keep core packages decoupled from tmux, editors, opencode, and personal scripts. Use hooks or opener adapters for those integrations.
+- Prefer explicit typed config structs over loosely typed maps when behavior is known.
+- Use comments sparingly. Explain rules, risk, or non-obvious decisions; do not narrate straightforward code.
 - Use `rg` first when searching the repo.
 - Keep edits scoped; avoid unrelated rewrites.
 

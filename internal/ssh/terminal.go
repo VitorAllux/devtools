@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/VitorAllux/devtools/internal/terminal"
 )
 
 var tmuxSessionUnsafeChars = regexp.MustCompile(`[^A-Za-z0-9_.-]+`)
@@ -33,37 +35,21 @@ func (m *Manager) OpenInNewTerminal(ctx context.Context, entry Entry) error {
 	if err := ValidateTarget(entry.Target); err != nil {
 		return err
 	}
+	if !commandExists(m, "tmux") {
+		return fmt.Errorf("tmux is required to open SSH targets in a new terminal session")
+	}
 	if err := m.runConnectLoader(ctx, entry); err != nil {
 		return err
 	}
 
-	if commandExists(m, "wt.exe") {
-		args := []string{"wsl.exe"}
-		if distro := os.Getenv("WSL_DISTRO_NAME"); distro != "" {
-			args = append(args, "-d", distro)
-		}
-		args = append(args, "-e", "ssh", entry.Target)
-		return m.Runner.Start(ctx, "", "wt.exe", args...)
+	session := tmuxSessionName(entry)
+	if err := m.Runner.Run(ctx, "", "tmux", "new-session", "-ds", session, "-n", "ssh", "ssh "+shellQuote(entry.Target)); err != nil {
+		return err
 	}
-
-	launchers := []struct {
-		Command string
-		Args    []string
-	}{
-		{"x-terminal-emulator", []string{"-e", "ssh", entry.Target}},
-		{"gnome-terminal", []string{"--", "ssh", entry.Target}},
-		{"konsole", []string{"-e", "ssh", entry.Target}},
-		{"alacritty", []string{"-e", "ssh", entry.Target}},
-		{"xfce4-terminal", []string{"-e", "ssh " + shellQuote(entry.Target)}},
+	if err := (terminal.Launcher{Runner: m.Runner}).Open(ctx, "tmux", "attach", "-t", session); err != nil {
+		return fmt.Errorf("%w; attach manually with: tmux attach -t %s", err, session)
 	}
-
-	for _, launcher := range launchers {
-		if commandExists(m, launcher.Command) {
-			return m.Runner.Start(ctx, "", launcher.Command, launcher.Args...)
-		}
-	}
-
-	return fmt.Errorf("no compatible terminal launcher found; run: ssh %s", entry.Target)
+	return nil
 }
 
 func commandExists(m *Manager, name string) bool {

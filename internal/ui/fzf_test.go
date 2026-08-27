@@ -72,3 +72,18 @@ func TestFZFSelectedRaw(t *testing.T) {
 		t.Fatalf("raw = %q, want api root@example.com", raw)
 	}
 }
+
+func TestParseFZFExpectOutputSupportsMultiSelect(t *testing.T) {
+	key, selected := ParseFZFExpectOutput("D\n/path/a\trow a\n/path/b\trow b\n")
+	if key != "D" {
+		t.Fatalf("key = %q", key)
+	}
+	if len(selected) != 2 || selected[0] != "/path/a\trow a" || selected[1] != "/path/b\trow b" {
+		t.Fatalf("selected = %#v", selected)
+	}
+
+	key, selected = ParseFZFExpectOutput("\n/path/a\trow a\n")
+	if key != "" || len(selected) != 1 || selected[0] != "/path/a\trow a" {
+		t.Fatalf("got key=%q selected=%#v", key, selected)
+	}
+}

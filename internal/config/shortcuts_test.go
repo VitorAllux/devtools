@@ -33,3 +33,15 @@ func TestNormalizeKeyRejectsUnsupportedShiftKey(t *testing.T) {
 		t.Fatal("expected unsupported shortcut error")
 	}
 }
+
+func TestWorkspaceHubKeysUseDefaults(t *testing.T) {
+	cfg := Config{Project: DefaultProjectConfig()}
+	keys := cfg.WorkspaceHubKeys()
+
+	if keys.Create.FZFKey != "C" || keys.Create.Label != "Shift+C" {
+		t.Fatalf("create key = %#v", keys.Create)
+	}
+	if keys.Manage.FZFKey != "M" || keys.Delete.FZFKey != "D" {
+		t.Fatalf("workspace keys = %#v", keys)
+	}
+}

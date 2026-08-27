@@ -17,12 +17,27 @@ type SSHHubKeyBindings struct {
 	NewTerminal KeyBinding
 }
 
+type WorkspaceHubKeyBindings struct {
+	Create KeyBinding
+	Manage KeyBinding
+	Delete KeyBinding
+}
+
 func (c *Config) SSHHubKeys() SSHHubKeyBindings {
 	defaults := DefaultProjectConfig().SSH.Hub.Shortcuts
 	return SSHHubKeyBindings{
 		Add:         normalizeKeyOrDefault(c.Project.SSH.Hub.Shortcuts.Add, defaults.Add),
 		Remove:      normalizeKeyOrDefault(c.Project.SSH.Hub.Shortcuts.Remove, defaults.Remove),
 		NewTerminal: normalizeKeyOrDefault(c.Project.SSH.Hub.Shortcuts.NewTerminal, defaults.NewTerminal),
+	}
+}
+
+func (c *Config) WorkspaceHubKeys() WorkspaceHubKeyBindings {
+	defaults := DefaultProjectConfig().Workspace.Interactive.Shortcuts
+	return WorkspaceHubKeyBindings{
+		Create: normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Create, defaults.Create),
+		Manage: normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Manage, defaults.Manage),
+		Delete: normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Delete, defaults.Delete),
 	}
 }
 

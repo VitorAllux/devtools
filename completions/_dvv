@@ -5,50 +5,44 @@ _dvv() {
 
   _arguments -C \
     "1: :->cmds" \
-    "2: :->ssh_actions" \
     "*::arg:->args"
 
   case "$state" in
     cmds)
       local -a commands
       commands=(
+        "config:Open the configuration hub"
+        "db:Open the database hub"
+        "doctor:Check local dependencies and integration"
+        "setup:Install zsh completion and shell shortcuts"
         "ssh:Open the SSH hub"
+        "tmux:Open the tmux environment hub"
+        "workspace:Open the workspace hub"
       )
       _describe -t commands 'dvv commands' commands
       ;;
-    ssh_actions)
-      if [[ "${words[2]:-}" == "ssh" ]]; then
-        local -a actions
-        actions=(
-          "add:Add a new SSH entry"
-          "remove:Remove SSH entries"
-          "list:List SSH entries"
-          "help:Show SSH help"
-        )
-        _describe -t ssh-actions 'ssh actions' actions
-      fi
-      ;;
     args)
-      if [[ "${words[2]:-}" == "ssh" ]]; then
-        case "${words[3]:-}" in
-          add)
-          local -a ssh_add_flags
-          ssh_add_flags=(
-            "--name:SSH entry name"
-            "--conn:SSH target"
-            "--target:SSH target"
+      case "${words[2]:-}" in
+        config)
+          local -a config_actions
+          config_actions=(
+            "list:List effective configuration values"
+            "set:Persist a configuration value"
           )
-          _describe -t ssh-add-flags 'ssh add flags' ssh_add_flags
+          _describe -t config-actions 'config actions' config_actions
           ;;
-          remove)
-          local -a ssh_remove_flags
-          ssh_remove_flags=(
-            "--name:SSH entry name"
-            "--line:Exact SSH entry line"
+        db)
+          local -a db_actions
+          db_actions=(
+            "create:Create a database"
+            "import:Import a local or Google Drive dump"
+            "clean:Delete local dump files"
+            "truncate:Truncate selected databases"
+            "drop:Drop selected databases"
           )
-          _describe -t ssh-remove-flags 'ssh remove flags' ssh_remove_flags
+          _describe -t db-actions 'db actions' db_actions
           ;;
-          "")
+        ssh)
           local -a ssh_flags
           ssh_flags=(
             "--name:Connect by SSH entry name"
@@ -57,8 +51,17 @@ _dvv() {
           )
           _describe -t ssh-flags 'ssh flags' ssh_flags
           ;;
-        esac
-      fi
+        tmux)
+          local -a tmux_actions
+          tmux_actions=(
+            "up:Start or open the selected environment"
+            "down:Stop the selected environment"
+            "api-restart:Restart API and Horizon panes"
+            "web-restart:Restart Web pane"
+          )
+          _describe -t tmux-actions 'tmux actions' tmux_actions
+          ;;
+      esac
       ;;
   esac
 }

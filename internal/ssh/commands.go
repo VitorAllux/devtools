@@ -38,14 +38,9 @@ func Run(ctx context.Context, cfg *config.Config, runner run.Runner, args []stri
 func showHelp(cfg *config.Config) {
 	keys := cfg.SSHHubKeys()
 	ui.Title("SSH Hub")
-	fmt.Printf("  %s dvv ssh [action] [args]\n\n", ui.Bold("Usage:"))
+	fmt.Printf("  %s dvv ssh [name|flags]\n\n", ui.Bold("Usage:"))
 	helpSection("Hub")
 	helpEntry("dvv ssh", "Open the interactive SSH hub")
-	fmt.Println()
-	helpSection("Actions")
-	helpEntry("dvv ssh add", "Add a new SSH entry")
-	helpEntry("dvv ssh remove", "Remove SSH entries")
-	helpEntry("dvv ssh list", "List SSH entries")
 	fmt.Println()
 	helpSection("Direct Connect")
 	helpEntry("dvv ssh <name>", "Connect by SSH entry name")
@@ -53,10 +48,10 @@ func showHelp(cfg *config.Config) {
 	helpEntry("dvv ssh --target <user@host>", "Connect to a raw SSH target")
 	fmt.Println()
 	helpSection("Hub Shortcuts")
-	helpEntry("Enter", "Open selected SSH entry in tmux")
+	helpEntry("Enter", "Open selected SSH entry in a new terminal tmux session")
 	helpEntry(keys.Add.Label, "Add SSH entry")
 	helpEntry(keys.Remove.Label, "Remove selected SSH entry")
-	helpEntry(keys.NewTerminal.Label, "Open selected SSH connection in a system terminal")
+	helpEntry(keys.NewTerminal.Label, "Open selected SSH entry in a new terminal tmux session")
 	helpEntry("Esc", "Exit")
 	fmt.Println()
 	helpSection("Shortcut Config")
@@ -232,7 +227,7 @@ func (m *Manager) fzfRemove(ctx context.Context, entries []Entry) (int, error) {
 	input := styledEntriesInput(entries)
 	args := ui.FZFHub{
 		Prompt:        ui.Crown("remove") + ui.Muted("> "),
-		BorderLabel:   "dvv ssh remove",
+		BorderLabel:   "dvv ssh:remove",
 		Preview:       sshPreviewCommand(shortcuts),
 		PreviewLabel:  "hub panel",
 		PreviewWindow: "right,34%,border-rounded,wrap",
@@ -273,7 +268,7 @@ func (m *Manager) basicRemove(entries []Entry) (int, error) {
 }
 
 func parseAddArgs(args []string) (string, string, error) {
-	fs := flag.NewFlagSet("ssh add", flag.ContinueOnError)
+	fs := flag.NewFlagSet("ssh:add", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	name := fs.String("name", "", "SSH entry name")
 	conn := fs.String("conn", "", "SSH target")
@@ -299,7 +294,7 @@ func parseAddArgs(args []string) (string, string, error) {
 }
 
 func parseRemoveArgs(args []string) (string, string, error) {
-	fs := flag.NewFlagSet("ssh remove", flag.ContinueOnError)
+	fs := flag.NewFlagSet("ssh:remove", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	name := fs.String("name", "", "SSH entry name")
 	line := fs.String("line", "", "SSH raw line")

@@ -23,6 +23,7 @@
   ],
   "scripts": {
     "build": "node ./scripts/build.js",
+    "setup": "node ./scripts/setup.js",
     "test": "node ./scripts/go.js test ./...",
     "vet": "node ./scripts/go.js vet ./...",
     "check": "npm run build && npm test && npm run vet",

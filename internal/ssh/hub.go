@@ -135,7 +135,7 @@ func (m *Manager) fzfHub(ctx context.Context, entries []Entry, hubError string) 
 		if !ok {
 			return true, hubErrorMessage(fmt.Errorf("selected SSH entry no longer exists")), nil
 		}
-		if err := m.OpenInTmux(ctx, entry); err != nil {
+		if err := m.OpenInNewTerminal(ctx, entry); err != nil {
 			return true, hubErrorMessage(err), nil
 		}
 		return false, "", nil
@@ -149,7 +149,7 @@ func (m *Manager) basicHub(ctx context.Context, entries []Entry, hubError string
 	}
 	printEntryList(entries)
 	fmt.Println()
-	fmt.Printf("Commands: number opens tmux | %s adds | %s number removes | %s number opens terminal | q exits\n", keys.Add.Label, keys.Remove.Label, keys.NewTerminal.Label)
+	fmt.Printf("Commands: number opens terminal | %s adds | %s number removes | %s number opens terminal | q exits\n", keys.Add.Label, keys.Remove.Label, keys.NewTerminal.Label)
 	value, err := ui.Prompt("SSH")
 	if err != nil {
 		return false, "", err
@@ -198,7 +198,7 @@ func (m *Manager) basicHub(ctx context.Context, entries []Entry, hubError string
 	if !ok {
 		return true, hubErrorMessage(fmt.Errorf("invalid SSH entry selection: %s", value)), nil
 	}
-	if err := m.OpenInTmux(ctx, entries[index]); err != nil {
+	if err := m.OpenInNewTerminal(ctx, entries[index]); err != nil {
 		return true, hubErrorMessage(err), nil
 	}
 	return false, "", nil
@@ -274,7 +274,7 @@ func sshTableHeader() string {
 
 func sshHubShortcuts(keys config.SSHHubKeyBindings) []ui.FZFShortcut {
 	return []ui.FZFShortcut{
-		{Label: "Enter", Description: "open in tmux"},
+		{Label: "Enter", Description: "open terminal"},
 		{Key: keys.Add.FZFKey, Label: keys.Add.Label, Description: "add SSH entry"},
 		{Key: keys.Remove.FZFKey, Label: keys.Remove.Label, Description: "remove selected"},
 		{Key: keys.NewTerminal.FZFKey, Label: keys.NewTerminal.Label, Description: "open system terminal"},

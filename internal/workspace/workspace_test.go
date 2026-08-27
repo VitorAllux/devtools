@@ -1,0 +1,510 @@
+package workspace
+
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/VitorAllux/devtools/internal/config"
+	"github.com/VitorAllux/devtools/internal/discovery"
+	"github.com/VitorAllux/devtools/internal/metadata"
+)
+
+func TestWorkspaceNaming(t *testing.T) {
+	if got := Slug("workspace-feature-123"); got != "feature-123" {
+		t.Fatalf("Slug = %q", got)
+	}
+
+	dirName, err := DirName("Feature 123")
+	if err != nil {
+		t.Fatalf("DirName returned error: %v", err)
+	}
+	if dirName != "workspace-feature-123" {
+		t.Fatalf("DirName = %q", dirName)
+	}
+
+	if _, err := DirName("!!!"); err == nil {
+		t.Fatal("expected invalid workspace name to be rejected")
+	}
+}
+
+func TestListInspectsOnlyWorkspaceWorktrees(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	source := filepath.Join(root, "source", "api")
+	workspacePath := filepath.Join(root, "workspace-alpha")
+	worktreePath := filepath.Join(workspacePath, "api")
+
+	mustMkdir(t, source)
+	mustMkdir(t, worktreePath)
+	mustMkdir(t, filepath.Join(workspacePath, "notes"))
+	mustMkdir(t, filepath.Join(root, "not-a-workspace"))
+
+	runner := newWorkspaceRunner()
+	runner.linked[worktreePath] = source
+	runner.branches[worktreePath] = "alpha"
+	runner.status[worktreePath] = ""
+
+	manager := NewManager(testWorkspaceConfig(root), runner)
+	details, err := manager.List(ctx)
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+
+	if len(details) != 1 {
+		t.Fatalf("details length = %d", len(details))
+	}
+	if details[0].Workspace.DirName != "workspace-alpha" {
+		t.Fatalf("workspace = %#v", details[0].Workspace)
+	}
+	if details[0].ProjectCount != 1 || details[0].Projects[0].Name != "api" {
+		t.Fatalf("projects = %#v", details[0].Projects)
+	}
+}
+
+func TestListFastUsesMetadataWithoutGitInspection(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	workspacePath := filepath.Join(root, "workspaces", "workspace-alpha")
+	mustMkdir(t, workspacePath)
+
+	if err := metadata.Write(workspacePath, metadata.Workspace{
+		Version:       1,
+		WorkspaceName: "alpha",
+		WorkspaceDir:  "workspace-alpha",
+		WorkBranch:    "alpha",
+		Projects: []metadata.Project{
+			{Name: "api", Source: filepath.Join(root, "repos", "api"), Path: filepath.Join(workspacePath, "api")},
+			{Name: "web", Source: filepath.Join(root, "repos", "web"), Path: filepath.Join(workspacePath, "web")},
+		},
+	}); err != nil {
+		t.Fatalf("metadata write failed: %v", err)
+	}
+
+	runner := newWorkspaceRunner()
+	manager := NewManager(testWorkspaceConfig(filepath.Join(root, "workspaces")), runner)
+	details, err := manager.ListFast(ctx)
+	if err != nil {
+		t.Fatalf("ListFast returned error: %v", err)
+	}
+
+	if len(details) != 1 {
+		t.Fatalf("details length = %d", len(details))
+	}
+	if details[0].ProjectCount != 2 || !details[0].HasMetadata || details[0].DirtyKnown {
+		t.Fatalf("details = %#v", details[0])
+	}
+	if len(runner.outputs) != 0 {
+		t.Fatalf("ListFast should not run git inspection commands: %#v", runner.outputs)
+	}
+}
+
+func TestBuildCreatePlanUsesBaseTypeAndCreateAction(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	source := filepath.Join(root, "repos", "api")
+	mustMkdir(t, source)
+
+	runner := newWorkspaceRunner()
+	runner.refs[source] = map[string]bool{"origin/prod": true}
+	manager := NewManager(testWorkspaceConfig(filepath.Join(root, "workspaces")), runner)
+
+	plan, err := manager.BuildCreatePlan(ctx, "Bug 144", []discovery.Project{{Name: "api", Path: source}}, "bug", "")
+	if err != nil {
+		t.Fatalf("BuildCreatePlan returned error: %v", err)
+	}
+
+	if plan.WorkspaceDir != "workspace-bug-144" || plan.WorkBranch != "bug-144" {
+		t.Fatalf("plan workspace fields = %#v", plan)
+	}
+	if len(plan.Items) != 1 {
+		t.Fatalf("items length = %d", len(plan.Items))
+	}
+	item := plan.Items[0]
+	if item.BaseBranch != "prod" || item.Action != CreateBranchAction {
+		t.Fatalf("item = %#v", item)
+	}
+}
+
+func TestWorkspaceRowsShowsEmptyState(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+
+	rows := workspaceRows(nil)
+	if !strings.Contains(rows, "__dvv_header__\t NO") {
+		t.Fatalf("header missing from rows: %q", rows)
+	}
+	if !strings.Contains(rows, "__dvv_empty__\t--  No workspaces yet") {
+		t.Fatalf("empty state row missing: %q", rows)
+	}
+	if paths := selectedWorkspacePaths([]string{"__dvv_empty__\t--  No workspaces yet"}); len(paths) != 0 {
+		t.Fatalf("empty state row should not select a workspace: %#v", paths)
+	}
+}
+
+func TestFZFHubKeepsEmptyWorkspaceHubOpen(t *testing.T) {
+	runner := newWorkspaceRunner()
+	runner.fzfOutput = []byte("\n__dvv_empty__\t--  No workspaces yet\n")
+	manager := NewManager(testWorkspaceConfig(t.TempDir()), runner)
+
+	keepOpen, message, err := manager.fzfHub(context.Background(), nil, "")
+	if err != nil {
+		t.Fatalf("fzfHub returned error: %v", err)
+	}
+	if !keepOpen {
+		t.Fatal("empty hub should stay open")
+	}
+	if !strings.Contains(message, "Use Shift+C to create one") {
+		t.Fatalf("message = %q", message)
+	}
+	if !strings.Contains(runner.fzfInput, "__dvv_empty__") {
+		t.Fatalf("fzf input missing empty state: %q", runner.fzfInput)
+	}
+}
+
+func TestExecuteCreatePlanWritesMetadataAndAgentsFile(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	workspacesRoot := filepath.Join(root, "workspaces")
+	source := filepath.Join(root, "repos", "api")
+	mustMkdir(t, source)
+
+	runner := newWorkspaceRunner()
+	runner.refs[source] = map[string]bool{"origin/master": true}
+	manager := NewManager(testWorkspaceConfig(workspacesRoot), runner)
+
+	plan, err := manager.BuildCreatePlan(ctx, "Issue 42", []discovery.Project{{Name: "api", Path: source}}, "issue", "")
+	if err != nil {
+		t.Fatalf("BuildCreatePlan returned error: %v", err)
+	}
+	result := manager.ExecuteCreatePlan(ctx, plan)
+	if result.Failed != 0 || result.Created != 1 {
+		t.Fatalf("result = %#v", result)
+	}
+
+	meta, exists, err := metadata.Read(plan.WorkspacePath)
+	if err != nil {
+		t.Fatalf("metadata read failed: %v", err)
+	}
+	if !exists || meta.WorkspaceName != "issue-42" || len(meta.Projects) != 1 {
+		t.Fatalf("metadata = %#v exists=%v", meta, exists)
+	}
+	if _, err := os.Stat(filepath.Join(plan.WorkspacePath, "AGENTS.md")); err != nil {
+		t.Fatalf("AGENTS.md missing: %v", err)
+	}
+	if !runner.hasRun("git -C " + source + " worktree add -b issue-42 " + filepath.Join(plan.WorkspacePath, "api") + " origin/master") {
+		t.Fatalf("git worktree add was not executed, runs = %#v", runner.runs)
+	}
+}
+
+func TestBuildAddPlanUsesWorkspaceMetadataBase(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	source := filepath.Join(root, "repos", "web")
+	workspacePath := filepath.Join(root, "workspaces", "workspace-release")
+	mustMkdir(t, source)
+	mustMkdir(t, workspacePath)
+
+	base := "master"
+	if err := metadata.Write(workspacePath, metadata.Workspace{
+		Version:        1,
+		WorkspaceName:  "release",
+		WorkspaceDir:   "workspace-release",
+		WorkBranch:     "release",
+		BaseBranch:     &base,
+		BootstrapOnAdd: true,
+	}); err != nil {
+		t.Fatalf("metadata write failed: %v", err)
+	}
+
+	runner := newWorkspaceRunner()
+	runner.refs[source] = map[string]bool{"origin/master": true}
+	manager := NewManager(testWorkspaceConfig(filepath.Join(root, "workspaces")), runner)
+
+	plan, err := manager.BuildAddPlan(ctx, Workspace{Name: "release", DirName: "workspace-release", Path: workspacePath}, []discovery.Project{{Name: "web", Path: source}}, AddPlanOptions{Mode: AddBaseWorkspace})
+	if err != nil {
+		t.Fatalf("BuildAddPlan returned error: %v", err)
+	}
+	if len(plan.Items) != 1 {
+		t.Fatalf("items length = %d", len(plan.Items))
+	}
+	if plan.Items[0].BaseBranch != "master" || plan.Items[0].WorkBranch != "release" || plan.Items[0].Action != CreateBranchAction {
+		t.Fatalf("item = %#v", plan.Items[0])
+	}
+}
+
+func TestAdoptExistingWritesMissingMetadata(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	source := filepath.Join(root, "repos", "api")
+	workspacePath := filepath.Join(root, "workspaces", "workspace-alpha")
+	worktreePath := filepath.Join(workspacePath, "api")
+	mustMkdir(t, source)
+	mustMkdir(t, worktreePath)
+
+	runner := newWorkspaceRunner()
+	runner.linked[worktreePath] = source
+	runner.branches[worktreePath] = "feature-alpha"
+	manager := NewManager(testWorkspaceConfig(filepath.Join(root, "workspaces")), runner)
+
+	result := manager.AdoptExisting(ctx)
+	if result.Adopted != 1 || result.Scanned != 1 || len(result.Errors) != 0 {
+		t.Fatalf("adopt result = %#v", result)
+	}
+
+	meta, exists, err := metadata.Read(workspacePath)
+	if err != nil {
+		t.Fatalf("metadata read failed: %v", err)
+	}
+	if !exists {
+		t.Fatal("metadata was not written")
+	}
+	if meta.WorkspaceName != "alpha" || meta.WorkBranch != "feature-alpha" || len(meta.Projects) != 1 {
+		t.Fatalf("metadata = %#v", meta)
+	}
+	if _, err := os.Stat(worktreePath); err != nil {
+		t.Fatalf("worktree should not be moved or removed: %v", err)
+	}
+}
+
+func TestAdoptExistingDoesNotOverwriteMetadata(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	workspacePath := filepath.Join(root, "workspaces", "workspace-alpha")
+	mustMkdir(t, workspacePath)
+
+	original := metadata.Workspace{
+		Version:       1,
+		WorkspaceName: "custom-name",
+		WorkspaceDir:  "workspace-alpha",
+		WorkBranch:    "custom-branch",
+	}
+	if err := metadata.Write(workspacePath, original); err != nil {
+		t.Fatalf("metadata write failed: %v", err)
+	}
+
+	manager := NewManager(testWorkspaceConfig(filepath.Join(root, "workspaces")), newWorkspaceRunner())
+	result := manager.AdoptExisting(ctx)
+	if result.Adopted != 0 || result.Skipped != 1 || len(result.Errors) != 0 {
+		t.Fatalf("adopt result = %#v", result)
+	}
+
+	meta, exists, err := metadata.Read(workspacePath)
+	if err != nil || !exists {
+		t.Fatalf("metadata read failed: exists=%v err=%v", exists, err)
+	}
+	if meta.WorkspaceName != original.WorkspaceName || meta.WorkBranch != original.WorkBranch {
+		t.Fatalf("metadata was overwritten: %#v", meta)
+	}
+}
+
+func TestRemoveWorkspaceBlocksDirtyWorktrees(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	source := filepath.Join(root, "repos", "api")
+	workspacePath := filepath.Join(root, "workspaces", "workspace-alpha")
+	worktreePath := filepath.Join(workspacePath, "api")
+	mustMkdir(t, source)
+	mustMkdir(t, worktreePath)
+
+	runner := newWorkspaceRunner()
+	runner.linked[worktreePath] = source
+	runner.status[worktreePath] = " M file.go"
+	manager := NewManager(testWorkspaceConfig(filepath.Join(root, "workspaces")), runner)
+
+	result := manager.RemoveWorkspace(ctx, Workspace{Name: "alpha", DirName: "workspace-alpha", Path: workspacePath}, RemoveWorkspaceOptions{})
+	if result.Status != RemoveBlockedDirty {
+		t.Fatalf("status = %s, result = %#v", result.Status, result)
+	}
+	if _, err := os.Stat(worktreePath); err != nil {
+		t.Fatalf("dirty worktree should remain: %v", err)
+	}
+}
+
+func TestRemoveWorkspaceRequiresExplicitMetadataRemoval(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	workspacePath := filepath.Join(root, "workspaces", "workspace-alpha")
+	mustMkdir(t, workspacePath)
+
+	if err := metadata.Write(workspacePath, metadata.Workspace{
+		Version:       1,
+		WorkspaceName: "alpha",
+		WorkspaceDir:  "workspace-alpha",
+		WorkBranch:    "alpha",
+	}); err != nil {
+		t.Fatalf("metadata write failed: %v", err)
+	}
+
+	manager := NewManager(testWorkspaceConfig(filepath.Join(root, "workspaces")), newWorkspaceRunner())
+	result := manager.RemoveWorkspace(ctx, Workspace{Name: "alpha", DirName: "workspace-alpha", Path: workspacePath}, RemoveWorkspaceOptions{})
+	if result.Status != RemoveBlockedMetadata {
+		t.Fatalf("status = %s, result = %#v", result.Status, result)
+	}
+
+	result = manager.RemoveWorkspace(ctx, Workspace{Name: "alpha", DirName: "workspace-alpha", Path: workspacePath}, RemoveWorkspaceOptions{RemoveMetadata: true})
+	if result.Status != RemoveComplete || !result.RemovedWorkspace {
+		t.Fatalf("status = %s, result = %#v", result.Status, result)
+	}
+	if _, err := os.Stat(workspacePath); !os.IsNotExist(err) {
+		t.Fatalf("workspace should be removed, stat err = %v", err)
+	}
+}
+
+func testWorkspaceConfig(workspacesRoot string) *config.Config {
+	project := config.DefaultProjectConfig()
+	project.Workspace.Root = workspacesRoot
+	project.Workspace.Hooks = map[string][]config.HookConfig{}
+	return &config.Config{
+		ConfigDir: filepath.Join(workspacesRoot, ".config"),
+		Project:   project,
+	}
+}
+
+func mustMkdir(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatalf("MkdirAll %s failed: %v", path, err)
+	}
+}
+
+type workspaceRunner struct {
+	linked    map[string]string
+	primary   map[string]bool
+	refs      map[string]map[string]bool
+	branches  map[string]string
+	status    map[string]string
+	runs      []string
+	outputs   []string
+	fzfInput  string
+	fzfOutput []byte
+	fzfErr    error
+}
+
+func newWorkspaceRunner() *workspaceRunner {
+	return &workspaceRunner{
+		linked:   map[string]string{},
+		primary:  map[string]bool{},
+		refs:     map[string]map[string]bool{},
+		branches: map[string]string{},
+		status:   map[string]string{},
+	}
+}
+
+func (r *workspaceRunner) Run(_ context.Context, _ string, name string, args ...string) error {
+	r.runs = append(r.runs, strings.Join(append([]string{name}, args...), " "))
+	if name != "git" {
+		return nil
+	}
+	projectPath := gitCommandPath(args)
+	if len(args) >= 6 && args[2] == "show-ref" {
+		branch := strings.TrimPrefix(args[5], "refs/heads/")
+		if r.refs[projectPath][branch] || r.refs[projectPath]["refs/heads/"+branch] {
+			return nil
+		}
+		return errors.New("branch not found")
+	}
+	if len(args) >= 6 && args[2] == "rev-parse" {
+		ref := strings.TrimSuffix(args[5], "^{commit}")
+		if r.refs[projectPath][ref] {
+			return nil
+		}
+		return errors.New("ref not found")
+	}
+	if len(args) >= 4 && args[2] == "worktree" && args[3] == "prune" {
+		return nil
+	}
+	if len(args) >= 5 && args[2] == "worktree" && args[3] == "add" {
+		destination := args[4]
+		if args[4] == "-b" {
+			destination = args[6]
+		}
+		if err := os.MkdirAll(destination, 0o755); err != nil {
+			return err
+		}
+		r.linked[destination] = projectPath
+		return nil
+	}
+	if len(args) >= 5 && args[2] == "worktree" && args[3] == "remove" {
+		worktreePath := args[len(args)-1]
+		delete(r.linked, worktreePath)
+		return os.RemoveAll(worktreePath)
+	}
+	return nil
+}
+
+func (r *workspaceRunner) Output(_ context.Context, _ string, name string, args ...string) ([]byte, error) {
+	r.outputs = append(r.outputs, strings.Join(append([]string{name}, args...), " "))
+	if name != "git" {
+		return nil, errors.New("unexpected command")
+	}
+	projectPath := gitCommandPath(args)
+	if len(args) >= 5 && args[2] == "rev-parse" {
+		last := args[len(args)-1]
+		source, linked := r.linked[projectPath]
+		switch last {
+		case "--git-dir":
+			if linked {
+				return []byte(filepath.Join(source, ".git", "worktrees", filepath.Base(projectPath)) + "\n"), nil
+			}
+			if r.primary[projectPath] {
+				return []byte(filepath.Join(projectPath, ".git") + "\n"), nil
+			}
+		case "--git-common-dir":
+			if linked {
+				return []byte(filepath.Join(source, ".git") + "\n"), nil
+			}
+			if r.primary[projectPath] {
+				return []byte(filepath.Join(projectPath, ".git") + "\n"), nil
+			}
+		}
+		return nil, errors.New("not a git worktree")
+	}
+	if len(args) >= 4 && args[2] == "branch" && args[3] == "--show-current" {
+		return []byte(r.branches[projectPath] + "\n"), nil
+	}
+	if len(args) >= 4 && args[2] == "status" && args[3] == "--porcelain" {
+		return []byte(r.status[projectPath] + "\n"), nil
+	}
+	if len(args) >= 5 && args[2] == "symbolic-ref" {
+		if r.refs[projectPath]["origin/HEAD"] {
+			return []byte("origin/master\n"), nil
+		}
+		return nil, errors.New("remote head not found")
+	}
+	return nil, errors.New("unexpected output")
+}
+
+func (r *workspaceRunner) OutputWithInput(_ context.Context, _ string, input []byte, _ string, _ ...string) ([]byte, error) {
+	r.fzfInput = string(input)
+	if r.fzfOutput != nil || r.fzfErr != nil {
+		return r.fzfOutput, r.fzfErr
+	}
+	return nil, errors.New("unexpected fzf call")
+}
+
+func (r *workspaceRunner) Start(context.Context, string, string, ...string) error {
+	return errors.New("unexpected start")
+}
+
+func (r *workspaceRunner) LookPath(name string) (string, error) {
+	return "", errors.New(name + " not found")
+}
+
+func (r *workspaceRunner) hasRun(command string) bool {
+	for _, run := range r.runs {
+		if run == command {
+			return true
+		}
+	}
+	return false
+}
+
+func gitCommandPath(args []string) string {
+	if len(args) >= 2 && args[0] == "-C" {
+		return args[1]
+	}
+	return ""
+}

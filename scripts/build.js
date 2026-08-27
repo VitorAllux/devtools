@@ -30,4 +30,9 @@ if (result.error) {
   process.exit(127);
 }
 
-process.exit(result.status ?? 1);
+if ((result.status ?? 1) !== 0) {
+  process.exit(result.status ?? 1);
+}
+
+console.error(`dvv built at ${output}`);
+process.exit(0);

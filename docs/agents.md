@@ -23,3 +23,5 @@ This repository uses focused agent guides for the Go rewrite.
 ## Working Rule
 
 Use `main` as the reference for previous behavior when porting a feature. Keep this branch clean: port behavior into Go instead of reintroducing old scripts. Treat `code-grove` as a reference for architecture and safeguards, especially around config, workspace metadata, execution plans, bootstrap rules, hooks, and tests.
+
+The local `.agents/` guides intentionally adapt `code-grove` discipline without copying its project identity: keep config readable, split risky work into plan/build/execute phases, decouple personal integrations through hooks or opener adapters, and write code that is understandable through names and package boundaries instead of line-by-line comments.

@@ -4,7 +4,7 @@ Status: Completed on 2026-08-26.
 
 ## Objective
 
-Implement the first native Go feature for the rewrite: `dvv ssh`, `dvv ssh add`, `dvv ssh remove`, and `dvv ssh list`.
+Implement the first native Go feature for the rewrite: `dvv ssh`, with list/add/remove internals available for the hub and migration compatibility.
 
 ## Context
 
@@ -50,9 +50,9 @@ The new public command prefix is `dvv`, but existing local data paths and enviro
 6. Add terminal UI helper and SSH hub theme.
 7. Implement SSH store parsing and mutation.
 8. Implement SSH backup prepare/sync helpers.
-9. Implement `dvv ssh list`.
-10. Implement `dvv ssh add`.
-11. Implement `dvv ssh remove`.
+9. Implement SSH list support.
+10. Implement SSH add support.
+11. Implement SSH remove support.
 12. Implement `dvv ssh` hub.
 13. Add tests for env parsing, SSH entry parsing, store mutation, and config path resolution.
 14. Remove old Bash SSH scripts from the branch.
@@ -62,9 +62,9 @@ The new public command prefix is `dvv`, but existing local data paths and enviro
 - `npm run build`
 - `go test ./...`
 - `go run ./cmd/dvv --help`
-- `go run ./cmd/dvv ssh list` with temporary `XDG_CONFIG_HOME`
-- `go run ./cmd/dvv ssh add --name local --conn user@example.test` with temporary `XDG_CONFIG_HOME`
-- `go run ./cmd/dvv ssh remove --name local` with temporary `XDG_CONFIG_HOME`
+- `go run ./cmd/dvv ssh:list` with temporary `XDG_CONFIG_HOME`
+- `go run ./cmd/dvv ssh:add --name local --conn user@example.test` with temporary `XDG_CONFIG_HOME`
+- `go run ./cmd/dvv ssh:remove --name local` with temporary `XDG_CONFIG_HOME`
 
 ## Completion Criteria
 
@@ -80,8 +80,8 @@ The new public command prefix is `dvv`, but existing local data paths and enviro
 - `GOCACHE=/tmp/go-build-cache go test ./...` passed.
 - `GOCACHE=/tmp/go-build-cache go vet ./...` passed.
 - `GOCACHE=/tmp/go-build-cache go build -o dist/dvv ./cmd/dvv` passed.
-- Smoke-tested `dvv help`, `dvv ssh list`, `dvv ssh add`, and `dvv ssh remove` with temporary SSH config paths under `/tmp/dvv-smoke`.
-- `dvv ssh help` shows only the hub and nested SSH actions.
+- Smoke-tested `dvv help`, `dvv ssh:list`, `dvv ssh:add`, and `dvv ssh:remove` with temporary SSH config paths under `/tmp/dvv-smoke`.
+- `dvv ssh help` shows the hub, direct connect, and hub shortcuts; root help does not advertise mutation routes.
 
 ## Theme Result
 

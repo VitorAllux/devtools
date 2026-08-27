@@ -152,3 +152,26 @@ func FZFSelectedRaw(selection string) string {
 	raw, _, _ := strings.Cut(selection, fzfHiddenDelimiter)
 	return strings.TrimSpace(raw)
 }
+
+func ParseFZFExpectOutput(output string) (string, []string) {
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+	if len(lines) == 0 {
+		return "", nil
+	}
+	if len(lines) == 1 {
+		line := strings.TrimSpace(lines[0])
+		if line == "" {
+			return "", nil
+		}
+		return "", []string{line}
+	}
+	key := strings.TrimSpace(lines[0])
+	selected := make([]string, 0, len(lines)-1)
+	for _, line := range lines[1:] {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			selected = append(selected, line)
+		}
+	}
+	return key, selected
+}

@@ -24,13 +24,12 @@ ssh -> workspace -> tmux -> db -> systemconfig -> resources -> wsl
 - Add config loader with project defaults and local env compatibility.
 - Add process runner abstraction.
 - Add interactive prompt abstraction with `fzf` and non-fzf terminal prompts.
+- Add explicit `dvv setup` for shell integration and `dvv doctor` for local diagnostics.
 - Add tests for config, path expansion, runner fakes, and command routing.
 
 ## Phase 1: SSH
 
-- Port `dvv ssh list`.
-- Port `dvv ssh add`.
-- Port `dvv ssh remove`.
+- Port SSH list/add/remove internals for the hub and migration compatibility.
 - Port `dvv ssh` interactive hub.
 - Preserve the current server file format.
 - Preserve encrypted backup integration behavior, but keep secret material out of tests.
@@ -48,25 +47,39 @@ ssh -> workspace -> tmux -> db -> systemconfig -> resources -> wsl
 - Port open/manage/delete flows.
 - Preserve destructive action confirmations and dirty worktree checks.
 
+Current visible Go command surface:
+
+```text
+dvv workspace
+```
+
 ## Phase 3: Tmux
 
-- Port tmux target detection.
-- Port the tmux hub and its start, stop, API restart, and web restart actions.
-- Reuse workspace metadata and config where possible.
-- Keep the previous tmux session and window behavior compatible under the new nested command surface.
+- [x] Port `dvv tmux:session` first to preserve the zsh `Ctrl+F` directory session picker.
+- [x] Port tmux target detection.
+- [x] Port the tmux hub and its start, stop, API restart, and web restart actions.
+- [x] Reuse workspace metadata and config where possible.
+- [x] Keep the previous tmux session and window behavior compatible under the new nested command surface.
+
+Current Go command surface:
+
+```text
+dvv tmux
+dvv tmux:session
+```
 
 ## Phase 4: DB
 
-- Port `dvv db` hub.
-- Port create, drop, truncate, clean, and import.
-- Preserve one-password-per-flow behavior.
-- Keep dump import sanitization and progress behavior.
+- [x] Port `dvv db` hub.
+- [x] Port create, drop, truncate, clean, and import.
+- [x] Preserve one-password-per-flow behavior.
+- [x] Keep dump import sanitization and progress behavior.
 
 ## Phase 5: System Config
 
-- Port the config hub and its set/list actions.
-- Port env setup/bootstrap only after the Go binary install story is stable.
-- Define config migration from env files to the project config format.
+- [x] Port the config hub and its set/list actions.
+- [x] Keep explicit setup separate from build.
+- [x] Keep runtime env file compatibility through `~/.config/devv/config.env`.
 
 ## Phase 6: Resources
 

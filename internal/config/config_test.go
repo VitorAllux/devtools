@@ -54,4 +54,179 @@ func TestLoadProjectConfigMergesShortcutDefaults(t *testing.T) {
 	if cfg.Theme.Name != "royal-noir" {
 		t.Fatalf("theme = %q, want royal-noir", cfg.Theme.Name)
 	}
+	if cfg.Workspace.Root != "~/workspace" {
+		t.Fatalf("workspace root = %q", cfg.Workspace.Root)
+	}
+}
+
+func TestLoadProjectConfigMergesWorkspaceDefaults(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dvv.config.json")
+	content := []byte(`{
+  "tmux": {
+    "session": {
+      "shortcut": "ctrl+p"
+    }
+  },
+  "workspace": {
+    "root": "~/workspaces",
+    "interactive": {
+      "shortcuts": {
+        "create": "alt-c"
+      }
+    },
+    "bootstrap": {
+      "copyRules": []
+    }
+  }
+}`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+
+	cfg := DefaultProjectConfig()
+	if err := loadProjectConfig(path, &cfg); err != nil {
+		t.Fatalf("loadProjectConfig failed: %v", err)
+	}
+
+	if cfg.Workspace.Root != "~/workspaces" {
+		t.Fatalf("workspace root = %q", cfg.Workspace.Root)
+	}
+	if cfg.Tmux.Session.Shortcut != "ctrl+p" {
+		t.Fatalf("tmux shortcut = %q", cfg.Tmux.Session.Shortcut)
+	}
+	if cfg.Tmux.Session.SearchDepth != 3 {
+		t.Fatalf("tmux search depth = %d", cfg.Tmux.Session.SearchDepth)
+	}
+	if cfg.Workspace.Interactive.Shortcuts.Create != "alt-c" {
+		t.Fatalf("create shortcut = %q", cfg.Workspace.Interactive.Shortcuts.Create)
+	}
+	if cfg.Workspace.Interactive.Shortcuts.Delete != "shift+d" {
+		t.Fatalf("delete shortcut = %q", cfg.Workspace.Interactive.Shortcuts.Delete)
+	}
+	if cfg.Workspace.ProjectSearchDepth != 4 {
+		t.Fatalf("search depth = %d", cfg.Workspace.ProjectSearchDepth)
+	}
+	if len(cfg.Workspace.Bootstrap.CopyRules) != 0 {
+		t.Fatalf("explicit empty copy rules should be preserved: %#v", cfg.Workspace.Bootstrap.CopyRules)
+	}
+	if len(cfg.Workspace.Bootstrap.Commands) == 0 {
+		t.Fatal("bootstrap command defaults should be preserved")
+	}
+}
+
+func TestResolveWorkspaceConfigUsesEnvOverrides(t *testing.T) {
+	t.Setenv("HOME", "/home/tester")
+	t.Setenv("DVV_WORKSPACES_DIR", "~/dvv-workspaces")
+	t.Setenv("DVV_WORKSPACE_PROJECT_ROOTS", "~/a:/opt/projects")
+	t.Setenv("DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "7")
+	t.Setenv("DVV_WORKSPACE_OPENER", "cursor")
+
+	cfg := resolveWorkspaceConfig(defaultWorkspaceConfig())
+
+	if cfg.Root != "/home/tester/dvv-workspaces" {
+		t.Fatalf("workspace root = %q", cfg.Root)
+	}
+	if got := cfg.ProjectSearchRoots; len(got) != 2 || got[0] != "/home/tester/a" || got[1] != "/opt/projects" {
+		t.Fatalf("project roots = %#v", got)
+	}
+	if cfg.ProjectSearchDepth != 7 {
+		t.Fatalf("project search depth = %d", cfg.ProjectSearchDepth)
+	}
+	if cfg.Interactive.Opener != "cursor" {
+		t.Fatalf("opener = %q", cfg.Interactive.Opener)
+	}
+}
+
+func TestResolveWorkspaceConfigKeepsLegacyWorkspaceEnv(t *testing.T) {
+	t.Setenv("HOME", "/home/tester")
+	t.Setenv("TMUX_DEFAULT_DIR", "$HOME/workspace")
+	t.Setenv("API_DIR", "$HOME/workspace/saas/api")
+	t.Setenv("WEB_DIR", "$HOME/workspace/saas/web")
+
+	cfg := resolveWorkspaceConfig(defaultWorkspaceConfig())
+
+	if cfg.Root != "/home/tester/workspace" {
+		t.Fatalf("workspace root = %q", cfg.Root)
+	}
+	expected := []string{
+		"/home/tester/workspace/saas",
+		"/home/tester/workspace",
+		"/home/tester/Development/projects",
+		"/home/tester/Work/Development/dev",
+		"/home/tester/Work/Development",
+		"/home/tester/Development",
+	}
+	if len(cfg.ProjectSearchRoots) < len(expected) {
+		t.Fatalf("project roots = %#v", cfg.ProjectSearchRoots)
+	}
+	for index, root := range expected {
+		if cfg.ProjectSearchRoots[index] != root {
+			t.Fatalf("project root %d = %q, want %q: %#v", index, cfg.ProjectSearchRoots[index], root, cfg.ProjectSearchRoots)
+		}
+	}
+}
+
+func TestResolveTmuxConfigUsesEnvOverrides(t *testing.T) {
+	t.Setenv("HOME", "/home/tester")
+	t.Setenv("DVV_TMUX_SESSION_SEARCH_ROOTS", "~/one:/opt/two")
+	t.Setenv("DVV_TMUX_SESSION_SEARCH_DEPTH", "5")
+	t.Setenv("DVV_TMUX_SESSION_NAME", "code")
+	t.Setenv("DVV_TMUX_SESSION_SHORTCUT", "ctrl+p")
+
+	cfg := resolveTmuxConfig(defaultTmuxConfig())
+
+	if got := cfg.Session.SearchRoots; len(got) != 2 || got[0] != "/home/tester/one" || got[1] != "/opt/two" {
+		t.Fatalf("tmux roots = %#v", got)
+	}
+	if cfg.Session.SearchDepth != 5 {
+		t.Fatalf("tmux search depth = %d", cfg.Session.SearchDepth)
+	}
+	if cfg.Session.DefaultSessionName != "code" {
+		t.Fatalf("tmux session name = %q", cfg.Session.DefaultSessionName)
+	}
+	if cfg.Session.Shortcut != "ctrl+p" {
+		t.Fatalf("tmux shortcut = %q", cfg.Session.Shortcut)
+	}
+}
+
+func TestResolveDBConfigUsesEnvOverrides(t *testing.T) {
+	t.Setenv("HOME", "/home/tester")
+	t.Setenv("DVV_DB_HOST", "127.0.0.1")
+	t.Setenv("DVV_DB_PORT", "3307")
+	t.Setenv("DVV_DB_USER", "wslroot")
+	t.Setenv("DVV_DUMPS_DIR", "~/dumps")
+	t.Setenv("DVV_RCLONE_REMOTE", "drive")
+
+	cfg := resolveDBConfig(defaultDBConfigForTest(), "/repo")
+
+	if cfg.Host != "127.0.0.1" {
+		t.Fatalf("db host = %q", cfg.Host)
+	}
+	if cfg.Port != "3307" {
+		t.Fatalf("db port = %q", cfg.Port)
+	}
+	if cfg.User != "wslroot" {
+		t.Fatalf("db user = %q", cfg.User)
+	}
+	if cfg.DumpsDir != "/home/tester/dumps" {
+		t.Fatalf("dumps dir = %q", cfg.DumpsDir)
+	}
+	if cfg.RcloneRemote != "drive" {
+		t.Fatalf("rclone remote = %q", cfg.RcloneRemote)
+	}
+}
+
+func TestResolveDBConfigMakesRelativeDumpsDirProjectRelative(t *testing.T) {
+	cfg := defaultDBConfigForTest()
+	cfg.DumpsDir = "runtime-dumps"
+
+	got := resolveDBConfig(cfg, "/repo")
+
+	if got.DumpsDir != "/repo/runtime-dumps" {
+		t.Fatalf("dumps dir = %q", got.DumpsDir)
+	}
+}
+
+func defaultDBConfigForTest() DBConfig {
+	return DefaultProjectConfig().DB
 }

@@ -6,6 +6,7 @@ Use this guide when adding or reviewing tests for the Go rewrite.
 
 - Path expansion and config defaults.
 - Legacy config compatibility.
+- Config validation for readable, typed workspace settings.
 - Workspace name sanitization.
 - Workspace path containment.
 - Symlink rejection before copy or removal.
@@ -14,6 +15,8 @@ Use this guide when adding or reviewing tests for the Go rewrite.
 - Hook template rendering and environment variables.
 - Bootstrap copy rules and command matching.
 - Project discovery order from explicit config and discovered roots.
+- Plan building for create/add/remove flows before execution.
+- Opener selection without launching real editors or shells.
 
 ## Safety
 
@@ -22,3 +25,5 @@ Use this guide when adding or reviewing tests for the Go rewrite.
 - Prefer fake runners for external commands.
 - Use real Git repositories only in temporary fixtures when behavior requires `git`.
 - Do not create real tmux sessions, SSH sessions, MySQL databases, Docker containers, or WSL operations in tests.
+- Do not run configured hooks against real operator scripts in tests.
+- When testing destructive flows, assert both the refused path and the allowed path.

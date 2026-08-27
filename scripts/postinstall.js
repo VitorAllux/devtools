@@ -14,4 +14,9 @@ const result = childProcess.spawnSync(process.execPath, [path.join(root, "script
   windowsHide: false,
 });
 
-process.exit(result.status ?? 1);
+if ((result.status ?? 1) !== 0) {
+  process.exit(result.status ?? 1);
+}
+
+console.error("Run `dvv setup` to install zsh completion and shell shortcuts.");
+process.exit(0);
