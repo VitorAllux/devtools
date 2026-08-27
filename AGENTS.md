@@ -132,6 +132,25 @@ dvv config list
 dvv config set
 ```
 
+## Resources And Secrets Surface
+
+- Root help should advertise:
+
+```text
+dvv resources
+dvv bootstrap
+```
+
+- `dvv resources` is the interactive local resources hub.
+- `dvv bootstrap` restores AGE/Bitwarden secret state and encrypted SSH backups.
+- Keep `dvv env:bootstrap` as a compatibility route for the previous Bash command.
+- Script-friendly compatibility routes may exist, but should not make root help noisy:
+
+```text
+dvv resources list
+dvv resources:list
+```
+
 ## Go Version Rewrite
 
 - The Go rewrite branch is `go-version`.

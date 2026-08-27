@@ -52,6 +52,20 @@ func (ExecRunner) OutputWithInput(ctx context.Context, dir string, input []byte,
 	return out.Bytes(), nil
 }
 
+func (ExecRunner) InteractiveOutput(ctx context.Context, dir string, name string, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = dir
+	cmd.Stdin = os.Stdin
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		return out.Bytes(), commandError(name, args, out.Bytes(), err)
+	}
+	return out.Bytes(), nil
+}
+
 func (ExecRunner) Start(ctx context.Context, dir string, name string, args ...string) error {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir

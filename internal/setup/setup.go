@@ -59,7 +59,16 @@ func (m Manager) Doctor(_ context.Context) error {
 	checkCommand(m.Runner, "rclone", false)
 	checkCommand(m.Runner, "pv", false)
 	checkCommand(m.Runner, "gunzip", false)
+	checkCommand(m.Runner, "age", false)
+	checkCommand(m.Runner, "age-keygen", false)
+	checkCommand(m.Runner, "bw", false)
+	checkCommand(m.Runner, "docker", false)
+	checkCommand(m.Runner, "systemctl", false)
+	checkCommand(m.Runner, "service", false)
 	checkPath("SSH list", m.Config.ServersFile, false)
+	checkPath("AGE key", m.Config.AgeKeyFile, false)
+	checkPath("AGE recipients", m.Config.AgeRecipientsFile, false)
+	checkPath("Encrypted SSH", m.Config.EncryptedServersFile, false)
 	checkPath("Workspace root", m.Config.Project.Workspace.Root, false)
 	checkPath("Dumps dir", m.Config.Project.DB.DumpsDir, false)
 	checkPath("Zsh completion", filepath.Join(homeDir(), ".zfunc", "_dvv"), false)
@@ -153,8 +162,8 @@ func showDoctorHelp() {
 	ui.Title("Doctor")
 	fmt.Printf("  %s dvv doctor\n\n", ui.Bold("Usage:"))
 	helpSection("Checks")
-	helpEntry("commands", "dvv, node, git, ssh, tmux, fzf, mysql, rclone, pv, and gunzip")
-	helpEntry("files", "dist binary, SSH list, workspace root, dumps dir, completion, and shortcuts")
+	helpEntry("commands", "dvv, node, git, ssh, tmux, fzf, MySQL, rclone, AGE, Bitwarden, Docker, and service tools")
+	helpEntry("files", "dist binary, SSH/secrets files, workspace root, dumps dir, completion, and shortcuts")
 }
 
 func helpSection(title string) {

@@ -6,7 +6,9 @@ import (
 
 	"github.com/VitorAllux/devtools/internal/config"
 	dbcmd "github.com/VitorAllux/devtools/internal/db"
+	resourcescmd "github.com/VitorAllux/devtools/internal/resources"
 	"github.com/VitorAllux/devtools/internal/run"
+	secretscmd "github.com/VitorAllux/devtools/internal/secrets"
 	setupcmd "github.com/VitorAllux/devtools/internal/setup"
 	sshcmd "github.com/VitorAllux/devtools/internal/ssh"
 	configcmd "github.com/VitorAllux/devtools/internal/systemconfig"
@@ -66,6 +68,12 @@ func Run(args []string) int {
 		return runCommand(ctx, cfg, runner, "db", append([]string{"clean"}, commandArgs...))
 	case "db:import":
 		return runCommand(ctx, cfg, runner, "db", append([]string{"import"}, commandArgs...))
+	case "bootstrap", "env:bootstrap":
+		if err := secretscmd.RunBootstrap(ctx, cfg, runner, commandArgs); err != nil {
+			ui.Error("%v", err)
+			return 1
+		}
+		return 0
 	case "doctor":
 		if err := setupcmd.RunDoctor(ctx, cfg, runner, commandArgs); err != nil {
 			ui.Error("%v", err)
@@ -78,6 +86,16 @@ func Run(args []string) int {
 			return 1
 		}
 		return 0
+	case "env:setup":
+		return runCommand(ctx, cfg, runner, "setup", commandArgs)
+	case "resources":
+		if err := resourcescmd.Run(ctx, cfg, runner, commandArgs); err != nil {
+			ui.Error("%v", err)
+			return 1
+		}
+		return 0
+	case "resources:list":
+		return runCommand(ctx, cfg, runner, "resources", append([]string{"list"}, commandArgs...))
 	case "ssh":
 		if err := sshcmd.Run(ctx, cfg, runner, commandArgs); err != nil {
 			ui.Error("%v", err)
@@ -141,6 +159,10 @@ func runCommand(ctx context.Context, cfg *config.Config, runner run.Runner, comm
 		err = configcmd.Run(ctx, cfg, runner, args)
 	case "db":
 		err = dbcmd.Run(ctx, cfg, runner, args)
+	case "resources":
+		err = resourcescmd.Run(ctx, cfg, runner, args)
+	case "setup":
+		err = setupcmd.RunSetup(ctx, cfg, runner, args)
 	case "ssh":
 		err = sshcmd.Run(ctx, cfg, runner, args)
 	case "tmux":
@@ -169,11 +191,15 @@ func showHelp() {
 	helpSection("Database")
 	helpEntry("db", ">", "Open the database hub")
 	fmt.Println()
+	helpSection("Resources")
+	helpEntry("resources", ">", "Open the local resources hub")
+	fmt.Println()
 	helpSection("Tmux")
 	helpEntry("tmux", ">", "Open the tmux environment hub")
 	fmt.Println()
 	helpSection("System")
 	helpEntry("setup", "*", "Install zsh completion and shell shortcuts")
+	helpEntry("bootstrap", "*", "Restore AGE/Bitwarden secrets and SSH backup")
 	helpEntry("doctor", "?", "Check local dependencies and integration")
 	helpEntry("config", ">", "Open the configuration hub")
 	fmt.Println()

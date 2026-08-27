@@ -32,7 +32,7 @@ ssh -> workspace -> tmux -> db -> systemconfig -> resources -> wsl
 - Port SSH list/add/remove internals for the hub and migration compatibility.
 - Port `dvv ssh` interactive hub.
 - Preserve the current server file format.
-- Preserve encrypted backup integration behavior, but keep secret material out of tests.
+- [x] Preserve encrypted backup integration behavior, but keep secret material out of tests.
 
 ## Phase 2: Workspace
 
@@ -83,9 +83,23 @@ dvv tmux:session
 
 ## Phase 6: Resources
 
-- Port resource detection currently implemented in Python.
-- Preserve Docker, Docker Compose, and service actions.
-- Do not port the desktop control center.
+- [x] Port resource detection previously implemented in Python.
+- [x] Preserve Docker, Docker Compose, and service actions.
+- [x] Keep action shortcuts configurable in `dvv.config.json`.
+- [x] Do not port the desktop control center.
+
+Current Go command surface:
+
+```text
+dvv resources
+```
+
+Compatibility/list route:
+
+```text
+dvv resources list
+dvv resources:list
+```
 
 ## Phase 7: WSL
 
@@ -96,7 +110,7 @@ dvv tmux:session
 
 The Go version can replace the current `main` implementation when these are true:
 
-- `ssh`, `workspace`, `tmux`, and `db` are implemented in Go.
+- `ssh`, `workspace`, `tmux`, `db`, `systemconfig`, and `resources` are implemented in Go.
 - `go test ./...` passes.
 - Help output advertises only the public Go-ready surface.
 - README and completion docs are updated.

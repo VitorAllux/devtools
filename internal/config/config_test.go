@@ -57,6 +57,65 @@ func TestLoadProjectConfigMergesShortcutDefaults(t *testing.T) {
 	if cfg.Workspace.Root != "~/workspace" {
 		t.Fatalf("workspace root = %q", cfg.Workspace.Root)
 	}
+	if cfg.Resources.Hub.Shortcuts.Start != "alt+s" {
+		t.Fatalf("resources start shortcut = %q", cfg.Resources.Hub.Shortcuts.Start)
+	}
+}
+
+func TestLoadProjectConfigMergesResourcesDefaults(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dvv.config.json")
+	content := []byte(`{
+  "resources": {
+    "hub": {
+      "shortcuts": {
+        "restart": "shift+r"
+      }
+    }
+  }
+}`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+
+	cfg := DefaultProjectConfig()
+	if err := loadProjectConfig(path, &cfg); err != nil {
+		t.Fatalf("loadProjectConfig failed: %v", err)
+	}
+
+	if cfg.Resources.Hub.Shortcuts.Start != "alt+s" {
+		t.Fatalf("start shortcut = %q", cfg.Resources.Hub.Shortcuts.Start)
+	}
+	if cfg.Resources.Hub.Shortcuts.Restart != "shift+r" {
+		t.Fatalf("restart shortcut = %q", cfg.Resources.Hub.Shortcuts.Restart)
+	}
+	if cfg.Resources.Hub.Shortcuts.Stop != "alt+x" {
+		t.Fatalf("stop shortcut = %q", cfg.Resources.Hub.Shortcuts.Stop)
+	}
+}
+
+func TestRuntimeSecretPathPrefersLegacySecretsDirWhenPresent(t *testing.T) {
+	root := t.TempDir()
+	configDir := filepath.Join(root, "config")
+	if err := os.Mkdir(filepath.Join(root, "secrets"), 0o700); err != nil {
+		t.Fatalf("Mkdir secrets failed: %v", err)
+	}
+
+	got := runtimeSecretPath(root, configDir, "servers.list.age")
+	want := filepath.Join(root, "secrets", "servers.list.age")
+	if got != want {
+		t.Fatalf("runtime secret path = %q, want %q", got, want)
+	}
+}
+
+func TestRuntimeSecretPathFallsBackToConfigDir(t *testing.T) {
+	root := t.TempDir()
+	configDir := filepath.Join(root, "config")
+
+	got := runtimeSecretPath(root, configDir, "servers.list.age")
+	want := filepath.Join(configDir, "servers.list.age")
+	if got != want {
+		t.Fatalf("runtime secret path = %q, want %q", got, want)
+	}
 }
 
 func TestLoadProjectConfigMergesWorkspaceDefaults(t *testing.T) {

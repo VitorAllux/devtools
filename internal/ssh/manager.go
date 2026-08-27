@@ -111,6 +111,10 @@ func (m *Manager) SyncBackup(ctx context.Context) error {
 	return os.Rename(tmpName, m.Config.EncryptedServersFile)
 }
 
+func (m *Manager) RestoreBackup(ctx context.Context) error {
+	return m.decryptBackup(ctx)
+}
+
 func (m *Manager) decryptBackup(ctx context.Context) error {
 	if err := os.MkdirAll(filepath.Dir(m.Config.ServersFile), 0o700); err != nil {
 		return err

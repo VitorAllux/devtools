@@ -23,6 +23,12 @@ type WorkspaceHubKeyBindings struct {
 	Delete KeyBinding
 }
 
+type ResourcesHubKeyBindings struct {
+	Start   KeyBinding
+	Restart KeyBinding
+	Stop    KeyBinding
+}
+
 func (c *Config) SSHHubKeys() SSHHubKeyBindings {
 	defaults := DefaultProjectConfig().SSH.Hub.Shortcuts
 	return SSHHubKeyBindings{
@@ -38,6 +44,15 @@ func (c *Config) WorkspaceHubKeys() WorkspaceHubKeyBindings {
 		Create: normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Create, defaults.Create),
 		Manage: normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Manage, defaults.Manage),
 		Delete: normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Delete, defaults.Delete),
+	}
+}
+
+func (c *Config) ResourcesHubKeys() ResourcesHubKeyBindings {
+	defaults := DefaultProjectConfig().Resources.Hub.Shortcuts
+	return ResourcesHubKeyBindings{
+		Start:   normalizeKeyOrDefault(c.Project.Resources.Hub.Shortcuts.Start, defaults.Start),
+		Restart: normalizeKeyOrDefault(c.Project.Resources.Hub.Shortcuts.Restart, defaults.Restart),
+		Stop:    normalizeKeyOrDefault(c.Project.Resources.Hub.Shortcuts.Stop, defaults.Stop),
 	}
 }
 

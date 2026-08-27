@@ -23,6 +23,15 @@ The file is versioned because it defines project behavior, theme identity, and d
     "rcloneRemote": "gdrive",
     "safetyConfirm": true
   },
+  "resources": {
+    "hub": {
+      "shortcuts": {
+        "start": "alt+s",
+        "restart": "alt+r",
+        "stop": "alt+x"
+      }
+    }
+  },
   "ssh": {
     "hub": {
       "shortcuts": {
@@ -93,6 +102,16 @@ The `db` section contains local database defaults used by `dvv db`:
 - `rcloneRemote`: default remote name used for Google Drive downloads.
 - `safetyConfirm`: reserved for destructive-action confirmation policy.
 
+## Resources Config
+
+The `resources.hub.shortcuts` section configures the local resource hub actions:
+
+- `start`: start the selected service/container/Compose project.
+- `restart`: restart the selected service/container/Compose project.
+- `stop`: stop the selected service/container/Compose project.
+
+Defaults preserve the previous resources hub shortcuts: `alt+s`, `alt+r`, and `alt+x`.
+
 ## Tmux Config
 
 The `tmux.session` section contains the standalone directory session picker used by `dvv tmux:session` and the zsh `Ctrl+F` shortcut:
@@ -153,11 +172,13 @@ Runtime data remains outside the repository:
 ```text
 ~/.config/devv/servers.list
 ~/.config/devv/keys/age.key
-~/.config/devv/age-recipients.txt
-~/.config/devv/servers.list.age
+secrets/age-recipients.txt
+secrets/servers.list.age
 ```
 
-The `devv` path is kept for compatibility with existing local machines. A future migration can move this to `~/.config/dvv` if needed.
+The `devv` path is kept for compatibility with existing local machines. For encrypted SSH backup data, the Go rewrite prefers the repository `secrets/` directory when it exists, matching the previous Bash implementation. If that directory is absent, it falls back to `~/.config/devv`.
+
+`dvv bootstrap` prepares these files. It can restore the AGE private key from Bitwarden using `DVV_BW_AGE_KEY_ITEM` or the legacy `DEVT_BW_AGE_KEY_ITEM`, decrypt `servers.list.age`, and refresh the encrypted backup.
 
 ## Environment Overrides
 
@@ -168,6 +189,7 @@ DVV_SERVERS_FILE
 DVV_AGE_KEY_FILE
 DVV_AGE_RECIPIENTS_FILE
 DVV_ENCRYPTED_SERVERS_FILE
+DVV_BW_AGE_KEY_ITEM
 ```
 
 Legacy equivalents:
@@ -177,6 +199,7 @@ DEVT_SERVERS_FILE
 DEVT_AGE_KEY_FILE
 DEVT_AGE_RECIPIENTS_FILE
 DEVT_ENCRYPTED_SERVERS_FILE
+DEVT_BW_AGE_KEY_ITEM
 ```
 
 Workspace overrides:

@@ -10,15 +10,17 @@ This branch is the Go rewrite. The current public surface is hub-first:
 
 ```bash
 dvv setup
+dvv bootstrap
 dvv doctor
 dvv ssh
 dvv workspace
 dvv tmux
 dvv db
+dvv resources
 dvv config
 ```
 
-`dvv setup` installs optional shell integration. `dvv doctor` checks the local environment. `dvv ssh`, `dvv workspace`, `dvv tmux`, `dvv db`, and `dvv config` open the interactive hubs for each topic.
+`dvv setup` installs optional shell integration. `dvv bootstrap` restores local encrypted secrets. `dvv doctor` checks the local environment. `dvv ssh`, `dvv workspace`, `dvv tmux`, `dvv db`, `dvv resources`, and `dvv config` open the interactive hubs for each topic.
 
 `Ctrl+F` opens the tmux directory picker preserved from the previous shell version.
 
@@ -28,7 +30,7 @@ Other modules from the previous `main` implementation are being ported in this o
 ssh -> workspace -> tmux -> db -> systemconfig -> resources -> wsl
 ```
 
-Implemented in Go now: `ssh`, `workspace`, `tmux`, `db`, and `systemconfig`. Remaining modules are `resources` and optional `wsl`.
+Implemented in Go now: `ssh`, `workspace`, `tmux`, `db`, `systemconfig`, `resources`, and secrets bootstrap. Remaining module is optional `wsl`.
 
 ## Install
 
@@ -82,10 +84,29 @@ dvv ssh
 dvv workspace
 dvv tmux
 dvv db
+dvv resources
 dvv config
 ```
 
 Run `dvv setup` only when completion or shell shortcuts changed. `npm run check` runs build, tests, and vet.
+
+## Secrets Bootstrap
+
+```bash
+dvv bootstrap
+dvv bootstrap --force
+dvv bootstrap --skip-setup
+```
+
+`dvv bootstrap` prepares local secret state for the CLI:
+
+- runs `dvv setup` unless `--skip-setup` is passed;
+- migrates an old `config/servers.list` into the configured SSH list when needed;
+- restores the AGE private key from Bitwarden when `DVV_BW_AGE_KEY_ITEM` or `DEVT_BW_AGE_KEY_ITEM` is configured;
+- decrypts the encrypted SSH backup when the local SSH list is empty, or always with `--force`;
+- refreshes the encrypted SSH backup when `age`, recipients, and SSH entries are available.
+
+The compatibility command `dvv env:bootstrap` is also supported.
 
 ## Run Without Installing
 
@@ -266,6 +287,28 @@ dvv config list
 dvv config set API_DIR ~/workspace/saas/api
 ```
 
+## Resources Hub
+
+```bash
+dvv resources
+```
+
+The resources hub detects local services, Docker daemon state, Docker containers, and Docker Compose projects.
+
+Hub shortcuts:
+
+- `Enter`: show selected resource details.
+- `Alt+S`: start selected resource.
+- `Alt+R`: restart selected resource.
+- `Alt+X`: stop selected resource.
+- `Esc`: exit.
+
+Script-friendly action:
+
+```bash
+dvv resources list
+```
+
 ## Theme
 
 `dvv` uses a custom `Royal Noir` terminal theme: black surfaces, royal purple interactive accents, and restrained gold brand/status accents.
@@ -279,8 +322,8 @@ Existing local data paths are preserved for compatibility:
 - Local config: `~/.config/devv/config.env`
 - Local SSH list: `~/.config/devv/servers.list`
 - Local age private key: `~/.config/devv/keys/age.key`
-- Encrypted SSH backup: `~/.config/devv/servers.list.age`
-- Public age recipients: `~/.config/devv/age-recipients.txt`
+- Encrypted SSH backup: `secrets/servers.list.age` when the repo `secrets/` directory exists, otherwise `~/.config/devv/servers.list.age`
+- Public age recipients: `secrets/age-recipients.txt` when the repo `secrets/` directory exists, otherwise `~/.config/devv/age-recipients.txt`
 
 Use `examples/servers.list` for documentation/examples, not a real server list.
 
@@ -294,4 +337,4 @@ npm run setup
 npm run check
 ```
 
-The Go entrypoint is `cmd/dvv`. Shared CLI theme helpers live in `internal/ui`. SSH behavior lives in `internal/ssh`; workspace behavior lives in `internal/workspace` with supporting packages for discovery, metadata, hooks, bootstrap, safety, and Git.
+The Go entrypoint is `cmd/dvv`. Shared CLI theme helpers live in `internal/ui`. SSH behavior lives in `internal/ssh`; workspace behavior lives in `internal/workspace` with supporting packages for discovery, metadata, hooks, bootstrap, safety, and Git. Resources live in `internal/resources`; AGE/Bitwarden bootstrap lives in `internal/secrets`.

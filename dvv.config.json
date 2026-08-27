@@ -10,6 +10,15 @@
     "rcloneRemote": "gdrive",
     "safetyConfirm": true
   },
+  "resources": {
+    "hub": {
+      "shortcuts": {
+        "start": "alt+s",
+        "restart": "alt+r",
+        "stop": "alt+x"
+      }
+    }
+  },
   "ssh": {
     "hub": {
       "shortcuts": {

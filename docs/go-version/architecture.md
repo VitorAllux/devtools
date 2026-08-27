@@ -20,8 +20,10 @@ internal/discovery
 internal/git
 internal/hooks
 internal/metadata
+internal/resources
 internal/run
 internal/safety
+internal/secrets
 internal/setup
 internal/ssh
 internal/systemconfig
@@ -34,7 +36,6 @@ internal/workspace
 ## Planned Package Layout
 
 ```text
-internal/resources
 internal/wsl
 ```
 
@@ -49,8 +50,10 @@ internal/wsl
 - `internal/git`: branch/ref checks, worktree detection, add/remove/prune, and dirty status.
 - `internal/hooks`: workspace/project lifecycle hook rendering and execution.
 - `internal/metadata`: `.workspace/config.json` read/write.
+- `internal/resources`: local service, Docker, container, and Compose detection plus resource hub actions.
 - `internal/run`: external process runner and fake runner support for tests.
 - `internal/safety`: workspace name, relative path, direct-child, and deletion safety checks.
+- `internal/secrets`: AGE key, encrypted SSH backup, legacy server list migration, and Bitwarden restore bootstrap.
 - `internal/setup`: explicit shell integration installer and environment diagnostics.
 - `internal/ssh`: SSH server list, add, remove, list, hub, and terminal launch helpers.
 - `internal/systemconfig`: interactive configuration hub and persisted runtime config editing.
@@ -65,15 +68,17 @@ Only hub-first Go-ready features should be advertised in public help. The curren
 
 ```text
 dvv setup
+dvv bootstrap
 dvv doctor
 dvv ssh
 dvv workspace
 dvv tmux
 dvv db
+dvv resources
 dvv config
 ```
 
-`dvv tmux:session` exists as the command behind the managed `Ctrl+F` shell shortcut.
+`dvv tmux:session` exists as the command behind the managed `Ctrl+F` shell shortcut. `dvv env:bootstrap` is kept as a compatibility route for the previous bootstrap command.
 
 Compatibility routes used by tests or scripts may exist during migration, but root help and autocomplete should stay hub-first unless a script command is intentionally promoted.
 

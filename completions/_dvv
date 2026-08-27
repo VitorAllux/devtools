@@ -11,9 +11,11 @@ _dvv() {
     cmds)
       local -a commands
       commands=(
+        "bootstrap:Restore AGE/Bitwarden secrets and SSH backup"
         "config:Open the configuration hub"
         "db:Open the database hub"
         "doctor:Check local dependencies and integration"
+        "resources:Open the local resources hub"
         "setup:Install zsh completion and shell shortcuts"
         "ssh:Open the SSH hub"
         "tmux:Open the tmux environment hub"
@@ -41,6 +43,21 @@ _dvv() {
             "drop:Drop selected databases"
           )
           _describe -t db-actions 'db actions' db_actions
+          ;;
+        bootstrap)
+          local -a bootstrap_flags
+          bootstrap_flags=(
+            "--force:Overwrite local SSH list from encrypted backup"
+            "--skip-setup:Skip zsh completion and shortcut setup"
+          )
+          _describe -t bootstrap-flags 'bootstrap flags' bootstrap_flags
+          ;;
+        resources)
+          local -a resources_actions
+          resources_actions=(
+            "list:List detected resources"
+          )
+          _describe -t resources-actions 'resources actions' resources_actions
           ;;
         ssh)
           local -a ssh_flags

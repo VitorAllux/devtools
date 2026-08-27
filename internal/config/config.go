@@ -16,12 +16,14 @@ type Config struct {
 	AgeKeyFile           string
 	AgeRecipientsFile    string
 	EncryptedServersFile string
+	BitwardenAgeKeyItem  string
 	Project              ProjectConfig
 }
 
 type ProjectConfig struct {
 	Theme     ThemeConfig     `json:"theme"`
 	DB        DBConfig        `json:"db"`
+	Resources ResourcesConfig `json:"resources"`
 	SSH       SSHConfig       `json:"ssh"`
 	Tmux      TmuxConfig      `json:"tmux"`
 	Workspace WorkspaceConfig `json:"workspace"`
@@ -42,6 +44,20 @@ type DBConfig struct {
 
 type SSHConfig struct {
 	Hub SSHHubConfig `json:"hub"`
+}
+
+type ResourcesConfig struct {
+	Hub ResourcesHubConfig `json:"hub"`
+}
+
+type ResourcesHubConfig struct {
+	Shortcuts ResourcesHubShortcuts `json:"shortcuts"`
+}
+
+type ResourcesHubShortcuts struct {
+	Start   string `json:"start"`
+	Restart string `json:"restart"`
+	Stop    string `json:"stop"`
 }
 
 type SSHHubConfig struct {
@@ -179,6 +195,8 @@ func Load() (*Config, error) {
 	}
 
 	keyDir := filepath.Join(configDir, "keys")
+	ageRecipientsFile := runtimeSecretPath(root, configDir, "age-recipients.txt")
+	encryptedServersFile := runtimeSecretPath(root, configDir, "servers.list.age")
 	projectConfig := DefaultProjectConfig()
 	if err := loadProjectConfig(filepath.Join(root, "dvv.config.json"), &projectConfig); err != nil {
 		return nil, err
@@ -190,8 +208,9 @@ func Load() (*Config, error) {
 		ConfigFile:           configFile,
 		ServersFile:          ExpandPath(firstEnv("DVV_SERVERS_FILE", "DEVT_SERVERS_FILE", filepath.Join(configDir, "servers.list"))),
 		AgeKeyFile:           ExpandPath(firstEnv("DVV_AGE_KEY_FILE", "DEVT_AGE_KEY_FILE", filepath.Join(keyDir, "age.key"))),
-		AgeRecipientsFile:    ExpandPath(firstEnv("DVV_AGE_RECIPIENTS_FILE", "DEVT_AGE_RECIPIENTS_FILE", filepath.Join(configDir, "age-recipients.txt"))),
-		EncryptedServersFile: ExpandPath(firstEnv("DVV_ENCRYPTED_SERVERS_FILE", "DEVT_ENCRYPTED_SERVERS_FILE", filepath.Join(configDir, "servers.list.age"))),
+		AgeRecipientsFile:    ExpandPath(firstEnv("DVV_AGE_RECIPIENTS_FILE", "DEVT_AGE_RECIPIENTS_FILE", ageRecipientsFile)),
+		EncryptedServersFile: ExpandPath(firstEnv("DVV_ENCRYPTED_SERVERS_FILE", "DEVT_ENCRYPTED_SERVERS_FILE", encryptedServersFile)),
+		BitwardenAgeKeyItem:  firstSetEnv("DVV_BW_AGE_KEY_ITEM", "DEVT_BW_AGE_KEY_ITEM"),
 		Project:              projectConfig,
 	}
 	cfg.Project.Workspace = resolveWorkspaceConfig(cfg.Project.Workspace)
@@ -298,6 +317,14 @@ func firstSetEnv(keys ...string) string {
 	return ""
 }
 
+func runtimeSecretPath(root string, configDir string, name string) string {
+	legacyDir := filepath.Join(root, "secrets")
+	if info, err := os.Stat(legacyDir); err == nil && info.IsDir() {
+		return filepath.Join(legacyDir, name)
+	}
+	return filepath.Join(configDir, name)
+}
+
 func ExpandPath(value string) string {
 	home := homeDir()
 	if value == "~" {
@@ -324,6 +351,15 @@ func DefaultProjectConfig() ProjectConfig {
 			DumpsDir:      "dumps",
 			RcloneRemote:  "gdrive",
 			SafetyConfirm: true,
+		},
+		Resources: ResourcesConfig{
+			Hub: ResourcesHubConfig{
+				Shortcuts: ResourcesHubShortcuts{
+					Start:   "alt+s",
+					Restart: "alt+r",
+					Stop:    "alt+x",
+				},
+			},
 		},
 		SSH: SSHConfig{
 			Hub: SSHHubConfig{
@@ -447,6 +483,7 @@ func mergeProjectConfigDefaults(target *ProjectConfig) {
 		target.Theme.Name = defaults.Theme.Name
 	}
 	target.DB = mergeDBConfigDefaults(target.DB, defaults.DB)
+	target.Resources = mergeResourcesConfigDefaults(target.Resources, defaults.Resources)
 	if strings.TrimSpace(target.SSH.Hub.Shortcuts.Add) == "" {
 		target.SSH.Hub.Shortcuts.Add = defaults.SSH.Hub.Shortcuts.Add
 	}
@@ -475,6 +512,19 @@ func mergeDBConfigDefaults(target DBConfig, defaults DBConfig) DBConfig {
 	}
 	if !target.SafetyConfirm {
 		target.SafetyConfirm = defaults.SafetyConfirm
+	}
+	return target
+}
+
+func mergeResourcesConfigDefaults(target ResourcesConfig, defaults ResourcesConfig) ResourcesConfig {
+	if strings.TrimSpace(target.Hub.Shortcuts.Start) == "" {
+		target.Hub.Shortcuts.Start = defaults.Hub.Shortcuts.Start
+	}
+	if strings.TrimSpace(target.Hub.Shortcuts.Restart) == "" {
+		target.Hub.Shortcuts.Restart = defaults.Hub.Shortcuts.Restart
+	}
+	if strings.TrimSpace(target.Hub.Shortcuts.Stop) == "" {
+		target.Hub.Shortcuts.Stop = defaults.Hub.Shortcuts.Stop
 	}
 	return target
 }

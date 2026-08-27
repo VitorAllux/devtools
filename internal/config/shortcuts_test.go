@@ -45,3 +45,15 @@ func TestWorkspaceHubKeysUseDefaults(t *testing.T) {
 		t.Fatalf("workspace keys = %#v", keys)
 	}
 }
+
+func TestResourcesHubKeysUseDefaults(t *testing.T) {
+	cfg := Config{Project: DefaultProjectConfig()}
+	keys := cfg.ResourcesHubKeys()
+
+	if keys.Start.FZFKey != "alt-s" || keys.Start.Label != "Alt+S" {
+		t.Fatalf("start key = %#v", keys.Start)
+	}
+	if keys.Restart.FZFKey != "alt-r" || keys.Stop.FZFKey != "alt-x" {
+		t.Fatalf("resources keys = %#v", keys)
+	}
+}

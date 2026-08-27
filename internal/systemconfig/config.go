@@ -372,6 +372,7 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Secrets", "DVV_AGE_KEY_FILE", "Local AGE private key path", "path", cfg.AgeKeyFile, "", false},
 		{"Secrets", "DVV_AGE_RECIPIENTS_FILE", "AGE recipients file path", "path", cfg.AgeRecipientsFile, "", false},
 		{"Secrets", "DVV_ENCRYPTED_SERVERS_FILE", "Encrypted SSH backup path", "path", cfg.EncryptedServersFile, "", false},
+		{"Secrets", "DVV_BW_AGE_KEY_ITEM", "Bitwarden item storing the AGE private key", "secret", cfg.BitwardenAgeKeyItem, "", false},
 	}
 }
 

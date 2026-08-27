@@ -3,8 +3,8 @@ dumps/
 dist/
 tmp/
 node_modules/
-secrets/
-secrets.local/
+/secrets/
+/secrets.local/
 *.sql
 *.sql.gz
 *.log
