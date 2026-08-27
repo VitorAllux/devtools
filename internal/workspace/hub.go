@@ -792,25 +792,25 @@ print_commands() {
 ` + commandDeck + `
 }
 if [ "$raw" = "__dvv_empty__" ]; then
+  printf "\033[1;38;2;212;175;55mHub commands\033[0m\n"
+  print_commands
+  printf "\n\033[38;2;139;126;163m--------------------------------\033[0m\n"
   printf "\033[1;38;2;212;175;55mWorkspace hub\033[0m\n"
   printf "  \033[38;2;196;181;253mNo workspaces yet\033[0m\n"
   printf "  \033[38;2;139;126;163mUse the create shortcut to start one.\033[0m\n"
-  printf "\n\033[38;2;139;126;163m--------------------------------\033[0m\n"
-  printf "\033[1;38;2;212;175;55mHub commands\033[0m\n"
-  print_commands
   exit 0
 fi
 workspace_name=$(basename "$raw")
 project_count=$(printf "%s" "$display" | awk "{print \$3}")
 status=$(printf "%s" "$display" | awk "{print \$4}")
+printf "\033[1;38;2;212;175;55mHub commands\033[0m\n"
+print_commands
+printf "\n\033[38;2;139;126;163m--------------------------------\033[0m\n"
 printf "\033[1;38;2;212;175;55mWorkspace profile\033[0m\n"
 printf "  \033[38;2;196;181;253m%-9s\033[0m %s\n" "Name" "$workspace_name"
 printf "  \033[38;2;196;181;253m%-9s\033[0m %s\n" "Projects" "$project_count"
 printf "  \033[38;2;196;181;253m%-9s\033[0m %s\n" "Status" "$status"
 printf "  \033[38;2;196;181;253m%-9s\033[0m %s\n" "Path" "$raw"
-printf "\n\033[38;2;139;126;163m--------------------------------\033[0m\n"
-printf "\033[1;38;2;212;175;55mHub commands\033[0m\n"
-print_commands
 ' sh {}`
 }
 

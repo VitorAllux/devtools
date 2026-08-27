@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/VitorAllux/devtools/internal/config"
 	gitclient "github.com/VitorAllux/devtools/internal/git"
@@ -78,17 +79,18 @@ func (m *Manager) Workspaces() ([]Workspace, error) {
 
 	workspaces := make([]Workspace, 0, len(entries))
 	for _, entry := range entries {
-		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "workspace-") {
+		name := entry.Name()
+		if !entry.IsDir() || !strings.HasPrefix(name, "workspace-") || !utf8.ValidString(name) {
 			continue
 		}
-		path := filepath.Join(root, entry.Name())
+		path := filepath.Join(root, name)
 		info, err := os.Lstat(path)
 		if err != nil || info.Mode()&os.ModeSymlink != 0 {
 			continue
 		}
 		workspaces = append(workspaces, Workspace{
-			Name:    NameFromDir(entry.Name()),
-			DirName: entry.Name(),
+			Name:    NameFromDir(name),
+			DirName: name,
 			Path:    path,
 		})
 	}
@@ -177,6 +179,9 @@ func (m *Manager) Resolve(nameOrPath string) (Workspace, error) {
 	dirName := filepath.Base(workspacePath)
 	if !strings.HasPrefix(dirName, "workspace-") {
 		return Workspace{}, fmt.Errorf("workspace directory must be named workspace-<name>: %s", dirName)
+	}
+	if !utf8.ValidString(dirName) {
+		return Workspace{}, fmt.Errorf("workspace directory has invalid UTF-8 bytes: %q", dirName)
 	}
 	return Workspace{Name: NameFromDir(dirName), DirName: dirName, Path: workspacePath}, nil
 }

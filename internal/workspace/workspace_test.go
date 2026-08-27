@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -99,6 +100,36 @@ func TestListFastUsesMetadataWithoutGitInspection(t *testing.T) {
 	}
 	if len(runner.outputs) != 0 {
 		t.Fatalf("ListFast should not run git inspection commands: %#v", runner.outputs)
+	}
+}
+
+func TestWorkspacesSkipInvalidUTF8Names(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows normalizes filenames as UTF-16")
+	}
+
+	root := t.TempDir()
+	validPath := filepath.Join(root, "workspace-task_600_7656")
+	invalidPath := filepath.Join(root, string([]byte{
+		'w', 'o', 'r', 'k', 's', 'p', 'a', 'c', 'e', '-', 't', 'a', 's', 'k', '_', 0xc2, '6', '0', '0', '_', '7', '6', '5', '6',
+	}))
+	mustMkdir(t, validPath)
+	mustMkdir(t, invalidPath)
+
+	manager := NewManager(testWorkspaceConfig(root), newWorkspaceRunner())
+	workspaces, err := manager.Workspaces()
+	if err != nil {
+		t.Fatalf("Workspaces returned error: %v", err)
+	}
+
+	if len(workspaces) != 1 {
+		t.Fatalf("expected only valid workspace, got %#v", workspaces)
+	}
+	if workspaces[0].Path != validPath {
+		t.Fatalf("workspace path = %q, want %q", workspaces[0].Path, validPath)
+	}
+	if _, err := manager.Resolve(invalidPath); err == nil {
+		t.Fatal("expected invalid UTF-8 workspace path to be rejected")
 	}
 }
 
