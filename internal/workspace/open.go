@@ -3,9 +3,7 @@ package workspace
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/VitorAllux/devtools/internal/hooks"
@@ -40,12 +38,12 @@ func (m *Manager) Open(ctx context.Context, ws Workspace, opener string) error {
 func (m *Manager) AvailableOpeners(ws Workspace) []Opener {
 	openers := []Opener{}
 	if commandExists(m.Runner, "cursor") {
-		openers = append(openers, Opener{Value: "cursor", Label: "Cursor", Command: "cursor", Args: editorFolderArgs(ws.Path)})
+		openers = append(openers, Opener{Value: "cursor", Label: "Cursor", Command: "cursor", Args: editorFolderArgs(), Dir: ws.Path})
 	} else if commandExists(m.Runner, "cursor.exe") {
 		openers = append(openers, Opener{Value: "cursor", Label: "Cursor", Command: "cursor.exe", Args: editorPathArgs(windowsWorkspacePath(ws.Path))})
 	}
 	if commandExists(m.Runner, "code") {
-		openers = append(openers, Opener{Value: "code", Label: "VS Code", Command: "code", Args: editorFolderArgs(ws.Path)})
+		openers = append(openers, Opener{Value: "code", Label: "VS Code", Command: "code", Args: editorFolderArgs(), Dir: ws.Path})
 	} else if commandExists(m.Runner, "code.exe") {
 		openers = append(openers, Opener{Value: "code", Label: "VS Code", Command: "code.exe", Args: editorPathArgs(windowsWorkspacePath(ws.Path))})
 	}
@@ -77,20 +75,12 @@ func commandExists(runner run.Runner, name string) bool {
 	return err == nil
 }
 
-func editorFolderArgs(path string) []string {
-	return []string{"--new-window", "--folder-uri", fileURI(path)}
+func editorFolderArgs() []string {
+	return []string{"--new-window", "."}
 }
 
 func editorPathArgs(path string) []string {
 	return []string{"--new-window", path}
-}
-
-func fileURI(path string) string {
-	absolute, err := filepath.Abs(path)
-	if err != nil {
-		absolute = path
-	}
-	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(absolute)}).String()
 }
 
 func windowsWorkspacePath(path string) string {

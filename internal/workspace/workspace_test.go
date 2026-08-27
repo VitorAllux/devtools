@@ -228,9 +228,9 @@ func TestVSCodeOpenerUsesNewWindow(t *testing.T) {
 		t.Fatalf("Open returned error: %v", err)
 	}
 
-	want := "code --new-window --folder-uri " + fileURI(workspacePath)
-	if !runner.hasRun(want) {
-		t.Fatalf("VS Code should open in a new window, runs = %#v", runner.runs)
+	want := "code --new-window ."
+	if !runner.hasRunInDir(workspacePath, want) {
+		t.Fatalf("VS Code should open the current workspace dir in a new window, runs = %#v dirs = %#v", runner.runs, runner.runDirs)
 	}
 }
 
@@ -470,6 +470,7 @@ type workspaceRunner struct {
 	status    map[string]string
 	paths     map[string]bool
 	runs      []string
+	runDirs   []string
 	outputs   []string
 	fzfInput  string
 	fzfOutput []byte
@@ -487,7 +488,8 @@ func newWorkspaceRunner() *workspaceRunner {
 	}
 }
 
-func (r *workspaceRunner) Run(_ context.Context, _ string, name string, args ...string) error {
+func (r *workspaceRunner) Run(_ context.Context, dir string, name string, args ...string) error {
+	r.runDirs = append(r.runDirs, dir)
 	r.runs = append(r.runs, strings.Join(append([]string{name}, args...), " "))
 	if name != "git" {
 		return nil
@@ -593,6 +595,15 @@ func (r *workspaceRunner) LookPath(name string) (string, error) {
 func (r *workspaceRunner) hasRun(command string) bool {
 	for _, run := range r.runs {
 		if run == command {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *workspaceRunner) hasRunInDir(dir string, command string) bool {
+	for index, run := range r.runs {
+		if run == command && index < len(r.runDirs) && r.runDirs[index] == dir {
 			return true
 		}
 	}
