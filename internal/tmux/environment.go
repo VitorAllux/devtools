@@ -419,10 +419,11 @@ func tmuxPreviewCommand(shortcuts []ui.FZFShortcut) string {
 shift
 raw=$(printf "%s" "$line" | cut -f1)
 display=$(printf "%s" "$line" | cut -f2-)
-set -- $display
+target_name=$(printf "%s" "$display" | awk "{print \$2}")
+target_status=$(printf "%s" "$display" | awk "{print \$3}")
 printf "\033[1;38;2;212;175;55mTmux target\033[0m\n"
-printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Name" "$2"
-printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Status" "$3"
+printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Name" "$target_name"
+printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Status" "$target_status"
 printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Session" "$raw"
 printf "\n\033[38;2;139;126;163m--------------------------------\033[0m\n"
 printf "\033[1;38;2;212;175;55mCommands\033[0m\n"

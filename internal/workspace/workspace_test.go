@@ -164,6 +164,20 @@ func TestFZFHubKeepsEmptyWorkspaceHubOpen(t *testing.T) {
 	}
 }
 
+func TestWorkspacePreviewPreservesHubCommandArgs(t *testing.T) {
+	keys := (&config.Config{Project: config.DefaultProjectConfig()}).WorkspaceHubKeys()
+	preview := workspacePreviewCommand(workspaceHubShortcuts(keys))
+
+	if strings.Contains(preview, "set -- $display") {
+		t.Fatalf("preview should not replace shortcut args with display columns: %s", preview)
+	}
+	for _, want := range []string{"Shift+C", "create workspace", "Shift+M", "manage projects", "Shift+D", "delete selected"} {
+		if !strings.Contains(preview, want) {
+			t.Fatalf("preview missing %q: %s", want, preview)
+		}
+	}
+}
+
 func TestExecuteCreatePlanWritesMetadataAndAgentsFile(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
