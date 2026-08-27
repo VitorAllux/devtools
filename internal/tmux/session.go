@@ -179,12 +179,14 @@ func sessionFZFArgs(currentDir string, searchRoot string, depth int, executable 
 		PreviewLabel:  "directory panel",
 		PreviewWindow: "right,34%,border-rounded,wrap",
 		Shortcuts:     shortcuts,
-		ExtraArgs: append(ui.FZFHiddenRowArgs(),
-			"--header-lines=1",
+		ExtraArgs: []string{
+			"--delimiter=\\|",
+			"--with-nth=4",
+			"--nth=3,4",
 			"--disabled",
-			"--bind=start:reload:"+startCommand,
-			"--bind=change:reload:"+changeCommand,
-		),
+			"--bind=start:reload:" + startCommand,
+			"--bind=change:reload:" + changeCommand,
+		},
 	}.Args()
 }
 
@@ -230,14 +232,15 @@ func BrowseEntries(currentDir string, query string, searchRoot string, maxDepth 
 
 func BrowseRows(entries []BrowseEntry) string {
 	var builder strings.Builder
-	builder.WriteString(ui.FZFHiddenHeader(browseTableHeader()))
-	builder.WriteByte('\n')
 	for _, entry := range entries {
-		raw := entry.Kind + "|" + entry.Path
-		builder.WriteString(ui.FZFHiddenRow(raw, browseRow(entry)))
+		builder.WriteString(browseLine(entry))
 		builder.WriteByte('\n')
 	}
 	return builder.String()
+}
+
+func browseLine(entry BrowseEntry) string {
+	return strings.Join([]string{entry.Path, entry.Kind, entry.Name, browseLabel(entry)}, "|")
 }
 
 func appendMatchingControls(entries []BrowseEntry, currentDir string, query string) []BrowseEntry {
@@ -312,29 +315,18 @@ func searchDirectories(root string, query string, maxDepth int) ([]BrowseEntry, 
 	return entries, nil
 }
 
-func browseRow(entry BrowseEntry) string {
-	marker := "DIR"
-	if entry.Kind == "current" {
-		marker = "."
+func browseLabel(entry BrowseEntry) string {
+	switch entry.Kind {
+	case "current":
+		return "[.] " + entry.Name + "/    select current"
+	case "parent":
+		return "[..] ../"
+	default:
+		if strings.TrimSpace(entry.Hint) != "" && entry.Hint != "enter" {
+			return entry.Name + "/    " + entry.Hint
+		}
+		return entry.Name + "/"
 	}
-	if entry.Kind == "parent" {
-		marker = ".."
-	}
-	return fmt.Sprintf("%s  %s  %s  %s",
-		ui.Gold(fixedWidth(marker, 5)),
-		ui.Accent(fixedWidth(entry.Name, 32)),
-		ui.Muted(fixedWidth(entry.Kind, 8)),
-		ui.Muted(entry.Hint),
-	)
-}
-
-func browseTableHeader() string {
-	return fmt.Sprintf(" %s  %s  %s  %s",
-		ui.Crown(fixedWidth("TYPE", 5)),
-		ui.Crown(fixedWidth("DIRECTORY", 32)),
-		ui.Crown(fixedWidth("KIND", 8)),
-		ui.Crown("DETAIL"),
-	)
 }
 
 func browsePreviewCommand(shortcuts []ui.FZFShortcut) string {
@@ -352,13 +344,12 @@ func browsePreviewCommand(shortcuts []ui.FZFShortcut) string {
 	}
 	return `sh -c 'line=$1
 shift
-raw=$(printf "%s" "$line" | cut -f1)
-display=$(printf "%s" "$line" | cut -f2-)
-path=${raw#*|}
-set -- $display
+path=$(printf "%s" "$line" | cut -d "|" -f1)
+kind=$(printf "%s" "$line" | cut -d "|" -f2)
+name=$(printf "%s" "$line" | cut -d "|" -f3)
 printf "\033[1;38;2;212;175;55mDirectory\033[0m\n"
-printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Name" "$2"
-printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Kind" "$3"
+printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Name" "$name"
+printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Kind" "$kind"
 printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Path" "$path"
 printf "\n\033[38;2;139;126;163m--------------------------------\033[0m\n"
 printf "\033[1;38;2;212;175;55mCommands\033[0m\n"
@@ -370,11 +361,12 @@ done
 }
 
 func parseBrowseSelection(selection string) (BrowseEntry, error) {
-	raw := ui.FZFSelectedRaw(selection)
-	kind, path, ok := strings.Cut(raw, "|")
-	if !ok || kind == "" || path == "" {
+	parts := strings.SplitN(selection, "|", 4)
+	if len(parts) < 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
 		return BrowseEntry{}, fmt.Errorf("invalid directory selection")
 	}
+	path := parts[0]
+	kind := parts[1]
 	realPath, err := realDir(path)
 	if err != nil {
 		return BrowseEntry{}, err

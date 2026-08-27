@@ -251,7 +251,6 @@ func FZFThemeArgs(prompt ...string) []string {
 		"--separator=-",
 		"--cycle",
 		"--scroll-off=3",
-		"--keep-right",
 		"--tabstop=4",
 		"--prompt=" + value,
 		"--pointer=>>",

@@ -25,13 +25,13 @@ func TestBrowseEntriesListsCurrentParentAndChildren(t *testing.T) {
 	}
 	rows := BrowseRows(entries)
 
-	if !strings.Contains(rows, "current|"+current) {
+	if !strings.Contains(rows, current+"|current|") {
 		t.Fatalf("current entry missing: %q", rows)
 	}
-	if !strings.Contains(rows, "parent|"+root) {
+	if !strings.Contains(rows, root+"|parent|") {
 		t.Fatalf("parent entry missing: %q", rows)
 	}
-	if !strings.Contains(rows, "dir|"+filepath.Join(current, "api")) {
+	if !strings.Contains(rows, filepath.Join(current, "api")+"|dir|") {
 		t.Fatalf("child directory missing: %q", rows)
 	}
 	if strings.Contains(rows, "node_modules") {
@@ -61,7 +61,7 @@ func TestSelectDirectoryBuildsReloadingFZFCommand(t *testing.T) {
 
 	runner := &fakeRunner{
 		paths:     map[string]bool{"fzf": true},
-		fzfOutput: []byte("\ndir|" + selected + "\tDIR  api\n"),
+		fzfOutput: []byte("\n" + selected + "|dir|api|api/\n"),
 	}
 	manager := NewManager(testConfig(root), runner)
 
@@ -74,6 +74,9 @@ func TestSelectDirectoryBuildsReloadingFZFCommand(t *testing.T) {
 	}
 	if !runner.hasArgPrefix("--bind=start:reload:") || !runner.hasArgPrefix("--bind=change:reload:") {
 		t.Fatalf("fzf args missing reload bindings: %#v", runner.fzfArgs)
+	}
+	if !runner.hasArg("--delimiter=\\|") || !runner.hasArg("--with-nth=4") {
+		t.Fatalf("fzf args should use the legacy pipe display rule: %#v", runner.fzfArgs)
 	}
 }
 
@@ -201,6 +204,15 @@ func (r *fakeRunner) hasStart(command string) bool {
 func (r *fakeRunner) hasArgPrefix(prefix string) bool {
 	for _, arg := range r.fzfArgs {
 		if strings.HasPrefix(arg, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *fakeRunner) hasArg(value string) bool {
+	for _, arg := range r.fzfArgs {
+		if arg == value {
 			return true
 		}
 	}
