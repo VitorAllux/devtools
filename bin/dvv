@@ -14,6 +14,23 @@ if (!env.GOCACHE) {
   env.GOCACHE = path.join(os.tmpdir(), "dvv-go-build-cache");
 }
 
+if (shouldRebuild(binaryPath)) {
+  const build = childProcess.spawnSync(process.execPath, [path.join(root, "scripts", "build.js")], {
+    cwd: root,
+    env,
+    stdio: "inherit",
+    windowsHide: false,
+  });
+  if (build.error) {
+    console.error("dvv could not rebuild.");
+    console.error(build.error.message);
+    process.exit(127);
+  }
+  if ((build.status ?? 1) !== 0) {
+    process.exit(build.status ?? 1);
+  }
+}
+
 let command = binaryPath;
 let commandArgs = args;
 
@@ -37,3 +54,38 @@ if (result.error) {
 }
 
 process.exit(result.status ?? 1);
+
+function shouldRebuild(binary) {
+  if (process.env.DVV_AUTO_BUILD === "0") {
+    return false;
+  }
+  if (!fs.existsSync(binary)) {
+    return false;
+  }
+
+  const binaryMtime = fs.statSync(binary).mtimeMs;
+  const sourceMtime = newestMtime([
+    path.join(root, "cmd"),
+    path.join(root, "internal"),
+    path.join(root, "go.mod"),
+    path.join(root, "dvv.config.json"),
+  ]);
+  return sourceMtime > binaryMtime;
+}
+
+function newestMtime(paths) {
+  let newest = 0;
+  for (const item of paths) {
+    if (!fs.existsSync(item)) {
+      continue;
+    }
+    const stat = fs.statSync(item);
+    newest = Math.max(newest, stat.mtimeMs);
+    if (stat.isDirectory()) {
+      for (const child of fs.readdirSync(item)) {
+        newest = Math.max(newest, newestMtime([path.join(item, child)]));
+      }
+    }
+  }
+  return newest;
+}

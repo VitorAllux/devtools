@@ -1,9 +1,11 @@
 package db
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/VitorAllux/devtools/internal/config"
@@ -60,5 +62,20 @@ func TestDumpFilesAreSortedAndFiltered(t *testing.T) {
 	want := []string{"a.sql", "b.sql.gz"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("dumpFiles = %#v, want %#v", got, want)
+	}
+}
+
+func TestSanitizeSQLReaderRemovesStandaloneDashLines(t *testing.T) {
+	reader, removed := sanitizeSQLReader(strings.NewReader("select 1;\r\n-\nselect '-';\n"))
+	got, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll returned error: %v", err)
+	}
+	want := "select 1;\nselect '-';\n"
+	if string(got) != want {
+		t.Fatalf("sanitized SQL = %q, want %q", got, want)
+	}
+	if removed() != 1 {
+		t.Fatalf("removed = %d, want 1", removed())
 	}
 }

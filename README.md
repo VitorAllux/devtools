@@ -72,6 +72,8 @@ npm run build
 
 That command only rebuilds `dist/dvv`. It does not edit shell files.
 
+When using `npm link`, the `bin/dvv` launcher also rebuilds automatically if Go source files are newer than `dist/dvv`. Set `DVV_AUTO_BUILD=0` to disable that development behavior.
+
 Then test normally:
 
 ```bash

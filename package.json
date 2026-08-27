@@ -27,6 +27,7 @@
     "test": "node ./scripts/go.js test ./...",
     "vet": "node ./scripts/go.js vet ./...",
     "check": "npm run build && npm test && npm run vet",
+    "prepare": "node ./scripts/build.js",
     "postinstall": "node ./scripts/postinstall.js"
   },
   "engines": {

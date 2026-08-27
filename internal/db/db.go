@@ -2,13 +2,18 @@ package db
 
 import (
 	"bufio"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/VitorAllux/devtools/internal/config"
 	"github.com/VitorAllux/devtools/internal/run"
@@ -465,19 +470,55 @@ func (m *Manager) truncate(ctx context.Context, dbName string) error {
 }
 
 func (m *Manager) importDump(ctx context.Context, dump string, dbName string) error {
-	if _, err := os.Stat(dump); err != nil {
+	info, err := os.Stat(dump)
+	if err != nil {
 		return err
 	}
 	if err := m.prepareAuth(); err != nil {
 		return err
 	}
-	command := "set -o pipefail; "
-	if strings.HasSuffix(dump, ".gz") {
-		command += "pv " + shellQuote(dump) + " | gunzip -c | awk 'BEGIN{removed=0} { sub(/\\r$/, \"\"); if ($0 == \"-\") { removed++; next } print } END{ if (removed > 0) printf \"[dvv][db import] Removed %d invalid SQL line(s)\\n\", removed > \"/dev/stderr\" }' | mysql --defaults-extra-file=" + shellQuote(m.defaultsFile) + " --default-character-set=utf8mb4 " + shellQuote(dbName)
-	} else {
-		command += "pv " + shellQuote(dump) + " | awk 'BEGIN{removed=0} { sub(/\\r$/, \"\"); if ($0 == \"-\") { removed++; next } print } END{ if (removed > 0) printf \"[dvv][db import] Removed %d invalid SQL line(s)\\n\", removed > \"/dev/stderr\" }' | mysql --defaults-extra-file=" + shellQuote(m.defaultsFile) + " --default-character-set=utf8mb4 " + shellQuote(dbName)
+
+	file, err := os.Open(dump)
+	if err != nil {
+		return err
 	}
-	return m.Runner.Run(ctx, "", "bash", "-lc", command)
+	defer file.Close()
+
+	progress := newImportProgress(filepath.Base(dump), info.Size())
+	counting := &countingReader{reader: file, onRead: progress.Add}
+	var source io.Reader = counting
+	if strings.HasSuffix(dump, ".gz") {
+		gz, err := gzip.NewReader(counting)
+		if err != nil {
+			return err
+		}
+		defer gz.Close()
+		source = gz
+	}
+	sqlReader, removedInvalidLines := sanitizeSQLReader(source)
+
+	cmd := exec.CommandContext(ctx,
+		"mysql",
+		"--defaults-extra-file="+m.defaultsFile,
+		"--default-character-set=utf8mb4",
+		dbName,
+	)
+	cmd.Stdin = sqlReader
+	cmd.Stdout = os.Stdout
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	progress.Start()
+	err = cmd.Run()
+	progress.Finish(err == nil)
+	if err != nil {
+		return fmt.Errorf("import failed: %s", summarizeCommandError(err, stderr.String()))
+	}
+	if removed := removedInvalidLines(); removed > 0 {
+		ui.Warn("Removed %d invalid SQL line(s)", removed)
+	}
+	ui.OK("Imported %s into %s", filepath.Base(dump), dbName)
+	return nil
 }
 
 func (m *Manager) dumpFiles() ([]string, error) {
@@ -500,6 +541,137 @@ func (m *Manager) dumpFiles() ([]string, error) {
 	}
 	sort.Strings(files)
 	return files, nil
+}
+
+type countingReader struct {
+	reader io.Reader
+	onRead func(int)
+}
+
+func (r *countingReader) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	if n > 0 && r.onRead != nil {
+		r.onRead(n)
+	}
+	return n, err
+}
+
+type importProgress struct {
+	subject string
+	total   int64
+	read    atomic.Int64
+	done    chan struct{}
+}
+
+func newImportProgress(subject string, total int64) *importProgress {
+	return &importProgress{
+		subject: subject,
+		total:   total,
+		done:    make(chan struct{}),
+	}
+}
+
+func (p *importProgress) Add(n int) {
+	p.read.Add(int64(n))
+}
+
+func (p *importProgress) Start() {
+	if !ui.LoaderEnabled() || p.total <= 0 {
+		return
+	}
+	go func() {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+		p.render(false)
+		for {
+			select {
+			case <-ticker.C:
+				p.render(false)
+			case <-p.done:
+				return
+			}
+		}
+	}()
+}
+
+func (p *importProgress) Finish(ok bool) {
+	if !ui.LoaderEnabled() || p.total <= 0 {
+		return
+	}
+	close(p.done)
+	p.render(ok)
+	fmt.Fprint(os.Stderr, "\n")
+}
+
+func (p *importProgress) render(done bool) {
+	percent := 0
+	if p.total > 0 {
+		percent = int((p.read.Load() * 100) / p.total)
+	}
+	if done || percent > 100 {
+		percent = 100
+	}
+	fmt.Fprintf(os.Stderr, "\r%s %s %s %s",
+		importProgressBar(percent),
+		ui.Crown("importing"),
+		ui.Accent(p.subject),
+		ui.Muted(fmt.Sprintf("%3d%%", percent)),
+	)
+}
+
+func importProgressBar(percent int) string {
+	const width = 18
+	filled := (percent * width) / 100
+	var builder strings.Builder
+	builder.WriteString(ui.Muted("["))
+	for index := 0; index < width; index++ {
+		if index < filled {
+			builder.WriteString(ui.Crown("█"))
+			continue
+		}
+		builder.WriteString(ui.Purple("░"))
+	}
+	builder.WriteString(ui.Muted("]"))
+	return builder.String()
+}
+
+func sanitizeSQLReader(source io.Reader) (io.Reader, func() int64) {
+	reader, writer := io.Pipe()
+	var removed atomic.Int64
+	go func() {
+		scanner := bufio.NewScanner(source)
+		scanner.Buffer(make([]byte, 64*1024), 64*1024*1024)
+		for scanner.Scan() {
+			line := strings.TrimSuffix(scanner.Text(), "\r")
+			if line == "-" {
+				removed.Add(1)
+				continue
+			}
+			if _, err := io.WriteString(writer, line+"\n"); err != nil {
+				_ = writer.CloseWithError(err)
+				return
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			_ = writer.CloseWithError(err)
+			return
+		}
+		_ = writer.Close()
+	}()
+	return reader, removed.Load
+}
+
+func summarizeCommandError(err error, stderr string) string {
+	message := strings.TrimSpace(stderr)
+	if message == "" {
+		return err.Error()
+	}
+	lines := strings.Split(message, "\n")
+	last := strings.TrimSpace(lines[len(lines)-1])
+	if last == "" {
+		return err.Error()
+	}
+	return last
 }
 
 func promptPassword(label string) (string, error) {
