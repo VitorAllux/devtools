@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -128,6 +129,26 @@ func ShortcutLine(shortcuts []FZFShortcut) string {
 	return strings.Join(parts, "  ")
 }
 
+func FZFPreviewCommandDeck(shortcuts []FZFShortcut) string {
+	var builder strings.Builder
+	for _, shortcut := range shortcuts {
+		label := strings.TrimSpace(shortcut.Label)
+		if label == "" {
+			label = strings.TrimSpace(shortcut.Key)
+		}
+		description := strings.TrimSpace(shortcut.Description)
+		if label == "" || description == "" {
+			continue
+		}
+		fmt.Fprintf(&builder,
+			"  printf \"  \\033[38;2;212;175;55m[%%-7s]\\033[0m \\033[38;2;139;126;163m%%s\\033[0m\\n\" %s %s\n",
+			shellDoubleQuote(label),
+			shellDoubleQuote(description),
+		)
+	}
+	return builder.String()
+}
+
 func FZFHiddenRow(raw string, display string) string {
 	return raw + fzfHiddenDelimiter + display
 }
@@ -174,4 +195,15 @@ func ParseFZFExpectOutput(output string) (string, []string) {
 		}
 	}
 	return key, selected
+}
+
+func shellDoubleQuote(value string) string {
+	replacer := strings.NewReplacer(
+		`\`, `\\`,
+		`"`, `\"`,
+		`$`, `\$`,
+		"`", "\\`",
+		"\n", `\n`,
+	)
+	return `"` + replacer.Replace(value) + `"`
 }

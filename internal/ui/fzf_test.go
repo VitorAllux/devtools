@@ -61,6 +61,23 @@ func TestFZFHubKeepsShortcutsOutOfHeaderByDefault(t *testing.T) {
 	}
 }
 
+func TestFZFPreviewCommandDeckPrintsEveryShortcut(t *testing.T) {
+	deck := FZFPreviewCommandDeck([]FZFShortcut{
+		{Label: "Enter", Description: "open"},
+		{Key: "C", Label: "Shift+C", Description: "create workspace"},
+		{Key: "D", Label: "Shift+D", Description: "delete selected"},
+	})
+
+	for _, want := range []string{"Enter", "open", "Shift+C", "create workspace", "Shift+D", "delete selected"} {
+		if !strings.Contains(deck, want) {
+			t.Fatalf("command deck missing %q: %s", want, deck)
+		}
+	}
+	if strings.Contains(deck, "DVV_FZF_COMMANDS") {
+		t.Fatalf("command deck should be static printf calls: %s", deck)
+	}
+}
+
 func TestFZFSelectedRaw(t *testing.T) {
 	raw := FZFSelectedRaw("api root@example.com\tstyled display")
 	if raw != "api root@example.com" {

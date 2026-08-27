@@ -784,15 +784,12 @@ func workspaceHubHeaderLines(message string) []string {
 }
 
 func workspacePreviewCommand(shortcuts []ui.FZFShortcut) string {
-	return "DVV_FZF_COMMANDS=" + shellQuote(shortcutEnv(shortcuts)) + ` sh -c 'line=$1
+	commandDeck := ui.FZFPreviewCommandDeck(shortcuts)
+	return `sh -c 'line=$1
 raw=$(printf "%s" "$line" | cut -f1)
 display=$(printf "%s" "$line" | cut -f2-)
 print_commands() {
-  tab=$(printf "\t")
-  printf "%s" "$DVV_FZF_COMMANDS" | while IFS="$tab" read -r label description; do
-    [ -n "$label" ] || continue
-    printf "  \033[38;2;212;175;55m[%-7s]\033[0m \033[38;2;139;126;163m%s\033[0m\n" "$label" "$description"
-  done
+` + commandDeck + `
 }
 if [ "$raw" = "__dvv_empty__" ]; then
   printf "\033[1;38;2;212;175;55mWorkspace hub\033[0m\n"
@@ -1056,23 +1053,4 @@ func messageFromError(err error, fallback string) string {
 
 func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
-}
-
-func shortcutEnv(shortcuts []ui.FZFShortcut) string {
-	var builder strings.Builder
-	for _, shortcut := range shortcuts {
-		label := strings.TrimSpace(shortcut.Label)
-		if label == "" {
-			label = strings.TrimSpace(shortcut.Key)
-		}
-		description := strings.TrimSpace(shortcut.Description)
-		if label == "" || description == "" {
-			continue
-		}
-		builder.WriteString(label)
-		builder.WriteByte('\t')
-		builder.WriteString(description)
-		builder.WriteByte('\n')
-	}
-	return builder.String()
 }

@@ -3,7 +3,9 @@ package workspace
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/VitorAllux/devtools/internal/hooks"
@@ -38,14 +40,14 @@ func (m *Manager) Open(ctx context.Context, ws Workspace, opener string) error {
 func (m *Manager) AvailableOpeners(ws Workspace) []Opener {
 	openers := []Opener{}
 	if commandExists(m.Runner, "cursor") {
-		openers = append(openers, Opener{Value: "cursor", Label: "Cursor", Command: "cursor", Args: editorFolderArgs(), Dir: ws.Path})
+		openers = append(openers, Opener{Value: "cursor", Label: "Cursor", Command: "cursor", Args: editorFolderArgs(ws.Path)})
 	} else if commandExists(m.Runner, "cursor.exe") {
-		openers = append(openers, Opener{Value: "cursor", Label: "Cursor", Command: "cursor.exe", Args: editorPathArgs(windowsWorkspacePath(ws.Path))})
+		openers = append(openers, Opener{Value: "cursor", Label: "Cursor", Command: "cursor.exe", Args: editorFolderArgs(ws.Path)})
 	}
 	if commandExists(m.Runner, "code") {
-		openers = append(openers, Opener{Value: "code", Label: "VS Code", Command: "code", Args: editorFolderArgs(), Dir: ws.Path})
+		openers = append(openers, Opener{Value: "code", Label: "VS Code", Command: "code", Args: editorFolderArgs(ws.Path)})
 	} else if commandExists(m.Runner, "code.exe") {
-		openers = append(openers, Opener{Value: "code", Label: "VS Code", Command: "code.exe", Args: editorPathArgs(windowsWorkspacePath(ws.Path))})
+		openers = append(openers, Opener{Value: "code", Label: "VS Code", Command: "code.exe", Args: editorFolderArgs(ws.Path)})
 	}
 	if commandExists(m.Runner, "opencode") {
 		openers = append(openers, Opener{Value: "opencode", Label: "OpenCode", Command: "opencode", Dir: ws.Path})
@@ -75,20 +77,27 @@ func commandExists(runner run.Runner, name string) bool {
 	return err == nil
 }
 
-func editorFolderArgs() []string {
-	return []string{"--new-window", "."}
-}
-
-func editorPathArgs(path string) []string {
+func editorFolderArgs(path string) []string {
+	if remoteURI := wslRemoteFolderURI(path); remoteURI != "" {
+		return []string{"--new-window", "--folder-uri", remoteURI}
+	}
 	return []string{"--new-window", path}
 }
 
-func windowsWorkspacePath(path string) string {
+func wslRemoteFolderURI(path string) string {
 	distro := strings.TrimSpace(os.Getenv("WSL_DISTRO_NAME"))
 	if distro == "" || !strings.HasPrefix(path, "/") {
-		return path
+		return ""
 	}
-	return `\\wsl.localhost\` + distro + strings.ReplaceAll(path, "/", `\`)
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		absolute = path
+	}
+	return (&url.URL{
+		Scheme: "vscode-remote",
+		Host:   "wsl+" + distro,
+		Path:   filepath.ToSlash(absolute),
+	}).String()
 }
 
 func shellCommand() string {

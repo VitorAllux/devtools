@@ -206,6 +206,9 @@ func TestWorkspacePreviewPreservesHubCommandArgs(t *testing.T) {
 	if strings.Contains(preview, "set -- $display") {
 		t.Fatalf("preview should not replace shortcut args with display columns: %s", preview)
 	}
+	if strings.Contains(preview, "DVV_FZF_COMMANDS") {
+		t.Fatalf("preview should render shortcut commands directly: %s", preview)
+	}
 	for _, want := range []string{"Shift+C", "create workspace", "Shift+M", "manage projects", "Shift+D", "delete selected"} {
 		if !strings.Contains(preview, want) {
 			t.Fatalf("preview missing %q: %s", want, preview)
@@ -214,6 +217,8 @@ func TestWorkspacePreviewPreservesHubCommandArgs(t *testing.T) {
 }
 
 func TestVSCodeOpenerUsesNewWindow(t *testing.T) {
+	t.Setenv("WSL_DISTRO_NAME", "Ubuntu")
+
 	ctx := context.Background()
 	root := t.TempDir()
 	workspacePath := filepath.Join(root, "workspace-alpha")
@@ -228,13 +233,13 @@ func TestVSCodeOpenerUsesNewWindow(t *testing.T) {
 		t.Fatalf("Open returned error: %v", err)
 	}
 
-	want := "code --new-window ."
-	if !runner.hasRunInDir(workspacePath, want) {
-		t.Fatalf("VS Code should open the current workspace dir in a new window, runs = %#v dirs = %#v", runner.runs, runner.runDirs)
+	want := "code --new-window --folder-uri " + wslRemoteFolderURI(workspacePath)
+	if !runner.hasRun(want) {
+		t.Fatalf("VS Code should open the WSL workspace folder in a new window, runs = %#v", runner.runs)
 	}
 }
 
-func TestVSCodeExeOpenerUsesWSLUNCPath(t *testing.T) {
+func TestVSCodeExeOpenerUsesWSLRemoteURI(t *testing.T) {
 	t.Setenv("WSL_DISTRO_NAME", "Ubuntu")
 
 	root := t.TempDir()
@@ -250,9 +255,9 @@ func TestVSCodeExeOpenerUsesWSLUNCPath(t *testing.T) {
 		t.Fatalf("Open returned error: %v", err)
 	}
 
-	want := `code.exe --new-window \\wsl.localhost\Ubuntu` + strings.ReplaceAll(workspacePath, "/", `\`)
+	want := "code.exe --new-window --folder-uri " + wslRemoteFolderURI(workspacePath)
 	if !runner.hasRun(want) {
-		t.Fatalf("VS Code exe should open WSL folders through UNC paths, runs = %#v", runner.runs)
+		t.Fatalf("VS Code exe should open WSL folders through remote URIs, runs = %#v", runner.runs)
 	}
 }
 
@@ -470,7 +475,6 @@ type workspaceRunner struct {
 	status    map[string]string
 	paths     map[string]bool
 	runs      []string
-	runDirs   []string
 	outputs   []string
 	fzfInput  string
 	fzfOutput []byte
@@ -488,8 +492,7 @@ func newWorkspaceRunner() *workspaceRunner {
 	}
 }
 
-func (r *workspaceRunner) Run(_ context.Context, dir string, name string, args ...string) error {
-	r.runDirs = append(r.runDirs, dir)
+func (r *workspaceRunner) Run(_ context.Context, _ string, name string, args ...string) error {
 	r.runs = append(r.runs, strings.Join(append([]string{name}, args...), " "))
 	if name != "git" {
 		return nil
@@ -595,15 +598,6 @@ func (r *workspaceRunner) LookPath(name string) (string, error) {
 func (r *workspaceRunner) hasRun(command string) bool {
 	for _, run := range r.runs {
 		if run == command {
-			return true
-		}
-	}
-	return false
-}
-
-func (r *workspaceRunner) hasRunInDir(dir string, command string) bool {
-	for index, run := range r.runs {
-		if run == command && index < len(r.runDirs) && r.runDirs[index] == dir {
 			return true
 		}
 	}
