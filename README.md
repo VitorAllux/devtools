@@ -199,11 +199,13 @@ Picker shortcuts:
 Configuration lives in `dvv.config.json` under `tmux.session`:
 
 ```bash
-DVV_TMUX_SESSION_SEARCH_ROOTS=~/workspace:~/Development/projects
+DVV_TMUX_SESSION_SEARCH_ROOTS=~/workspace:~/Work/Development/dev:~/Work/Development:~/Development
 DVV_TMUX_SESSION_SEARCH_DEPTH=3
 DVV_TMUX_SESSION_NAME=space
 DVV_TMUX_SESSION_SHORTCUT=ctrl+f
 ```
+
+Default search root priority follows the previous Bash implementation: `TMUX_DEFAULT_DIR`, then `~/workspace`, `~/Work/Development/dev`, `~/Work/Development`, `~/Development`, then the common parent of `API_DIR` and `WEB_DIR`, then `$HOME`.
 
 ## Database Hub
 

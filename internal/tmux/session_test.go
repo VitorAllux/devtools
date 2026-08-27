@@ -89,6 +89,26 @@ func TestSelectDirectoryBuildsReloadingFZFCommand(t *testing.T) {
 	}
 }
 
+func TestSessionSearchRootFallsBackToAPIWebCommonAncestor(t *testing.T) {
+	root := t.TempDir()
+	api := filepath.Join(root, "saas", "api")
+	web := filepath.Join(root, "saas", "web")
+	mustMkdir(t, api)
+	mustMkdir(t, web)
+	t.Setenv("API_DIR", api)
+	t.Setenv("WEB_DIR", web)
+
+	cfg := testConfig(root)
+	cfg.Project.Tmux.Session.SearchRoots = []string{filepath.Join(root, "missing")}
+	manager := NewManager(cfg, &fakeRunner{})
+
+	got := manager.sessionSearchRoot()
+	want := filepath.Join(root, "saas")
+	if got != want {
+		t.Fatalf("session search root = %q, want %q", got, want)
+	}
+}
+
 func TestOpenSessionCreatesUniqueDetachedSessionAndAttaches(t *testing.T) {
 	t.Setenv("TMUX", "")
 	root := t.TempDir()

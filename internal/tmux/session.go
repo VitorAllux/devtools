@@ -158,6 +158,12 @@ func (m *Manager) sessionSearchRoot() string {
 			return path
 		}
 	}
+	if ancestor := commonAncestor(
+		config.ExpandPath(os.Getenv("API_DIR")),
+		config.ExpandPath(os.Getenv("WEB_DIR")),
+	); ancestor != "" {
+		return ancestor
+	}
 	return realDirOrFallback(homeDir(), ".")
 }
 

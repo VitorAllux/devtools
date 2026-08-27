@@ -189,6 +189,31 @@ func TestResolveTmuxConfigUsesEnvOverrides(t *testing.T) {
 	}
 }
 
+func TestResolveTmuxConfigUsesLegacySessionRootOrder(t *testing.T) {
+	t.Setenv("HOME", "/home/tester")
+	t.Setenv("TMUX_DEFAULT_DIR", "$HOME/custom-root")
+	t.Setenv("API_DIR", "$HOME/workspace/saas/api")
+	t.Setenv("WEB_DIR", "$HOME/workspace/saas/web")
+
+	cfg := resolveTmuxConfig(defaultTmuxConfig())
+
+	expected := []string{
+		"/home/tester/custom-root",
+		"/home/tester/workspace",
+		"/home/tester/Work/Development/dev",
+		"/home/tester/Work/Development",
+		"/home/tester/Development",
+	}
+	if len(cfg.Session.SearchRoots) != len(expected) {
+		t.Fatalf("tmux roots = %#v, want %#v", cfg.Session.SearchRoots, expected)
+	}
+	for index, root := range expected {
+		if cfg.Session.SearchRoots[index] != root {
+			t.Fatalf("tmux root %d = %q, want %q: %#v", index, cfg.Session.SearchRoots[index], root, cfg.Session.SearchRoots)
+		}
+	}
+}
+
 func TestResolveDBConfigUsesEnvOverrides(t *testing.T) {
 	t.Setenv("HOME", "/home/tester")
 	t.Setenv("DVV_DB_HOST", "127.0.0.1")

@@ -36,7 +36,6 @@ The file is versioned because it defines project behavior, theme identity, and d
     "session": {
       "searchRoots": [
         "~/workspace",
-        "~/Development/projects",
         "~/Work/Development/dev",
         "~/Work/Development",
         "~/Development"
@@ -102,6 +101,8 @@ The `tmux.session` section contains the standalone directory session picker used
 - `searchDepth`: maximum depth for typed search below the active search root.
 - `defaultSessionName`: base tmux session name. Existing sessions append `_1`, `_2`, and so on.
 - `shortcut`: zsh keybinding installed by shell integration. Set to `none` to skip the tmux binding.
+
+Default search root priority mirrors the previous Bash implementation: `TMUX_DEFAULT_DIR`, then the configured `searchRoots` defaults `~/workspace`, `~/Work/Development/dev`, `~/Work/Development`, and `~/Development`, then the common parent of `API_DIR` and `WEB_DIR`, then `$HOME`.
 
 Shortcut changes are applied by running `dvv setup`; `npm run build` does not edit shell files.
 
@@ -239,4 +240,6 @@ DEVT_TMUX_SESSION_NAME
 DEVT_TMUX_SESSION_SHORTCUT
 ```
 
-When `DVV_WORKSPACES_DIR` and `DEVT_WORKSPACES_DIR` are unset, `TMUX_DEFAULT_DIR` is accepted as a legacy workspace root fallback. When explicit project search roots are unset, `API_DIR`, `WEB_DIR`, and `TMUX_DEFAULT_DIR` are used to seed project discovery before the versioned defaults.
+When `DVV_WORKSPACES_DIR` and `DEVT_WORKSPACES_DIR` are unset, `TMUX_DEFAULT_DIR` is accepted as a legacy workspace root fallback. When explicit project search roots are unset, `API_DIR`, `WEB_DIR`, and `TMUX_DEFAULT_DIR` are used to seed workspace project discovery before the versioned defaults.
+
+For `dvv tmux:session`, `TMUX_DEFAULT_DIR` keeps the old top priority. `API_DIR` and `WEB_DIR` are only used as a final common-parent fallback when none of the configured session roots exists.

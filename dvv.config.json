@@ -23,7 +23,6 @@
     "session": {
       "searchRoots": [
         "~/workspace",
-        "~/Development/projects",
         "~/Work/Development/dev",
         "~/Work/Development",
         "~/Development"

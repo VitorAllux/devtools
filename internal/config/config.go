@@ -344,7 +344,6 @@ func defaultTmuxConfig() TmuxConfig {
 		Session: TmuxSessionConfig{
 			SearchRoots: []string{
 				"~/workspace",
-				"~/Development/projects",
 				"~/Work/Development/dev",
 				"~/Work/Development",
 				"~/Development",
@@ -596,11 +595,6 @@ func legacyTmuxSearchRoots() []string {
 	roots := []string{}
 	if value := os.Getenv("TMUX_DEFAULT_DIR"); value != "" {
 		roots = append(roots, value)
-	}
-	for _, key := range []string{"API_DIR", "WEB_DIR"} {
-		if value := os.Getenv(key); value != "" {
-			roots = append(roots, filepath.Dir(value))
-		}
 	}
 	return roots
 }
