@@ -38,14 +38,14 @@ func (m *Manager) Open(ctx context.Context, ws Workspace, opener string) error {
 func (m *Manager) AvailableOpeners(ws Workspace) []Opener {
 	openers := []Opener{}
 	if commandExists(m.Runner, "cursor") {
-		openers = append(openers, Opener{Value: "cursor", Label: "Cursor", Command: "cursor", Args: []string{ws.Path}})
+		openers = append(openers, Opener{Value: "cursor", Label: "Cursor", Command: "cursor", Args: []string{"--new-window", ws.Path}})
 	} else if commandExists(m.Runner, "cursor.exe") {
-		openers = append(openers, Opener{Value: "cursor", Label: "Cursor", Command: "cursor.exe", Args: []string{ws.Path}})
+		openers = append(openers, Opener{Value: "cursor", Label: "Cursor", Command: "cursor.exe", Args: []string{"--new-window", ws.Path}})
 	}
 	if commandExists(m.Runner, "code") {
-		openers = append(openers, Opener{Value: "code", Label: "VS Code", Command: "code", Args: []string{ws.Path}})
+		openers = append(openers, Opener{Value: "code", Label: "VS Code", Command: "code", Args: []string{"--new-window", ws.Path}})
 	} else if commandExists(m.Runner, "code.exe") {
-		openers = append(openers, Opener{Value: "code", Label: "VS Code", Command: "code.exe", Args: []string{ws.Path}})
+		openers = append(openers, Opener{Value: "code", Label: "VS Code", Command: "code.exe", Args: []string{"--new-window", ws.Path}})
 	}
 	if commandExists(m.Runner, "opencode") {
 		openers = append(openers, Opener{Value: "opencode", Label: "OpenCode", Command: "opencode", Dir: ws.Path})

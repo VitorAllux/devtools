@@ -144,6 +144,41 @@ func TestWorkspaceRowsShowsEmptyState(t *testing.T) {
 	}
 }
 
+func TestWorkspaceRowKeepsColumnsAligned(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+
+	row := workspaceRow(7, Details{
+		Workspace: Workspace{
+			DirName: "workspace-task_600_7656",
+			Path:    "/root/workspace/workspace-task_600_7656",
+		},
+		ProjectCount: 0,
+		HasMetadata:  true,
+	})
+
+	nameColumn := strings.Index(row, "workspace-task_600_7656")
+	if nameColumn < 0 {
+		t.Fatalf("row missing expected values: %q", row)
+	}
+	nameEnd := nameColumn + len("workspace-task_600_7656")
+	projectOffset := strings.Index(row[nameEnd:], "0")
+	if projectOffset < 0 {
+		t.Fatalf("row missing project count: %q", row)
+	}
+	projectsColumn := nameEnd + projectOffset
+	statusOffset := strings.Index(row[projectsColumn:], "ready")
+	if statusOffset < 0 {
+		t.Fatalf("row missing status: %q", row)
+	}
+	statusColumn := projectsColumn + statusOffset
+	if projectsColumn <= nameColumn+len("workspace-task_600_7656") {
+		t.Fatalf("project count should not touch workspace name: %q", row)
+	}
+	if statusColumn <= projectsColumn {
+		t.Fatalf("status should stay after project count: %q", row)
+	}
+}
+
 func TestFZFHubKeepsEmptyWorkspaceHubOpen(t *testing.T) {
 	runner := newWorkspaceRunner()
 	runner.fzfOutput = []byte("\n__dvv_empty__\t--  No workspaces yet\n")
@@ -175,6 +210,27 @@ func TestWorkspacePreviewPreservesHubCommandArgs(t *testing.T) {
 		if !strings.Contains(preview, want) {
 			t.Fatalf("preview missing %q: %s", want, preview)
 		}
+	}
+}
+
+func TestVSCodeOpenerUsesNewWindow(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	workspacePath := filepath.Join(root, "workspace-alpha")
+	mustMkdir(t, workspacePath)
+
+	runner := newWorkspaceRunner()
+	runner.paths["code"] = true
+	manager := NewManager(testWorkspaceConfig(root), runner)
+
+	err := manager.Open(ctx, Workspace{Name: "alpha", DirName: "workspace-alpha", Path: workspacePath}, "vscode")
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	want := "code --new-window " + workspacePath
+	if !runner.hasRun(want) {
+		t.Fatalf("VS Code should open in a new window, runs = %#v", runner.runs)
 	}
 }
 
@@ -390,6 +446,7 @@ type workspaceRunner struct {
 	refs      map[string]map[string]bool
 	branches  map[string]string
 	status    map[string]string
+	paths     map[string]bool
 	runs      []string
 	outputs   []string
 	fzfInput  string
@@ -404,6 +461,7 @@ func newWorkspaceRunner() *workspaceRunner {
 		refs:     map[string]map[string]bool{},
 		branches: map[string]string{},
 		status:   map[string]string{},
+		paths:    map[string]bool{},
 	}
 }
 
@@ -504,6 +562,9 @@ func (r *workspaceRunner) Start(context.Context, string, string, ...string) erro
 }
 
 func (r *workspaceRunner) LookPath(name string) (string, error) {
+	if r.paths[name] {
+		return "/usr/bin/" + name, nil
+	}
 	return "", errors.New(name + " not found")
 }
 

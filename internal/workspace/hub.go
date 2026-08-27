@@ -612,6 +612,12 @@ func workspaceRows(details []Details) string {
 	return builder.String()
 }
 
+const (
+	workspaceNameColumnWidth    = 32
+	workspaceProjectColumnWidth = 8
+	workspaceStatusColumnWidth  = 8
+)
+
 func workspaceRow(index int, detail Details) string {
 	status := workspaceStatus(detail)
 	projectCount := fmt.Sprintf("%d", detail.ProjectCount)
@@ -619,10 +625,10 @@ func workspaceRow(index int, detail Details) string {
 		projectCount = "?"
 	}
 	return fmt.Sprintf("%s  %s  %s  %s  %s",
-		ui.Muted(fmt.Sprintf("%02d", index+1)),
-		ui.Accent(fixedWidth(detail.Workspace.DirName, 28)),
-		ui.Gold(fixedWidth(projectCount, 8)),
-		ui.Muted(fixedWidth(status, 8)),
+		styledFixedWidth(fmt.Sprintf("%02d", index+1), 2, ui.Muted),
+		styledFixedWidth(detail.Workspace.DirName, workspaceNameColumnWidth, ui.Accent),
+		styledFixedWidth(projectCount, workspaceProjectColumnWidth, ui.Gold),
+		styledFixedWidth(status, workspaceStatusColumnWidth, ui.Muted),
 		ui.Muted(detail.Workspace.Path),
 	)
 }
@@ -642,20 +648,20 @@ func workspaceStatus(detail Details) string {
 
 func workspaceEmptyRow() string {
 	return fmt.Sprintf("%s  %s  %s  %s  %s",
-		ui.Muted("--"),
-		ui.Accent(fixedWidth("No workspaces yet", 28)),
-		ui.Gold(fixedWidth("0", 8)),
-		ui.Muted(fixedWidth("empty", 8)),
+		styledFixedWidth("--", 2, ui.Muted),
+		styledFixedWidth("No workspaces yet", workspaceNameColumnWidth, ui.Accent),
+		styledFixedWidth("0", workspaceProjectColumnWidth, ui.Gold),
+		styledFixedWidth("empty", workspaceStatusColumnWidth, ui.Muted),
 		ui.Muted("Use create shortcut to start"),
 	)
 }
 
 func workspaceTableHeader() string {
 	return fmt.Sprintf(" %s  %s  %s  %s  %s",
-		ui.Crown("NO"),
-		ui.Crown(fixedWidth("WORKSPACE", 28)),
-		ui.Crown(fixedWidth("PROJECTS", 8)),
-		ui.Crown(fixedWidth("STATUS", 8)),
+		styledFixedWidth("NO", 2, ui.Crown),
+		styledFixedWidth("WORKSPACE", workspaceNameColumnWidth, ui.Crown),
+		styledFixedWidth("PROJECTS", workspaceProjectColumnWidth, ui.Crown),
+		styledFixedWidth("STATUS", workspaceStatusColumnWidth, ui.Crown),
 		ui.Crown("PATH"),
 	)
 }
@@ -778,35 +784,26 @@ func workspaceHubHeaderLines(message string) []string {
 }
 
 func workspacePreviewCommand(shortcuts []ui.FZFShortcut) string {
-	shortcutArgs := make([]string, 0, len(shortcuts)*2)
-	for _, shortcut := range shortcuts {
-		label := strings.TrimSpace(shortcut.Label)
-		if label == "" {
-			label = strings.TrimSpace(shortcut.Key)
-		}
-		description := strings.TrimSpace(shortcut.Description)
-		if label == "" || description == "" {
-			continue
-		}
-		shortcutArgs = append(shortcutArgs, shellQuote(label), shellQuote(description))
-	}
-	return `sh -c 'line=$1
-shift
+	return "DVV_FZF_COMMANDS=" + shellQuote(shortcutEnv(shortcuts)) + ` sh -c 'line=$1
 raw=$(printf "%s" "$line" | cut -f1)
 display=$(printf "%s" "$line" | cut -f2-)
+print_commands() {
+  tab=$(printf "\t")
+  printf "%s" "$DVV_FZF_COMMANDS" | while IFS="$tab" read -r label description; do
+    [ -n "$label" ] || continue
+    printf "  \033[38;2;212;175;55m[%-7s]\033[0m \033[38;2;139;126;163m%s\033[0m\n" "$label" "$description"
+  done
+}
 if [ "$raw" = "__dvv_empty__" ]; then
   printf "\033[1;38;2;212;175;55mWorkspace hub\033[0m\n"
   printf "  \033[38;2;196;181;253mNo workspaces yet\033[0m\n"
   printf "  \033[38;2;139;126;163mUse the create shortcut to start one.\033[0m\n"
   printf "\n\033[38;2;139;126;163m--------------------------------\033[0m\n"
   printf "\033[1;38;2;212;175;55mHub commands\033[0m\n"
-  while [ "$#" -gt 1 ]; do
-    printf "  \033[38;2;212;175;55m[%-7s]\033[0m \033[38;2;139;126;163m%s\033[0m\n" "$1" "$2"
-    shift 2
-  done
+  print_commands
   exit 0
 fi
-workspace_name=$(printf "%s" "$display" | awk "{print \$2}")
+workspace_name=$(basename "$raw")
 project_count=$(printf "%s" "$display" | awk "{print \$3}")
 status=$(printf "%s" "$display" | awk "{print \$4}")
 printf "\033[1;38;2;212;175;55mWorkspace profile\033[0m\n"
@@ -816,11 +813,8 @@ printf "  \033[38;2;196;181;253m%-9s\033[0m %s\n" "Status" "$status"
 printf "  \033[38;2;196;181;253m%-9s\033[0m %s\n" "Path" "$raw"
 printf "\n\033[38;2;139;126;163m--------------------------------\033[0m\n"
 printf "\033[1;38;2;212;175;55mHub commands\033[0m\n"
-while [ "$#" -gt 1 ]; do
-  printf "  \033[38;2;212;175;55m[%-7s]\033[0m \033[38;2;139;126;163m%s\033[0m\n" "$1" "$2"
-  shift 2
-done
-' sh {} ` + strings.Join(shortcutArgs, " ")
+print_commands
+' sh {}`
 }
 
 func projectPreviewCommand() string {
@@ -1019,15 +1013,25 @@ func matchesShortcut(input string, fzfKey string) bool {
 }
 
 func fixedWidth(value string, width int) string {
+	text, padding := fixedWidthParts(value, width)
+	return text + padding
+}
+
+func styledFixedWidth(value string, width int, style func(string) string) string {
+	text, padding := fixedWidthParts(value, width)
+	return style(text) + padding
+}
+
+func fixedWidthParts(value string, width int) (string, string) {
 	value = strings.TrimSpace(value)
 	runes := []rune(value)
 	if len(runes) > width {
 		if width <= 1 {
-			return string(runes[:width])
+			return string(runes[:width]), ""
 		}
-		value = string(runes[:width-1]) + "."
+		runes = []rune(string(runes[:width-1]) + ".")
 	}
-	return fmt.Sprintf("%-*s", width, value)
+	return string(runes), strings.Repeat(" ", width-len(runes))
 }
 
 func stripANSI(value string) string {
@@ -1052,4 +1056,23 @@ func messageFromError(err error, fallback string) string {
 
 func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
+}
+
+func shortcutEnv(shortcuts []ui.FZFShortcut) string {
+	var builder strings.Builder
+	for _, shortcut := range shortcuts {
+		label := strings.TrimSpace(shortcut.Label)
+		if label == "" {
+			label = strings.TrimSpace(shortcut.Key)
+		}
+		description := strings.TrimSpace(shortcut.Description)
+		if label == "" || description == "" {
+			continue
+		}
+		builder.WriteString(label)
+		builder.WriteByte('\t')
+		builder.WriteString(description)
+		builder.WriteByte('\n')
+	}
+	return builder.String()
 }
