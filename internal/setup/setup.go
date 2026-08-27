@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/VitorAllux/devtools/internal/config"
 	"github.com/VitorAllux/devtools/internal/run"
@@ -71,11 +72,17 @@ func (m Manager) Doctor(_ context.Context) error {
 	checkPath("Project root", m.Config.RootDir, true)
 	checkPath("Go binary", filepath.Join(m.Config.RootDir, "dist", binaryName()), false)
 	checkCommand(m.Runner, "dvv", false)
+	checkLegacyDevvCommand(m.Runner)
 	checkCommand(m.Runner, "node", true)
+	checkCommand(m.Runner, "npm", false)
 	checkCommand(m.Runner, "git", true)
 	checkCommand(m.Runner, "ssh", true)
 	checkCommand(m.Runner, "tmux", true)
 	checkCommand(m.Runner, "fzf", true)
+	checkCommand(m.Runner, "code", false)
+	checkCommand(m.Runner, "cursor", false)
+	checkCommand(m.Runner, "opencode", false)
+	checkCommand(m.Runner, "codex", false)
 	checkCommand(m.Runner, "mysql", false)
 	checkCommand(m.Runner, "rclone", false)
 	checkCommand(m.Runner, "pv", false)
@@ -91,6 +98,7 @@ func (m Manager) Doctor(_ context.Context) error {
 	checkPath("AGE recipients", m.Config.AgeRecipientsFile, false)
 	checkPath("Encrypted SSH", m.Config.EncryptedServersFile, false)
 	checkPath("Workspace root", m.Config.Project.Workspace.Root, false)
+	checkInvalidWorkspaceNames(m.Config.Project.Workspace.Root)
 	checkPath("Dumps dir", m.Config.Project.DB.DumpsDir, false)
 	checkPath("Zsh completion", filepath.Join(homeDir(), ".zfunc", "_dvv"), false)
 	checkZshShortcutBlock()
@@ -129,6 +137,58 @@ func checkPath(label string, path string, required bool) {
 		return
 	}
 	ui.Warn("%-16s missing: %s", label, path)
+}
+
+func checkLegacyDevvCommand(runner run.Runner) {
+	path, err := runner.LookPath("devv")
+	if err != nil {
+		ui.Info("%-16s not installed; use `dvv`", "Legacy devv")
+		return
+	}
+	ui.Warn("%-16s found at %s; use `dvv` for this Go rewrite", "Legacy devv", path)
+}
+
+func checkInvalidWorkspaceNames(root string) {
+	expandedRoot := config.ExpandPath(root)
+	if strings.TrimSpace(expandedRoot) == "" {
+		ui.Warn("%-16s not configured", "Workspace names")
+		return
+	}
+	info, err := os.Stat(expandedRoot)
+	if err != nil || !info.IsDir() {
+		ui.Info("%-16s not checked; workspace root is missing", "Workspace names")
+		return
+	}
+
+	names := invalidWorkspaceNames(expandedRoot)
+	if len(names) == 0 {
+		ui.OK("%-16s valid names", "Workspace names")
+		return
+	}
+	ui.Warn("%-16s %d invalid workspace dir(s) ignored by the hub", "Workspace names", len(names))
+	for _, name := range names {
+		ui.Warn("%-16s %q", "", name)
+	}
+}
+
+func invalidWorkspaceNames(root string) []string {
+	root = config.ExpandPath(root)
+	if strings.TrimSpace(root) == "" {
+		return nil
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil
+	}
+	names := []string{}
+	for _, entry := range entries {
+		name := entry.Name()
+		if !entry.IsDir() || !strings.HasPrefix(name, "workspace-") || utf8.ValidString(name) {
+			continue
+		}
+		names = append(names, name)
+	}
+	return names
 }
 
 func checkZshShortcutBlock() {
@@ -183,8 +243,9 @@ func showDoctorHelp() {
 	ui.Title("Doctor")
 	fmt.Printf("  %s dvv doctor\n\n", ui.Bold("Usage:"))
 	helpSection("Checks")
-	helpEntry("commands", "dvv, node, git, ssh, tmux, fzf, MySQL, rclone, AGE, Bitwarden, Docker, and service tools")
+	helpEntry("commands", "dvv, legacy devv, Node/npm, Git, SSH, tmux, fzf, editors, DB, secrets, Docker, and service tools")
 	helpEntry("files", "dist binary, SSH/secrets files, workspace root, dumps dir, completion, and shortcuts")
+	helpEntry("workspaces", "Detect invalid workspace directory names ignored by the hub")
 }
 
 func showBuildHelp() {

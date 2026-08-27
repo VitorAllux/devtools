@@ -3,6 +3,9 @@ package setup
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -22,6 +25,30 @@ func TestBuildRunsScriptFromProjectRoot(t *testing.T) {
 	}
 	if runner.command != "node scripts/build.js" {
 		t.Fatalf("command = %q", runner.command)
+	}
+}
+
+func TestInvalidWorkspaceNamesDetectsBrokenUTF8(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows normalizes filenames as UTF-16")
+	}
+
+	root := t.TempDir()
+	validPath := filepath.Join(root, "workspace-task_600_7656")
+	invalidName := string([]byte{
+		'w', 'o', 'r', 'k', 's', 'p', 'a', 'c', 'e', '-', 't', 'a', 's', 'k', '_', 0xc2, '6', '0', '0', '_', '7', '6', '5', '6',
+	})
+	invalidPath := filepath.Join(root, invalidName)
+	if err := os.MkdirAll(validPath, 0o755); err != nil {
+		t.Fatalf("MkdirAll valid failed: %v", err)
+	}
+	if err := os.MkdirAll(invalidPath, 0o755); err != nil {
+		t.Fatalf("MkdirAll invalid failed: %v", err)
+	}
+
+	names := invalidWorkspaceNames(root)
+	if len(names) != 1 || names[0] != invalidName {
+		t.Fatalf("invalid names = %#v", names)
 	}
 }
 
