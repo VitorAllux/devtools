@@ -56,6 +56,19 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | fzf previews | Detailed shortcut decks belong in the side preview panel. | Use shared `internal/ui.FZFHub` and `FZFPreviewCommandDeck`. |
 | Global shortcuts | Only `Ctrl+F` and `Alt+S` are project-managed zsh shortcuts. | Avoid adding new global `Ctrl-*` bindings. |
 
+## Loader Coverage
+
+Use `internal/ui.RunWithRoyalLoader` for actions that can leave the terminal visually idle after confirmation. Keep prompts, listings, and script-friendly output clean.
+
+| Area | Loader points |
+| --- | --- |
+| SSH | Connection probe before tmux/terminal handoff, encrypted backup sync. |
+| Workspace | Initial hub load, project discovery, create planning, create execution, project add/remove, workspace deletion. |
+| Tmux | Target scanning, environment open/start/stop/restart, directory picker session open. |
+| Database | Database fetch, create, drop, truncate, Google Drive download, import progress, dump cleaning. |
+| Resources | Resource scan and start/stop/restart actions. |
+| Secrets | AGE key preparation, SSH backup decrypt/encrypt. |
+
 ## Local Data And Secrets
 
 | Detail | Current rule | Action |

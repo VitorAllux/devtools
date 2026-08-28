@@ -332,6 +332,7 @@ DVV_BW_AGE_KEY_ITEM=<bitwarden-item-name-or-id>
 | No workspace found | The workspace hub still opens and offers create inside the hub. |
 | Deletion safety | Dirty worktrees and leftover content require explicit confirmation. |
 | Secrets | `dvv bootstrap` restores AGE/Bitwarden-backed SSH data without committing private files. |
+| Long operations | Confirmed create/delete/import/start/stop flows use the shared Royal Noir loader. |
 | Colors/loaders | Theme is Royal Noir. Set `NO_COLOR=1` or `DVV_NO_LOADER=1` to disable color/loader behavior. |
 
 More detail lives in [docs/go-version/operational-map.md](docs/go-version/operational-map.md).

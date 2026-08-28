@@ -196,17 +196,42 @@ func (m *Manager) basicEnvironmentHub(ctx context.Context, targets []Target, def
 }
 
 func (m *Manager) RunEnvironmentAction(ctx context.Context, action string, target Target) error {
+	options, err := tmuxActionLoaderOptions(action, target)
+	if err != nil {
+		return err
+	}
+	return ui.RunWithRoyalLoader(options, func() error {
+		switch action {
+		case "up":
+			return m.StartEnvironment(ctx, target)
+		case "down":
+			return m.StopEnvironment(ctx, target.Session)
+		case "api-restart":
+			return m.RestartAPI(ctx, target)
+		case "web-restart":
+			return m.RestartWeb(ctx, target)
+		default:
+			return fmt.Errorf("unknown tmux action: %s", action)
+		}
+	})
+}
+
+func tmuxActionLoaderOptions(action string, target Target) (ui.LoaderOptions, error) {
+	subject := strings.TrimSpace(target.Label)
+	if subject == "" {
+		subject = strings.TrimSpace(target.Session)
+	}
 	switch action {
 	case "up":
-		return m.StartEnvironment(ctx, target)
+		return ui.LoaderOptions{Action: "opening", Subject: subject}, nil
 	case "down":
-		return m.StopEnvironment(ctx, target.Session)
+		return ui.LoaderOptions{Action: "stopping", Subject: subject}, nil
 	case "api-restart":
-		return m.RestartAPI(ctx, target)
+		return ui.LoaderOptions{Action: "restarting", Subject: subject, Detail: "api"}, nil
 	case "web-restart":
-		return m.RestartWeb(ctx, target)
+		return ui.LoaderOptions{Action: "restarting", Subject: subject, Detail: "web"}, nil
 	default:
-		return fmt.Errorf("unknown tmux action: %s", action)
+		return ui.LoaderOptions{}, fmt.Errorf("unknown tmux action: %s", action)
 	}
 }
 

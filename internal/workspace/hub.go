@@ -287,7 +287,13 @@ func (m *Manager) createInteractive(ctx context.Context) (Workspace, error) {
 	if m.Config.Project.Workspace.Safety.RequireConfirmation && !ui.Confirm("Create this workspace?") {
 		return Workspace{}, fmt.Errorf("workspace creation cancelled")
 	}
-	result := m.ExecuteCreatePlan(ctx, plan)
+	var result CreateResult
+	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "creating", Subject: plan.WorkspaceDir}, func() error {
+		result = m.ExecuteCreatePlan(ctx, plan)
+		return nil
+	}); err != nil {
+		return Workspace{}, err
+	}
 	reportCreateResult(result)
 	if result.Failed > 0 {
 		return Workspace{}, fmt.Errorf("workspace created with %d failure(s)", result.Failed)
@@ -324,7 +330,9 @@ func (m *Manager) manageInteractive(ctx context.Context, ws Workspace) error {
 		return nil
 	}
 	for _, project := range toRemove {
-		if err := m.RemoveProject(ctx, ws, project, false); err != nil {
+		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "removing", Subject: project.Name}, func() error {
+			return m.RemoveProject(ctx, ws, project, false)
+		}); err != nil {
 			return err
 		}
 		ui.OK("Removed project %s", project.Name)
@@ -337,12 +345,22 @@ func (m *Manager) manageInteractive(ctx context.Context, ws Workspace) error {
 	if err != nil {
 		return err
 	}
-	plan, err := m.BuildAddPlan(ctx, ws, toAdd, options)
-	if err != nil {
+	var plan AddPlan
+	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "planning", Subject: ws.DirName}, func() error {
+		var buildErr error
+		plan, buildErr = m.BuildAddPlan(ctx, ws, toAdd, options)
+		return buildErr
+	}); err != nil {
 		return err
 	}
 	printAddPlan(plan)
-	result := m.ExecuteAddPlan(ctx, plan)
+	var result AddResult
+	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "adding", Subject: ws.DirName}, func() error {
+		result = m.ExecuteAddPlan(ctx, plan)
+		return nil
+	}); err != nil {
+		return err
+	}
 	reportAddResult(result)
 	if result.Failed > 0 {
 		return fmt.Errorf("project management completed with %d failure(s)", result.Failed)
@@ -369,7 +387,13 @@ func (m *Manager) deleteWorkspacesInteractive(ctx context.Context, paths []strin
 func (m *Manager) deleteWorkspaceInteractive(ctx context.Context, ws Workspace) error {
 	options := RemoveWorkspaceOptions{}
 	for {
-		result := m.RemoveWorkspace(ctx, ws, options)
+		var result RemoveWorkspaceResult
+		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "deleting", Subject: ws.DirName}, func() error {
+			result = m.RemoveWorkspace(ctx, ws, options)
+			return nil
+		}); err != nil {
+			return err
+		}
 		reportRemoveResult(result)
 		switch result.Status {
 		case RemoveComplete:

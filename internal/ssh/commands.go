@@ -197,7 +197,7 @@ func (m *Manager) prepareAndReport(ctx context.Context) error {
 }
 
 func (m *Manager) syncAndReport(ctx context.Context) {
-	if err := ui.RunWithLoader("Updating encrypted SSH backup", func() error {
+	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "encrypting", Subject: "ssh backup"}, func() error {
 		return m.SyncBackup(ctx)
 	}); err != nil {
 		if IsSkippedBackup(err) {

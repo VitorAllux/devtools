@@ -165,10 +165,15 @@ func (m *Manager) CommandClean(ctx context.Context) error {
 	if !ui.Confirm(fmt.Sprintf("Delete %d dump file(s)?", len(selected))) {
 		return nil
 	}
-	for _, file := range selected {
-		if err := os.Remove(filepath.Join(m.Config.Project.DB.DumpsDir, file)); err != nil {
-			return err
+	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "deleting", Subject: fmt.Sprintf("%d dump file(s)", len(selected))}, func() error {
+		for _, file := range selected {
+			if err := os.Remove(filepath.Join(m.Config.Project.DB.DumpsDir, file)); err != nil {
+				return err
+			}
 		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	ui.OK("Deleted %d dump file(s)", len(selected))
 	return nil

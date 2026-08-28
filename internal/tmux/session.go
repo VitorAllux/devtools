@@ -127,16 +127,18 @@ func (m *Manager) OpenSession(ctx context.Context, selected string) error {
 	sessionName := m.nextSessionName(ctx, m.Config.Project.Tmux.Session.DefaultSessionName)
 	windowName := windowName(path)
 
-	if err := m.Runner.Run(ctx, "", "tmux", "new-session", "-ds", sessionName, "-n", windowName, "-c", path); err != nil {
-		return err
-	}
-	if err := (terminal.Launcher{Runner: m.Runner}).Open(ctx, "tmux", "attach", "-t", sessionName); err != nil {
-		if os.Getenv("TMUX") != "" {
-			return m.Runner.Run(ctx, "", "tmux", "switch-client", "-t", sessionName)
+	return ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "opening", Subject: sessionName}, func() error {
+		if err := m.Runner.Run(ctx, "", "tmux", "new-session", "-ds", sessionName, "-n", windowName, "-c", path); err != nil {
+			return err
 		}
-		return fmt.Errorf("%w; attach manually with: tmux attach -t %s", err, sessionName)
-	}
-	return nil
+		if err := (terminal.Launcher{Runner: m.Runner}).Open(ctx, "tmux", "attach", "-t", sessionName); err != nil {
+			if os.Getenv("TMUX") != "" {
+				return m.Runner.Run(ctx, "", "tmux", "switch-client", "-t", sessionName)
+			}
+			return fmt.Errorf("%w; attach manually with: tmux attach -t %s", err, sessionName)
+		}
+		return nil
+	})
 }
 
 func (m *Manager) nextSessionName(ctx context.Context, base string) string {
