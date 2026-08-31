@@ -1,8 +1,8 @@
-# Go Version Hardening And Release Plan
+# Go Version Hardening And Merge Readiness Plan
 
 ## Objective
 
-Prepare the `go-version` branch for a confident merge into `main` and for a cleaner NPM-facing release by hardening behavior, tests, smoke validation, autocomplete, configuration UX, and maintainer/agent readability.
+Prepare the `go-version` branch for a confident merge into `main` by hardening behavior, tests, smoke validation, autocomplete, configuration UX, and maintainer/agent readability.
 
 ## Context
 
@@ -21,7 +21,7 @@ dvv doctor
 dvv build
 ```
 
-The hardening pass moved the release baseline from low exploratory coverage to a minimum alpha gate. Latest validation on 2026-08-31:
+The hardening pass moved the merge-readiness baseline from low exploratory coverage to a minimum alpha gate. Latest validation on 2026-08-31:
 
 | Package | Current coverage |
 | --- | ---: |
@@ -35,7 +35,7 @@ The hardening pass moved the release baseline from low exploratory coverage to a
 | `internal/ssh` | 38.7% |
 | `internal/resources` | 54.2% |
 
-Coverage percentage is a signal, not the only goal. The release target is stronger confidence around command contracts, filesystem safety, terminal handoff behavior, and interactive hub flows.
+Coverage percentage is a signal, not the only goal. The readiness target is stronger confidence around command contracts, filesystem safety, terminal handoff behavior, and interactive hub flows.
 
 ## Status Legend
 
@@ -51,7 +51,7 @@ Coverage percentage is a signal, not the only goal. The release target is strong
 4. Add smoke and integration validation for real CLI flows.
 5. Align autocomplete with the final hub-first command surface.
 6. Add and validate macOS support.
-7. Finalize release, NPM packaging, and the `go-version -> main` merge criteria.
+7. Finalize the `go-version -> main` merge criteria.
 
 ## Track 1: Config Hub Categories And Theme Selection
 
@@ -139,7 +139,7 @@ Implemented first-level `dvv config` categories:
 
 - [x] Add shared testing utilities only where they reduce real duplication.
 - [x] Track coverage after each package pass with `go test ./... -coverprofile`.
-- [x] Target release-candidate coverage: no critical public-flow package below 35%, and total coverage at or above 50%.
+- [x] Target merge-candidate coverage: no critical public-flow package below 35%, and total coverage at or above 50%.
 
 ## Track 4: Smoke And Integration Validation
 
@@ -167,11 +167,11 @@ Implemented first-level `dvv config` categories:
 - [x] Update README, `AGENTS.md`, and `docs/go-version/operational-map.md` when command surface decisions change.
 - [x] Run isolated setup smoke after completion changes and verify zsh reload instructions still work.
 
-## Track 6: macOS Support Gate Before NPM
+## Track 6: macOS Support Gate
 
-This is the last feature/platform gate before NPM packaging decisions. Do not treat `dvv` as a multi-platform NPM package until this track is either complete or the package is explicitly documented as Linux/WSL-only.
+This is the last feature/platform gate before the Go rewrite replaces `main`. Do not claim full macOS support until this track is validated on a real macOS machine.
 
-- [x] Keep macOS implementation in `go-version` for this hardening pass so the NPM gate is reviewed from one branch.
+- [x] Keep macOS implementation in `go-version` for this hardening pass so the platform gate is reviewed from one branch.
 - [x] Add macOS terminal tab support for SSH and tmux handoff, including Terminal.app and iTerm2.
 - [x] Keep the public command surface identical across platforms; use runtime platform detection and config preferences, not separate user-facing versions.
 - [x] Add config for terminal launcher preference with `auto` as the default.
@@ -180,20 +180,19 @@ This is the last feature/platform gate before NPM packaging decisions. Do not tr
 - [x] Document macOS setup with Homebrew dependencies for Go, Node, fzf, tmux, mysql client, rclone, age, Bitwarden CLI, Docker, and editor CLIs.
 - [x] Add unit tests for macOS terminal launcher behavior, resource manager detection, doctor output, and platform-specific fallbacks.
 - [x] Add a macOS smoke checklist covering `dvv build`, `dvv setup`, `dvv ssh`, `dvv workspace`, `dvv tmux`, `dvv db`, `dvv resources`, `dvv config`, and `dvv doctor`.
-- [x] Document real macOS NPM install validation as a manual gate before claiming full macOS support in a public alpha.
+- [x] Document real macOS source-checkout validation as a manual gate before claiming full macOS support.
 
 Validation note: this run happened in WSL/Linux, so macOS behavior is covered by code-level platform tests and a manual smoke checklist, not by an executed real macOS install.
 
-## Track 7: Final Release, NPM, And Main Merge
+## Track 7: Final Merge Readiness
 
-- [x] Define release criteria for replacing the current `main` implementation with the Go version.
-- [x] Decide final alpha behavior for NPM installs after Linux/WSL and macOS support gates are defined.
-- [x] Add a release packaging note covering `postinstall`, required Go version, platform support, and fallback behavior.
-- [x] Review `package.json` `files` and decide that Go source/tests should ship in alpha packages.
-- [x] Add an `npm pack --dry-run` release checklist with a cache override example for restricted environments.
-- [x] Document how version changes should update `VERSION`, `package.json`, README release notes, and any generated artifacts.
+- [x] Define merge criteria for replacing the current `main` implementation with the Go version.
+- [x] Confirm source-checkout install behavior after Linux/WSL and macOS support gates are defined.
+- [x] Add a source-checkout note covering the launcher, required Go/Node versions, platform support, and fallback behavior.
+- [x] Review git ignore rules for runtime/private data.
+- [x] Document how version changes should update `VERSION`, `package.json`, README version notes, and any generated artifacts.
 - [x] Add a pre-merge checklist for `go-version -> main`.
-- [x] Confirm ignored runtime data stays out of packages and git history: dumps, secrets, `.env`, private SSH data, and local config.
+- [x] Confirm ignored runtime data stays out of git history: dumps, secrets, `.env`, private SSH data, and local config.
 
 ## Validation Commands
 
@@ -202,7 +201,6 @@ Run these before marking this plan complete:
 ```bash
 dvv build
 npm run check
-npm_config_cache=/tmp/dvv-npm-cache npm pack --dry-run
 node ./scripts/go.js test ./... -coverprofile=/tmp/dvv-cover.out
 node ./scripts/go.js tool cover -func=/tmp/dvv-cover.out
 ```
@@ -211,16 +209,15 @@ When smoke tests are added, run the documented smoke command or complete the man
 
 ## Completion Criteria
 
-- [x] Release and merge criteria are documented.
+- [x] Merge criteria are documented.
 - [x] Low-coverage packages have meaningful tests for critical behavior.
 - [x] The total coverage target and package-level confidence target are met or consciously revised with rationale.
 - [x] Smoke validation exists for real or realistic CLI flows.
 - [x] Autocomplete matches the final hub-first command surface.
 - [x] `dvv config` opens a category hub with theme selection and nested config areas.
 - [x] Maintainer/agent harness documentation exists and is linked from the main docs.
-- [x] macOS support is implemented with platform unit tests, and NPM release docs clearly require real macOS smoke before claiming full macOS support.
+- [x] macOS support is implemented with platform unit tests, and docs clearly require real macOS smoke before claiming full macOS support.
 - [x] `npm run check` passes.
-- [x] `npm pack --dry-run` output is reviewed for package contents.
 - [x] `go-version` is ready for a final review before replacing `main`.
 
 Final validation on 2026-08-31:
@@ -229,7 +226,6 @@ Final validation on 2026-08-31:
 npm run check
 node ./scripts/go.js test ./... -coverprofile=/tmp/dvv-cover.out
 node ./scripts/go.js tool cover -func=/tmp/dvv-cover.out
-npm_config_cache=/tmp/dvv-npm-cache npm pack --dry-run
 ```
 
 Result:
@@ -237,12 +233,11 @@ Result:
 - `npm run check` passed.
 - Total coverage: `50.9%`.
 - All critical public-flow packages are above `35%`.
-- NPM dry-run produced `@vitorallux/dvv@2.0.0-alpha.2` with 94 files.
-- Reviewed package contents exclude `dist/`, dumps, secrets, `.env`, private SSH data, and local config.
+- Runtime/private files are ignored: `dist/`, dumps, secrets, `.env`, private SSH data, and local config.
 
 ## Out Of Scope
 
 - Porting WSL commands unless they become required before merge.
 - Reintroducing the Python desktop control center.
-- Publishing a stable public package before release packaging is decided.
+- Adding a public distribution channel before source-checkout behavior is stable.
 - Adding broad code comments instead of improving structure, tests, fixtures, and docs.

@@ -236,7 +236,6 @@ npm run check
 ./bin/dvv ssh help
 ./bin/dvv workspace help
 ./bin/dvv workspace:list
-env npm_config_cache=/tmp/dvv-npm-cache npm pack --dry-run
 ```
 
 ## Deferred Decisions

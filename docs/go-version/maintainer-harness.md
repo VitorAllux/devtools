@@ -7,7 +7,7 @@ This document is the map for humans and agents changing the Go rewrite. Read it 
 Before changing a major feature, read these files in order:
 
 1. `AGENTS.md`
-2. `docs/plans/active/2026-08-31-go-version-hardening-release.md`
+2. `docs/go-version/merge-readiness.md`
 3. `docs/go-version/architecture.md`
 4. `docs/go-version/configuration.md`
 5. `docs/go-version/operational-map.md`
@@ -31,7 +31,7 @@ For workspace changes, also read `internal/workspace`, `internal/git`, `internal
 | `dvv bootstrap` | `internal/bootstrap`, `internal/secrets`, `internal/config`, `internal/setup` | `bootstrap`, `integrations`, `paths`, `secrets` | AGE keys, encrypted backups, Bitwarden CLI, SSH server list | `internal/bootstrap`, `internal/secrets`, configuration |
 | `dvv setup` | `internal/setup`, `completions/_dvv`, `scripts/setup.js` | `shortcuts`, `paths` | zsh completion, managed zsh shortcut block | `internal/setup`, completion checks, README |
 | `dvv doctor` | `internal/setup`, feature dependency checks | `paths`, `integrations`, `terminal` | local binaries, shell integration, workspace names, runtime directories | `internal/setup`, smoke script, README |
-| `dvv build` | `internal/setup`, `scripts/build.js`, `bin/dvv` | none | `dist/dvv`, Go toolchain, package source | smoke script, release checklist |
+| `dvv build` | `internal/setup`, `scripts/build.js`, `bin/dvv` | none | `dist/dvv`, Go toolchain, source checkout | smoke script, merge readiness |
 
 Compatibility routes may exist for scripts, tests, and old migration entrypoints. Public help and default autocomplete should stay hub-first.
 
@@ -76,7 +76,7 @@ Workspace generation is controlled by project config and metadata, not by shell 
 
 | Symptom | First check | Usual fix |
 | --- | --- | --- |
-| `dvv` runs old behavior | `which dvv` and `dvv build` output | Rebuild from the repo and ensure the NPM link points at this checkout. |
+| `dvv` runs old behavior | `which dvv` and `dvv build` output | Rebuild from the repo and ensure the `dvv` symlink points at this checkout. |
 | `devv` is typed by habit | root help and shell aliases | Use `dvv`; old `devv` aliases should be removed by setup cleanup. |
 | Workspace appears with a corrupted name | workspace directory name and UTF-8 validity | Run `dvv doctor`, delete or rename only the invalid directory manually after confirming it is not needed. |
 | VS Code opens a broken WSL workspace | opener value and WSL remote URI | Use the `code` CLI from WSL, update VS Code Remote WSL, and verify the selected path exists. |

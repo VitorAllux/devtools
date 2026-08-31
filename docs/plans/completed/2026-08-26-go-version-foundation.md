@@ -2,7 +2,7 @@
 
 ## Status
 
-Completed on 2026-08-31. This plan is historical; remaining release work moved to `docs/plans/active/2026-08-31-go-version-hardening-release.md`.
+Completed on 2026-08-31. This plan is historical; remaining hardening work moved to `docs/plans/completed/2026-08-31-go-version-hardening-readiness.md`.
 
 ## Objective
 
@@ -32,8 +32,8 @@ The Go rewrite should use the `main` branch as the behavior reference. It should
 ## Out Of Scope
 
 - Implementing Go command code in this setup step.
-- Publishing binaries.
-- Public NPM release automation.
+- Binary distribution.
+- Public distribution automation.
 - Removing local ignored runtime data.
 - Porting the Python control center.
 
@@ -65,7 +65,7 @@ The migration order is documented in `docs/go-version/migration-roadmap.md`.
 ## Open Decisions
 
 - Exact Go module path.
-- Whether the public NPM package ships platform binaries directly or downloads from GitHub Releases.
+- Whether future public distribution ships platform binaries directly or downloads them from another artifact source.
 - Exact final config shape for workspace, tmux, DB, resources, and WSL settings.
 - Whether docs remain entirely English or plans may use Portuguese in future branches.
 

@@ -101,20 +101,20 @@ Listing and actions are owned by the interactive hub instead of separate public 
 - Port WSL list/status/start/stop/shutdown if still useful.
 - Keep this optional until the core flows are stable.
 
-## Phase 8: Hardening And Release
+## Phase 8: Hardening And Merge Readiness
 
-Active plan:
+Completed plan:
 
 ```text
-docs/plans/active/2026-08-31-go-version-hardening-release.md
+docs/plans/completed/2026-08-31-go-version-hardening-readiness.md
 ```
 
-- [ ] Define release and merge criteria.
-- [ ] Expand tests for low-coverage public-flow packages.
-- [ ] Add smoke validation for real or realistic hub flows.
-- [ ] Align autocomplete with the hub-first command surface.
-- [ ] Redesign the config hub with categories, theme selection, and nested selectors.
-- [ ] Improve maintainer and agent readability harness documentation.
+- [x] Define merge criteria.
+- [x] Expand tests for low-coverage public-flow packages.
+- [x] Add smoke validation for real or realistic hub flows.
+- [x] Align autocomplete with the hub-first command surface.
+- [x] Redesign the config hub with categories, theme selection, and nested selectors.
+- [x] Improve maintainer and agent readability harness documentation.
 
 ## Merge Criteria For Main
 

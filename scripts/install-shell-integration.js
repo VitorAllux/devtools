@@ -43,7 +43,7 @@ const begin = "# >>> dvv shell shortcuts >>>";
 const end = "# <<< dvv shell shortcuts <<<";
 const block = [
   begin,
-  "# Managed by dvv. Edit dvv.config.json or set DVV_SKIP_SHELL_INTEGRATION=1 before install.",
+  "# Managed by dvv. Edit dvv.config.json or set DVV_SKIP_SHELL_INTEGRATION=1 before setup.",
   `[[ -d "$HOME/.zfunc" && ":${"$"}{fpath[*]}:" != *":$HOME/.zfunc:"* ]] && fpath=("$HOME/.zfunc" $fpath)`,
   ...bindings,
   end,
@@ -54,7 +54,7 @@ try {
   content = fs.readFileSync(zshrc, "utf8");
 } catch (error) {
   if (error.code !== "ENOENT") {
-    if (process.env.DVV_VERBOSE_POSTINSTALL === "1") {
+    if (process.env.DVV_VERBOSE_SETUP === "1") {
       console.error(`dvv shell shortcuts skipped: ${error.message}`);
     }
     process.exit(0);
@@ -69,7 +69,7 @@ try {
   fs.writeFileSync(zshrc, next, "utf8");
   console.error(`dvv zsh shortcuts installed in ${zshrc}`);
 } catch (error) {
-  if (process.env.DVV_VERBOSE_POSTINSTALL === "1") {
+  if (process.env.DVV_VERBOSE_SETUP === "1") {
     console.error(`dvv shell shortcuts skipped: ${error.message}`);
   }
 }

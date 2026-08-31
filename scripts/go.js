@@ -25,7 +25,7 @@ const result = childProcess.spawnSync("go", args, {
 });
 
 if (result.error) {
-  console.error("dvv Go command failed. Go is required while release binaries are not published yet.");
+  console.error("dvv Go command failed. Go is required for local development checks.");
   console.error(result.error.message);
   process.exit(127);
 }

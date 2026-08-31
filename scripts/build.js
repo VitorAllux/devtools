@@ -25,7 +25,7 @@ const result = childProcess.spawnSync("go", ["build", "-buildvcs=false", "-o", o
 });
 
 if (result.error) {
-  console.error("dvv build failed. Go is required while release binaries are not published yet.");
+  console.error("dvv build failed. Go is required to build the local binary.");
   console.error(result.error.message);
   process.exit(127);
 }

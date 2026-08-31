@@ -29,7 +29,7 @@ for (const dir of completionDirs) {
     console.error(`dvv zsh completion installed at ${target}`);
     process.exit(0);
   } catch (error) {
-    if (process.env.DVV_VERBOSE_POSTINSTALL === "1") {
+    if (process.env.DVV_VERBOSE_SETUP === "1") {
       console.error(`dvv zsh completion skipped for ${dir.path}: ${error.message}`);
     }
   }

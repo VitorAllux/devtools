@@ -5,7 +5,7 @@ The `go-version` branch is a clean Go rewrite for `dvv`.
 ## Source Of Truth
 
 - `main` keeps the previous Bash implementation for reference.
-- This branch should contain only the new Go project, packaging files, docs, examples, and tests.
+- This branch should contain only the new Go project, launcher files, docs, examples, and tests.
 - Do not bring legacy scripts back into this branch. If behavior is needed, inspect `main` and port it intentionally.
 - Use `docs/go-version/maintainer-harness.md` as the command ownership and testing map before changing cross-package behavior.
 
@@ -86,15 +86,17 @@ Compatibility routes used by tests or scripts may exist during migration, but ro
 
 See `docs/go-version/maintainer-harness.md` for the command-to-package map, shared UI contracts, and smoke/testing conventions.
 
-## Packaging
+## Source Checkout Install
 
-Local installation uses NPM:
+Local installation uses the committed launcher:
 
 ```bash
-npm install -g .
+./bin/dvv build
+mkdir -p ~/.local/bin
+ln -sf "$PWD/bin/dvv" ~/.local/bin/dvv
 ```
 
-The NPM package builds the Go binary into `dist/dvv` during `postinstall`. Shell files are only changed by the explicit `dvv setup` command. Future public releases should use GitHub Releases or GoReleaser artifacts so NPM installs do not require a Go toolchain.
+`bin/dvv` locates the project root, rebuilds `dist/dvv` when needed, and runs the compiled Go binary. Shell files are only changed by the explicit `dvv setup` command.
 
 ## Workspace Safety Rule
 

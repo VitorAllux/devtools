@@ -1,6 +1,6 @@
 # Smoke Checklist
 
-Use this checklist before treating `go-version` as release-ready. Automated smoke checks are intentionally non-destructive and run with an isolated temporary `HOME`.
+Use this checklist before treating `go-version` as merge-ready. Automated smoke checks are intentionally non-destructive and run with an isolated temporary `HOME`.
 
 ## Automated Smoke
 
@@ -29,7 +29,7 @@ Run these checks on the machine that will use the CLI daily:
 
 | Area | Command | Expected result |
 | --- | --- | --- |
-| Install | `npm install -g .` | Global `dvv` command is available. |
+| Source install | `ln -sf "$PWD/bin/dvv" ~/.local/bin/dvv` | Global `dvv` command points at this checkout. |
 | Build | `dvv build` | Binary rebuilds from any directory. |
 | Setup | `dvv setup` | `~/.zfunc/_dvv` and the managed `.zshrc` block are updated. |
 | Help | `dvv help` | Only public hub-first commands are shown. |
@@ -49,7 +49,7 @@ Run after installing Homebrew dependencies listed in the README:
 
 | Area | Command | Expected result |
 | --- | --- | --- |
-| Install | `npm install -g .` | `dvv` is on `PATH`; `postinstall` builds the local binary. |
+| Source install | `ln -sf "$PWD/bin/dvv" ~/.local/bin/dvv` | `dvv` is on `PATH` and points at this checkout. |
 | Build | `dvv build` | Go binary builds locally. |
 | Setup | `dvv setup` | zsh completion and managed shortcuts are installed in the user's shell files. |
 | Doctor | `dvv doctor` | Checks `brew` and `osascript`; does not warn about Linux-only `systemctl` or `service`. |

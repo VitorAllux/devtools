@@ -15,10 +15,11 @@ This document maps the operational details that are easy to forget while using o
 
 | Detail | Current rule | Action |
 | --- | --- | --- |
+| Source install | Symlink `bin/dvv` from the checkout into a directory on `PATH`. | Re-run `dvv build` after pulling source changes. |
 | Local rebuild | `dvv build` rebuilds from any working directory. | Use this after source changes. |
 | Repository build | `npm run build` works only from this repo root. | Do not run it from `~`; npm will search for `/root/package.json`. |
 | Validation | `npm run check` runs build, tests, vet, and non-destructive smoke. | Use it before pushing behavior changes. |
-| Versioned launcher | `bin/dvv` is committed because NPM uses it as the package executable. | Keep it small and source-controlled. |
+| Versioned launcher | `bin/dvv` is committed as the source-checkout launcher and rebuild helper. | Keep it small and source-controlled. |
 | Compiled binary | `dist/dvv` is a build artifact. | Do not commit it. |
 | Shell integration | `dvv setup` installs completion and managed zsh shortcuts. | Run only when setup, completion, or shortcut behavior changes. |
 | Legacy shortcut cleanup | `dvv setup` removes old one-line `devv`/`dvv` shortcut bindings before writing the managed block. | Use the managed block instead of scattered shell lines. |
@@ -55,7 +56,7 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | Launcher config | `DVV_TERMINAL_LAUNCHER` controls terminal handoff and defaults to `auto`. | Prefer config over platform-specific commands in feature packages. |
 | WSL | `auto` opens a new Windows Terminal tab with `wt.exe -w 0 new-tab wsl.exe ...` when available. | Use for SSH and tmux handoff. |
 | Linux | `auto` probes supported terminal emulators such as GNOME Terminal, Konsole, XFCE Terminal, `x-terminal-emulator`, and Alacritty. | Keep fallback errors actionable. |
-| macOS | `auto` uses Terminal.app through `osascript`; `iterm2` uses iTerm2 when configured. | Run the macOS smoke checklist before publishing as multi-platform. |
+| macOS | `auto` uses Terminal.app through `osascript`; `iterm2` uses iTerm2 when configured. | Run the macOS smoke checklist before claiming full macOS support. |
 | Unsupported launcher | Unknown configured launchers fail before opening a new process. | Surface the configured value in the error. |
 
 ## Hubs And Shortcuts
@@ -111,7 +112,7 @@ Final indeterminate loader labels should be action-specific, such as `ready`, `c
 | Runtime config | Stored in `~/.config/devv/config.env`. | Keep this path for compatibility until a migration explicitly changes it. |
 | SSH list | Stored in `~/.config/devv/servers.list`. | Do not commit real SSH targets. |
 | AGE key | Stored in `~/.config/devv/keys/age.key`. | Never commit private keys. |
-| Encrypted SSH backup | Uses repo `secrets/servers.list.age` when `secrets/` exists, otherwise `~/.config/devv/servers.list.age`. | Keep `secrets/` out of NPM packaging and git history. |
+| Encrypted SSH backup | Uses repo `secrets/servers.list.age` when `secrets/` exists, otherwise `~/.config/devv/servers.list.age`. | Keep `secrets/` out of git history. |
 | Bitwarden | `dvv bootstrap` can restore the AGE key from Bitwarden. | Configure `DVV_BW_AGE_KEY_ITEM` when needed. |
 
 ## Doctor Checklist

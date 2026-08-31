@@ -196,12 +196,11 @@ docs/agents.md
 ## Secrets And Local Data
 
 - Do not commit private local data, dumps, `.env` changes, or machine-specific config.
-- `dumps/`, `secrets/`, `secrets.local/`, and local config under `~/.config/devv` are runtime data kept out of NPM packaging.
 - Do not commit private local data, dumps, `.env` changes, machine-specific config, SSH targets, AGE private keys, or encrypted backups.
 - Use `examples/servers.list` for documentation/examples, not a real server list.
 
 ## Documentation
 
 - README should stay concise and practical: install, common use, commands, configuration, files, and notes.
-- Update `VERSION` and the README release notes together when changing versioned behavior.
+- Update `VERSION` and the README version notes together when changing versioned behavior.
 - Prefer examples that do not expose company-private or personal-private paths, hosts, database names, or credentials.

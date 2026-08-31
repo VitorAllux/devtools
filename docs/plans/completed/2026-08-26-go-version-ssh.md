@@ -42,7 +42,7 @@ The new public command prefix is `dvv`, but existing local data paths and enviro
 
 ## Implementation Steps
 
-1. Add Go module and NPM-oriented build tooling.
+1. Add Go module and source-checkout build tooling.
 2. Add `bin/dvv` launcher.
 3. Add `cmd/dvv` entrypoint.
 4. Add config/env helpers that preserve existing paths and `.env` behavior.

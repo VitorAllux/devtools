@@ -42,4 +42,4 @@ dvv env:bootstrap
 ## Remaining
 
 - Optional WSL port.
-- Future release packaging can replace install-time Go builds with prebuilt binaries.
+- Future distribution can replace local Go builds with prebuilt binaries if needed.

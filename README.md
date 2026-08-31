@@ -23,16 +23,18 @@ This branch is `go-version`. The current Go implementation includes:
 
 The public UX is hub-first: the main commands open interactive hubs, and create/edit/delete flows live inside those hubs.
 
-## Install
+## Install From Source
 
 ```bash
 git clone git@github.com:VitorAllux/devtools.git
 cd devtools
 git checkout go-version
-npm install -g .
+./bin/dvv build
+mkdir -p ~/.local/bin
+ln -sf "$PWD/bin/dvv" ~/.local/bin/dvv
 ```
 
-The NPM package exposes:
+Make sure `~/.local/bin` is on `PATH`. The launcher exposes:
 
 ```bash
 dvv
@@ -101,30 +103,7 @@ Run the full validation suite before pushing behavior changes:
 npm run check
 ```
 
-`npm run check` runs build, tests, `go vet`, and the non-destructive smoke script.
-
-## Publish Alpha
-
-Use browser-based npm login. In WSL, the most reliable flow is to print the login URL and open it manually in the Windows browser:
-
-```bash
-npm_config_browser=false npm login --auth-type=web
-```
-
-Then publish the alpha package:
-
-```bash
-npm whoami
-npm run check
-npm_config_cache=/tmp/dvv-npm-cache npm pack --dry-run
-npm publish --tag alpha --access public
-```
-
-Install the published alpha:
-
-```bash
-npm install -g @vitorallux/dvv@alpha
-```
+`npm run check` is a local repository task runner. It runs build, tests, `go vet`, and the non-destructive smoke script.
 
 ## Command Map
 
@@ -333,7 +312,7 @@ Project defaults live in:
 dvv.config.json
 ```
 
-The project config is JSON in this alpha to keep the Go CLI dependency-light and simple to package through NPM. Its structure follows the YAML-style configuration model planned for the rewrite, so a future YAML migration can be explicit instead of mixed into feature work.
+The project config is JSON in this alpha to keep the Go CLI dependency-light while the command surface stabilizes. Its structure follows the YAML-style configuration model planned for the rewrite, so a future YAML migration can be explicit instead of mixed into feature work.
 
 Runtime/local data lives outside the repository:
 
@@ -399,7 +378,7 @@ DVV_BW_AGE_KEY_ITEM=<bitwarden-item-name-or-id>
 | --- | --- |
 | Command name | Use `dvv`. The old `devv` command is not installed by this branch. |
 | Build command | Use `dvv build` from anywhere. Use `npm run build` only from this repo root. |
-| NPM executable | `bin/dvv` is versioned because NPM points the package binary to it. |
+| Launcher script | `bin/dvv` is versioned as the source-checkout launcher and rebuild helper. |
 | Compiled binary | `dist/dvv` is ignored and rebuilt locally. |
 | VS Code on WSL | Workspace openers use VS Code remote URIs for WSL paths when needed. |
 | Invalid workspace names | `dvv workspace` ignores `workspace-*` directories with invalid UTF-8 names. |
@@ -421,8 +400,8 @@ More detail lives in [docs/go-version/operational-map.md](docs/go-version/operat
 | [Themes](docs/go-version/theme.md) | Built-in themes, fzf hub conventions, loaders, and CLI presentation rules. |
 | [Operational map](docs/go-version/operational-map.md) | Practical edge cases, local paths, install behavior, and troubleshooting details. |
 | [Maintainer harness](docs/go-version/maintainer-harness.md) | Command ownership map, shared UI contracts, workspace harness rules, and test conventions. |
-| [Smoke checklist](docs/go-version/smoke-checklist.md) | Automated and manual release smoke checks for Linux/WSL and macOS. |
-| [Release notes](docs/go-version/release.md) | NPM package shape, dry-run review, versioning, and merge criteria. |
+| [Smoke checklist](docs/go-version/smoke-checklist.md) | Automated and manual smoke checks for Linux/WSL and macOS. |
+| [Merge readiness](docs/go-version/merge-readiness.md) | Validation, versioning, and criteria for replacing `main`. |
 | [Migration roadmap](docs/go-version/migration-roadmap.md) | Porting status and remaining migration work. |
 
 ## Troubleshooting
@@ -480,7 +459,7 @@ Main packages:
 
 Before adding a new hub, use `internal/ui.FZFHub`, keep shortcuts configurable, and document the public command in this README and completion.
 
-## Release Notes
+## Version Notes
 
 `2.0.0-alpha.2`:
 
@@ -488,5 +467,5 @@ Before adding a new hub, use `internal/ui.FZFHub`, keep shortcuts configurable, 
 - Added terminal launcher preferences with WSL, Linux, Terminal.app, and iTerm2 support.
 - Added macOS resource and doctor support for `brew services` and `osascript`.
 - Added hub-first zsh completion with compatibility completions behind `DVV_COMPLETE_COMPAT=1`.
-- Added release smoke validation through `npm run smoke`.
-- Raised test coverage for critical packages and documented the release/NPM gate.
+- Added non-destructive smoke validation through `npm run smoke`.
+- Raised test coverage for critical packages and documented the merge readiness gate.
