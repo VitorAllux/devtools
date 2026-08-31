@@ -87,8 +87,9 @@ func (r *hookRunner) Run(_ context.Context, _ string, name string, _ ...string) 
 	return r.err
 }
 
-func (r *hookRunner) Output(context.Context, string, string, ...string) ([]byte, error) {
-	return nil, errors.New("unexpected output")
+func (r *hookRunner) Output(_ context.Context, _ string, name string, _ ...string) ([]byte, error) {
+	r.runs = append(r.runs, name)
+	return nil, r.err
 }
 
 func (r *hookRunner) OutputWithInput(context.Context, string, []byte, string, ...string) ([]byte, error) {

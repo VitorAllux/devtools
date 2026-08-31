@@ -223,13 +223,13 @@ func tmuxActionLoaderOptions(action string, target Target) (ui.LoaderOptions, er
 	}
 	switch action {
 	case "up":
-		return ui.LoaderOptions{Action: "opening", Subject: subject}, nil
+		return ui.LoaderOptions{Action: "opening", Subject: subject, ShowResult: true}, nil
 	case "down":
-		return ui.LoaderOptions{Action: "stopping", Subject: subject}, nil
+		return ui.LoaderOptions{Action: "stopping", Subject: subject, ShowResult: true}, nil
 	case "api-restart":
-		return ui.LoaderOptions{Action: "restarting", Subject: subject, Detail: "api"}, nil
+		return ui.LoaderOptions{Action: "restarting", Subject: subject, Detail: "api", ShowResult: true}, nil
 	case "web-restart":
-		return ui.LoaderOptions{Action: "restarting", Subject: subject, Detail: "web"}, nil
+		return ui.LoaderOptions{Action: "restarting", Subject: subject, Detail: "web", ShowResult: true}, nil
 	default:
 		return ui.LoaderOptions{}, fmt.Errorf("unknown tmux action: %s", action)
 	}

@@ -105,7 +105,7 @@ func (m *Manager) SyncBackup(ctx context.Context) error {
 	}
 	defer os.Remove(tmpName)
 
-	if err := m.Runner.Run(ctx, "", "age", "-R", m.Config.AgeRecipientsFile, "-o", tmpName, m.Config.ServersFile); err != nil {
+	if err := run.Quiet(ctx, m.Runner, "", "age", "-R", m.Config.AgeRecipientsFile, "-o", tmpName, m.Config.ServersFile); err != nil {
 		return err
 	}
 	return os.Rename(tmpName, m.Config.EncryptedServersFile)
@@ -132,7 +132,7 @@ func (m *Manager) decryptBackup(ctx context.Context) error {
 	}
 	defer os.Remove(tmpName)
 
-	if err := m.Runner.Run(ctx, "", "age", "-d", "-i", m.Config.AgeKeyFile, "-o", tmpName, m.Config.EncryptedServersFile); err != nil {
+	if err := run.Quiet(ctx, m.Runner, "", "age", "-d", "-i", m.Config.AgeKeyFile, "-o", tmpName, m.Config.EncryptedServersFile); err != nil {
 		return err
 	}
 	if err := os.Chmod(tmpName, 0o600); err != nil {

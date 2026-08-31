@@ -97,7 +97,7 @@ func (m *Manager) CommandCreate(ctx context.Context, args []string) error {
 	if err := m.prepareAuth(); err != nil {
 		return err
 	}
-	return ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "creating", Subject: name}, func() error {
+	return ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "creating", Subject: name, ShowResult: true}, func() error {
 		return m.mysql(ctx, "-e", "CREATE DATABASE IF NOT EXISTS "+identifier(name)+" CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
 	})
 }
@@ -114,7 +114,7 @@ func (m *Manager) CommandDrop(ctx context.Context) error {
 		return nil
 	}
 	for _, name := range selected {
-		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "dropping", Subject: name}, func() error {
+		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "dropping", Subject: name, ShowResult: true}, func() error {
 			return m.mysql(ctx, "-e", "DROP DATABASE "+identifier(name)+";")
 		}); err != nil {
 			return err
@@ -136,7 +136,7 @@ func (m *Manager) CommandTruncate(ctx context.Context) error {
 		return nil
 	}
 	for _, name := range selected {
-		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "truncating", Subject: name}, func() error {
+		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "truncating", Subject: name, ShowResult: true}, func() error {
 			return m.truncate(ctx, name)
 		}); err != nil {
 			return err
@@ -165,7 +165,7 @@ func (m *Manager) CommandClean(ctx context.Context) error {
 	if !ui.Confirm(fmt.Sprintf("Delete %d dump file(s)?", len(selected))) {
 		return nil
 	}
-	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "deleting", Subject: fmt.Sprintf("%d dump file(s)", len(selected))}, func() error {
+	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "deleting", Subject: fmt.Sprintf("%d dump file(s)", len(selected)), ShowResult: true}, func() error {
 		for _, file := range selected {
 			if err := os.Remove(filepath.Join(m.Config.Project.DB.DumpsDir, file)); err != nil {
 				return err
@@ -354,8 +354,8 @@ func (m *Manager) downloadDump(ctx context.Context) (string, error) {
 		fileName = fileID + ".sql.gz"
 	}
 	dest := filepath.Join(m.Config.Project.DB.DumpsDir, filepath.Base(fileName))
-	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "downloading", Subject: filepath.Base(dest)}, func() error {
-		return m.Runner.Run(ctx, "", "rclone", "backend", "copyid", remote+":", fileID, dest)
+	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "downloading", Subject: filepath.Base(dest), ShowResult: true}, func() error {
+		return run.Quiet(ctx, m.Runner, "", "rclone", "backend", "copyid", remote+":", fileID, dest)
 	}); err != nil {
 		return "", err
 	}
@@ -432,7 +432,7 @@ func (m *Manager) cleanup() {
 
 func (m *Manager) mysql(ctx context.Context, args ...string) error {
 	fullArgs := append([]string{"--defaults-extra-file=" + m.defaultsFile}, args...)
-	return m.Runner.Run(ctx, "", "mysql", fullArgs...)
+	return run.Quiet(ctx, m.Runner, "", "mysql", fullArgs...)
 }
 
 func (m *Manager) mysqlOutput(ctx context.Context, args ...string) ([]byte, error) {
@@ -604,7 +604,7 @@ func (p *importProgress) Finish(ok bool) {
 		return
 	}
 	close(p.done)
-	p.render(ok)
+	p.renderFinal(ok)
 	fmt.Fprint(os.Stderr, "\n")
 }
 
@@ -621,6 +621,19 @@ func (p *importProgress) render(done bool) {
 		ui.Crown("importing"),
 		ui.Accent(p.subject),
 		ui.Muted(fmt.Sprintf("%3d%%", percent)),
+	)
+}
+
+func (p *importProgress) renderFinal(ok bool) {
+	label := ui.Success("completed")
+	if !ok {
+		label = ui.Danger("failed")
+	}
+	fmt.Fprintf(os.Stderr, "\r%s %s %s %s",
+		importProgressBar(100),
+		label,
+		ui.Accent(p.subject),
+		ui.Muted("100%"),
 	)
 }
 

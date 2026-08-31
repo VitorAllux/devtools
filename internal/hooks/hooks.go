@@ -111,7 +111,7 @@ func runHook(ctx context.Context, runner run.Runner, hook config.HookConfig, ren
 	defer cancel()
 
 	return withEnv(rendered.Env, func() error {
-		return runner.Run(runCtx, rendered.CWD, rendered.Command, rendered.Args...)
+		return run.Quiet(runCtx, runner, rendered.CWD, rendered.Command, rendered.Args...)
 	})
 }
 

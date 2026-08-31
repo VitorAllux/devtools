@@ -60,6 +60,8 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 
 Use `internal/ui.RunWithRoyalLoader` for actions that can leave the terminal visually idle after confirmation. Keep prompts, listings, and script-friendly output clean.
 
+Commands executed under a loader should capture routine stdout/stderr with `internal/run.Quiet` unless the command is intentionally interactive. This keeps tool output from being printed on the same terminal line as the animated loader.
+
 | Area | Loader points |
 | --- | --- |
 | SSH | Connection probe before tmux/terminal handoff, encrypted backup sync. |

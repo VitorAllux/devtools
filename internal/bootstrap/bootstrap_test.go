@@ -98,8 +98,9 @@ func (r *bootstrapRunner) Run(_ context.Context, _ string, name string, args ...
 	return nil
 }
 
-func (bootstrapRunner) Output(context.Context, string, string, ...string) ([]byte, error) {
-	return nil, errors.New("unexpected output")
+func (r *bootstrapRunner) Output(_ context.Context, _ string, name string, args ...string) ([]byte, error) {
+	r.commands = append(r.commands, strings.Join(append([]string{name}, args...), " "))
+	return nil, nil
 }
 
 func (bootstrapRunner) OutputWithInput(context.Context, string, []byte, string, ...string) ([]byte, error) {

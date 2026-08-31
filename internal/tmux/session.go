@@ -127,7 +127,7 @@ func (m *Manager) OpenSession(ctx context.Context, selected string) error {
 	sessionName := m.nextSessionName(ctx, m.Config.Project.Tmux.Session.DefaultSessionName)
 	windowName := windowName(path)
 
-	return ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "opening", Subject: sessionName}, func() error {
+	return ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "opening", Subject: sessionName, ShowResult: true}, func() error {
 		if err := m.Runner.Run(ctx, "", "tmux", "new-session", "-ds", sessionName, "-n", windowName, "-c", path); err != nil {
 			return err
 		}

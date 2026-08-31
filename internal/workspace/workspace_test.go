@@ -566,6 +566,11 @@ func (r *workspaceRunner) Run(_ context.Context, _ string, name string, args ...
 }
 
 func (r *workspaceRunner) Output(_ context.Context, _ string, name string, args ...string) ([]byte, error) {
+	if name == "git" {
+		if handled, err := r.handleQuietGitMutation(args); handled {
+			return nil, err
+		}
+	}
 	r.outputs = append(r.outputs, strings.Join(append([]string{name}, args...), " "))
 	if name != "git" {
 		return nil, errors.New("unexpected command")
@@ -605,6 +610,37 @@ func (r *workspaceRunner) Output(_ context.Context, _ string, name string, args 
 		return nil, errors.New("remote head not found")
 	}
 	return nil, errors.New("unexpected output")
+}
+
+func (r *workspaceRunner) handleQuietGitMutation(args []string) (bool, error) {
+	if len(args) < 4 || args[0] != "-C" || args[2] != "worktree" {
+		return false, nil
+	}
+	r.runs = append(r.runs, strings.Join(append([]string{"git"}, args...), " "))
+	projectPath := args[1]
+	switch args[3] {
+	case "prune":
+		return true, nil
+	case "add":
+		if len(args) < 5 {
+			return true, nil
+		}
+		destination := args[4]
+		if args[4] == "-b" && len(args) >= 7 {
+			destination = args[6]
+		}
+		if err := os.MkdirAll(destination, 0o755); err != nil {
+			return true, err
+		}
+		r.linked[destination] = projectPath
+		return true, nil
+	case "remove":
+		worktreePath := args[len(args)-1]
+		delete(r.linked, worktreePath)
+		return true, os.RemoveAll(worktreePath)
+	default:
+		return false, nil
+	}
 }
 
 func (r *workspaceRunner) OutputWithInput(_ context.Context, _ string, input []byte, _ string, _ ...string) ([]byte, error) {

@@ -49,3 +49,21 @@ func TestRenderRoyalLoaderFrame(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderRoyalLoaderResult(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	frame := renderRoyalLoaderResult(LoaderOptions{
+		Subject: "workspace-task_600_8048",
+	}, true)
+
+	expected := []string{
+		"[████████████████]",
+		"completed",
+		"workspace-task_600_8048",
+	}
+	for _, value := range expected {
+		if !strings.Contains(frame, value) {
+			t.Fatalf("loader result missing %q in %q", value, frame)
+		}
+	}
+}

@@ -77,7 +77,7 @@ func RunProject(ctx context.Context, cfg config.WorkspaceBootstrap, runner run.R
 			result.Commands = append(result.Commands, action)
 			continue
 		}
-		if err := runner.Run(ctx, project.Path, command.Command, command.Args...); err != nil {
+		if err := run.Quiet(ctx, runner, project.Path, command.Command, command.Args...); err != nil {
 			action.Status = "failed"
 			action.Error = err.Error()
 			result.Failures++

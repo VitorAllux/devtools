@@ -15,6 +15,7 @@ const (
 	purple     = "\033[38;2;124;58;237m"
 	purpleSoft = "\033[38;2;196;181;253m"
 	gold       = "\033[38;2;212;175;55m"
+	success    = "\033[38;2;34;197;94m"
 	muted      = "\033[38;2;139;126;163m"
 	danger     = "\033[38;2;248;113;113m"
 )
@@ -59,6 +60,10 @@ func Cyan(text string) string {
 
 func Gold(text string) string {
 	return color(gold, text)
+}
+
+func Success(text string) string {
+	return color(bold+success, text)
 }
 
 func Danger(text string) string {
@@ -132,10 +137,11 @@ func RunWithLoaderMin(message string, minimum time.Duration, fn func() error) er
 }
 
 type LoaderOptions struct {
-	Action  string
-	Subject string
-	Detail  string
-	Minimum time.Duration
+	Action     string
+	Subject    string
+	Detail     string
+	Minimum    time.Duration
+	ShowResult bool
 }
 
 func RunWithRoyalLoader(options LoaderOptions, fn func() error) error {
@@ -159,7 +165,16 @@ func RunWithRoyalLoader(options LoaderOptions, fn func() error) error {
 		index++
 	}
 	clear := func() {
-		fmt.Fprint(os.Stderr, "\r"+strings.Repeat(" ", clearWidth)+"\r")
+		fmt.Fprint(os.Stderr, "\r\033[2K")
+		if !useColor() {
+			fmt.Fprint(os.Stderr, "\r"+strings.Repeat(" ", clearWidth)+"\r")
+		}
+	}
+	finish := func(err error) {
+		clear()
+		if options.ShowResult {
+			fmt.Fprintln(os.Stderr, renderRoyalLoaderResult(options, err == nil))
+		}
 	}
 
 	var result error
@@ -174,13 +189,13 @@ func RunWithRoyalLoader(options LoaderOptions, fn func() error) error {
 			completed = true
 			doneCh = nil
 			if options.Minimum <= 0 || time.Since(start) >= options.Minimum {
-				clear()
+				finish(result)
 				return result
 			}
 		case <-ticker.C:
 			render()
 			if completed && time.Since(start) >= options.Minimum {
-				clear()
+				finish(result)
 				return result
 			}
 		}
@@ -210,6 +225,27 @@ func renderRoyalLoaderFrame(options LoaderOptions, index int, _ time.Duration) s
 	return "  " + strings.Join(parts, " ")
 }
 
+func renderRoyalLoaderResult(options LoaderOptions, ok bool) string {
+	action := "completed"
+	style := Success
+	if !ok {
+		action = "failed"
+		style = Danger
+	}
+
+	parts := []string{
+		loaderResultBar(ok),
+		style(action),
+	}
+	if subject := strings.TrimSpace(options.Subject); subject != "" {
+		parts = append(parts, Accent(subject))
+	}
+	if detail := strings.TrimSpace(options.Detail); detail != "" {
+		parts = append(parts, Muted(detail))
+	}
+	return "  " + strings.Join(parts, " ")
+}
+
 func loaderBar(index int) string {
 	const width = 16
 	const segment = 5
@@ -229,6 +265,24 @@ func loaderBar(index int) string {
 			continue
 		}
 		builder.WriteString(Purple("░"))
+	}
+	builder.WriteString(Muted("]"))
+	return builder.String()
+}
+
+func loaderResultBar(ok bool) string {
+	const width = 16
+	fill := Crown
+	if ok {
+		fill = Success
+	} else {
+		fill = Danger
+	}
+
+	var builder strings.Builder
+	builder.WriteString(Muted("["))
+	for i := 0; i < width; i++ {
+		builder.WriteString(fill("█"))
 	}
 	builder.WriteString(Muted("]"))
 	return builder.String()

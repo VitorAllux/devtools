@@ -132,14 +132,14 @@ func (c Client) AddWorktree(ctx context.Context, projectPath string, destination
 	if err := c.PruneWorktrees(ctx, projectPath); err != nil {
 		return err
 	}
-	return c.Runner.Run(ctx, "", "git", "-C", projectPath, "worktree", "add", destination, branch)
+	return run.Quiet(ctx, c.Runner, "", "git", "-C", projectPath, "worktree", "add", destination, branch)
 }
 
 func (c Client) AddWorktreeNewBranch(ctx context.Context, projectPath string, destination string, branch string, baseRef string) error {
 	if err := c.PruneWorktrees(ctx, projectPath); err != nil {
 		return err
 	}
-	return c.Runner.Run(ctx, "", "git", "-C", projectPath, "worktree", "add", "-b", branch, destination, baseRef)
+	return run.Quiet(ctx, c.Runner, "", "git", "-C", projectPath, "worktree", "add", "-b", branch, destination, baseRef)
 }
 
 func (c Client) RemoveWorktree(ctx context.Context, baseProjectPath string, worktreePath string, force bool) error {
@@ -148,14 +148,14 @@ func (c Client) RemoveWorktree(ctx context.Context, baseProjectPath string, work
 		args = append(args, "--force")
 	}
 	args = append(args, worktreePath)
-	if err := c.Runner.Run(ctx, "", "git", args...); err != nil {
+	if err := run.Quiet(ctx, c.Runner, "", "git", args...); err != nil {
 		return err
 	}
 	return c.PruneWorktrees(ctx, baseProjectPath)
 }
 
 func (c Client) PruneWorktrees(ctx context.Context, projectPath string) error {
-	return c.Runner.Run(ctx, "", "git", "-C", projectPath, "worktree", "prune")
+	return run.Quiet(ctx, c.Runner, "", "git", "-C", projectPath, "worktree", "prune")
 }
 
 func (c Client) remoteHead(ctx context.Context, projectPath string, remoteName string) string {

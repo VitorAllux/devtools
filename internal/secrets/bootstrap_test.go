@@ -134,8 +134,23 @@ func (r *fakeRunner) Run(_ context.Context, _ string, name string, args ...strin
 
 func (r *fakeRunner) Output(_ context.Context, _ string, name string, args ...string) ([]byte, error) {
 	key := commandKey(name, args...)
+	r.runs = append(r.runs, key)
 	if output, ok := r.outputs[key]; ok {
 		return output, nil
+	}
+	if name == "age-keygen" && len(args) == 2 && args[0] == "-o" {
+		return nil, os.WriteFile(args[1], []byte("# public key: age1generated\nAGE-SECRET-KEY-GENERATED\n"), 0o600)
+	}
+	if name == "age" {
+		for index, arg := range args {
+			if arg == "-o" && index+1 < len(args) {
+				content := []byte("encrypted")
+				if len(args) > 0 && args[0] == "-d" {
+					content = r.decryptedServers
+				}
+				return nil, os.WriteFile(args[index+1], content, 0o600)
+			}
+		}
 	}
 	return nil, errors.New("unexpected output command: " + key)
 }

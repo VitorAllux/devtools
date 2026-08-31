@@ -81,10 +81,19 @@ func (r *gitRunner) Run(_ context.Context, _ string, name string, args ...string
 
 func (r *gitRunner) Output(_ context.Context, _ string, name string, args ...string) ([]byte, error) {
 	command := strings.Join(append([]string{name}, args...), " ")
+	if name == "git" && isQuietGitMutation(args) {
+		r.runs = append(r.runs, command)
+		return nil, nil
+	}
 	if output, ok := r.outputs[command]; ok {
 		return output, nil
 	}
 	return nil, errors.New("unexpected output command: " + command)
+}
+
+func isQuietGitMutation(args []string) bool {
+	return len(args) >= 4 && args[0] == "-C" && args[2] == "worktree" &&
+		(args[3] == "add" || args[3] == "remove" || args[3] == "prune")
 }
 
 func (r *gitRunner) OutputWithInput(context.Context, string, []byte, string, ...string) ([]byte, error) {

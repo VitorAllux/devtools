@@ -214,7 +214,7 @@ func (m Manager) CommandAction(ctx context.Context, action string, args []string
 		return fmt.Errorf("resource not found: %s", resourceID)
 	}
 	var result ActionResult
-	err = ui.RunWithRoyalLoader(ui.LoaderOptions{Action: actionGerund(action), Subject: resource.Name}, func() error {
+	err = ui.RunWithRoyalLoader(ui.LoaderOptions{Action: actionGerund(action), Subject: resource.Name, ShowResult: true}, func() error {
 		var runErr error
 		result, runErr = m.RunAction(ctx, resource, action, useSudo)
 		return runErr
@@ -325,7 +325,7 @@ func (m Manager) fzfHub(ctx context.Context, resources []Resource, hubError stri
 
 func (m Manager) runHubAction(ctx context.Context, resource Resource, action string) string {
 	var result ActionResult
-	err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: actionGerund(action), Subject: resource.Name}, func() error {
+	err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: actionGerund(action), Subject: resource.Name, ShowResult: true}, func() error {
 		var runErr error
 		result, runErr = m.RunAction(ctx, resource, action, true)
 		return runErr
