@@ -288,7 +288,7 @@ func (m *Manager) createInteractive(ctx context.Context) (Workspace, error) {
 		return Workspace{}, fmt.Errorf("workspace creation cancelled")
 	}
 	var result CreateResult
-	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "creating", Subject: plan.WorkspaceDir, ShowResult: true}, func() error {
+	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "creating", Subject: plan.WorkspaceDir, ShowResult: true, SuccessAction: "created"}, func() error {
 		result = m.ExecuteCreatePlan(ctx, plan)
 		return nil
 	}); err != nil {
@@ -330,7 +330,7 @@ func (m *Manager) manageInteractive(ctx context.Context, ws Workspace) error {
 		return nil
 	}
 	for _, project := range toRemove {
-		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "removing", Subject: project.Name, ShowResult: true}, func() error {
+		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "removing", Subject: project.Name, ShowResult: true, SuccessAction: "removed"}, func() error {
 			return m.RemoveProject(ctx, ws, project, false)
 		}); err != nil {
 			return err
@@ -355,7 +355,7 @@ func (m *Manager) manageInteractive(ctx context.Context, ws Workspace) error {
 	}
 	printAddPlan(plan)
 	var result AddResult
-	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "adding", Subject: ws.DirName, ShowResult: true}, func() error {
+	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "adding", Subject: ws.DirName, ShowResult: true, SuccessAction: "added"}, func() error {
 		result = m.ExecuteAddPlan(ctx, plan)
 		return nil
 	}); err != nil {
@@ -388,7 +388,7 @@ func (m *Manager) deleteWorkspaceInteractive(ctx context.Context, ws Workspace) 
 	options := RemoveWorkspaceOptions{}
 	for {
 		var result RemoveWorkspaceResult
-		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "deleting", Subject: ws.DirName, ShowResult: true}, func() error {
+		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "deleting", Subject: ws.DirName, ShowResult: true, SuccessAction: "deleted"}, func() error {
 			result = m.RemoveWorkspace(ctx, ws, options)
 			return nil
 		}); err != nil {

@@ -214,7 +214,7 @@ func (m Manager) CommandAction(ctx context.Context, action string, args []string
 		return fmt.Errorf("resource not found: %s", resourceID)
 	}
 	var result ActionResult
-	err = ui.RunWithRoyalLoader(ui.LoaderOptions{Action: actionGerund(action), Subject: resource.Name, ShowResult: true}, func() error {
+	err = ui.RunWithRoyalLoader(ui.LoaderOptions{Action: actionGerund(action), Subject: resource.Name, ShowResult: true, SuccessAction: actionDone(action)}, func() error {
 		var runErr error
 		result, runErr = m.RunAction(ctx, resource, action, useSudo)
 		return runErr
@@ -273,7 +273,7 @@ func (m Manager) RunAction(ctx context.Context, resource Resource, action string
 	}
 	return ActionResult{
 		Success: true,
-		Message: fmt.Sprintf("%s completed: %s", actionTitle(action), resource.Name),
+		Message: fmt.Sprintf("%s %s", actionDoneTitle(action), resource.Name),
 		Command: command,
 	}, nil
 }
@@ -325,7 +325,7 @@ func (m Manager) fzfHub(ctx context.Context, resources []Resource, hubError stri
 
 func (m Manager) runHubAction(ctx context.Context, resource Resource, action string) string {
 	var result ActionResult
-	err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: actionGerund(action), Subject: resource.Name, ShowResult: true}, func() error {
+	err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: actionGerund(action), Subject: resource.Name, ShowResult: true, SuccessAction: actionDone(action)}, func() error {
 		var runErr error
 		result, runErr = m.RunAction(ctx, resource, action, true)
 		return runErr
@@ -941,6 +941,23 @@ func actionGerund(action string) string {
 	default:
 		return action
 	}
+}
+
+func actionDone(action string) string {
+	switch action {
+	case "start":
+		return "started"
+	case "stop":
+		return "stopped"
+	case "restart":
+		return "restarted"
+	default:
+		return "done"
+	}
+}
+
+func actionDoneTitle(action string) string {
+	return actionTitle(actionDone(action))
 }
 
 func formatCommand(command []string) string {

@@ -33,10 +33,11 @@ func (m *Manager) runConnectLoader(ctx context.Context, entry Entry) error {
 	}
 
 	return ui.RunWithRoyalLoader(ui.LoaderOptions{
-		Action:     "connecting",
-		Subject:    label,
-		Minimum:    connectLoaderMinimum,
-		ShowResult: true,
+		Action:        "connecting",
+		Subject:       label,
+		Minimum:       connectLoaderMinimum,
+		ShowResult:    true,
+		SuccessAction: "ready",
 	}, func() error {
 		probeCtx, cancel := context.WithTimeout(ctx, connectProbeTimeout)
 		defer cancel()

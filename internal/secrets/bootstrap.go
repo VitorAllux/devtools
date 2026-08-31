@@ -89,7 +89,7 @@ func (m Manager) Bootstrap(ctx context.Context, options BootstrapOptions) error 
 				shouldRestore = true
 			}
 			if shouldRestore {
-				if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "decrypting", Subject: "ssh backup", ShowResult: true}, func() error {
+				if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "decrypting", Subject: "ssh backup", ShowResult: true, SuccessAction: "decrypted"}, func() error {
 					return ssh.NewManager(m.Config, m.Runner).RestoreBackup(ctx)
 				}); err != nil {
 					ui.Warn("Encrypted SSH backup exists, but decryption failed: %v", err)
@@ -103,7 +103,7 @@ func (m Manager) Bootstrap(ctx context.Context, options BootstrapOptions) error 
 			}
 		}
 	} else {
-		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "preparing", Subject: "AGE key", ShowResult: true}, func() error {
+		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "preparing", Subject: "AGE key", ShowResult: true, SuccessAction: "ready"}, func() error {
 			return m.generateAgeKeyIfMissing(ctx)
 		}); err != nil {
 			ui.Warn("Could not generate AGE key automatically. Install age and rerun `dvv bootstrap`.")
@@ -123,7 +123,7 @@ func (m Manager) Bootstrap(ctx context.Context, options BootstrapOptions) error 
 		return err
 	}
 
-	err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "encrypting", Subject: "ssh backup", ShowResult: true}, func() error {
+	err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "encrypting", Subject: "ssh backup", ShowResult: true, SuccessAction: "encrypted"}, func() error {
 		return ssh.NewManager(m.Config, m.Runner).SyncBackup(ctx)
 	})
 	if err != nil {

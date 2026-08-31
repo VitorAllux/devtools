@@ -28,7 +28,7 @@ Danger              #f87171
 - Warnings use `dvv !`.
 - Errors use `dvv x`.
 - Loaders use the shared short bar loader from `internal/ui.RunWithRoyalLoader`.
-- Confirmed long-running actions may keep a final full bar with `completed` in green or `failed` in red.
+- Confirmed long-running actions may keep a final full bar with an action-specific green status such as `ready`, `created`, or `imported`; failures use `failed` in red.
 - Loaders write to stderr so list commands can keep stdout script-friendly.
 - For interactive processes such as SSH, show loaders only before handoff; do not keep loaders running over the interactive session.
 - `NO_COLOR` disables color.

@@ -62,6 +62,8 @@ Use `internal/ui.RunWithRoyalLoader` for actions that can leave the terminal vis
 
 Commands executed under a loader should capture routine stdout/stderr with `internal/run.Quiet` unless the command is intentionally interactive. This keeps tool output from being printed on the same terminal line as the animated loader.
 
+Final loader labels should be action-specific, such as `ready`, `created`, `deleted`, `imported`, or `restarted`. Avoid generic labels when the next step starts another loader.
+
 | Area | Loader points |
 | --- | --- |
 | SSH | Connection probe before tmux/terminal handoff, encrypted backup sync. |

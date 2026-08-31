@@ -33,7 +33,7 @@ func TestRenderRoyalLoaderFrame(t *testing.T) {
 	}, 2, 1200*time.Millisecond)
 
 	expected := []string{
-		"[░░█████░░░░░░░░░]",
+		"[░░█████░░░░░░░░░░░]",
 		"connecting",
 		"api",
 	}
@@ -57,13 +57,25 @@ func TestRenderRoyalLoaderResult(t *testing.T) {
 	}, true)
 
 	expected := []string{
-		"[████████████████]",
-		"completed",
+		"[██████████████████]",
+		"done",
 		"workspace-task_600_8048",
 	}
 	for _, value := range expected {
 		if !strings.Contains(frame, value) {
 			t.Fatalf("loader result missing %q in %q", value, frame)
 		}
+	}
+}
+
+func TestRenderRoyalLoaderResultUsesCustomSuccessAction(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	frame := renderRoyalLoaderResult(LoaderOptions{
+		Subject:       "adami",
+		SuccessAction: "imported",
+	}, true)
+
+	if !strings.Contains(frame, "imported") || strings.Contains(frame, "done") {
+		t.Fatalf("loader result should use custom action: %q", frame)
 	}
 }

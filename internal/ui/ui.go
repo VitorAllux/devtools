@@ -9,6 +9,8 @@ import (
 )
 
 const (
+	RoyalLoaderWidth = 18
+
 	reset      = "\033[0m"
 	bold       = "\033[1m"
 	dim        = "\033[2m"
@@ -137,11 +139,13 @@ func RunWithLoaderMin(message string, minimum time.Duration, fn func() error) er
 }
 
 type LoaderOptions struct {
-	Action     string
-	Subject    string
-	Detail     string
-	Minimum    time.Duration
-	ShowResult bool
+	Action        string
+	Subject       string
+	Detail        string
+	Minimum       time.Duration
+	ShowResult    bool
+	SuccessAction string
+	FailureAction string
 }
 
 func RunWithRoyalLoader(options LoaderOptions, fn func() error) error {
@@ -226,10 +230,16 @@ func renderRoyalLoaderFrame(options LoaderOptions, index int, _ time.Duration) s
 }
 
 func renderRoyalLoaderResult(options LoaderOptions, ok bool) string {
-	action := "completed"
+	action := strings.TrimSpace(options.SuccessAction)
+	if action == "" {
+		action = "done"
+	}
 	style := Success
 	if !ok {
-		action = "failed"
+		action = strings.TrimSpace(options.FailureAction)
+		if action == "" {
+			action = "failed"
+		}
 		style = Danger
 	}
 
@@ -247,10 +257,9 @@ func renderRoyalLoaderResult(options LoaderOptions, ok bool) string {
 }
 
 func loaderBar(index int) string {
-	const width = 16
 	const segment = 5
 
-	travel := width - segment
+	travel := RoyalLoaderWidth - segment
 	cycle := travel * 2
 	position := index % cycle
 	if position > travel {
@@ -259,7 +268,7 @@ func loaderBar(index int) string {
 
 	var builder strings.Builder
 	builder.WriteString(Muted("["))
-	for i := 0; i < width; i++ {
+	for i := 0; i < RoyalLoaderWidth; i++ {
 		if i >= position && i < position+segment {
 			builder.WriteString(Crown("█"))
 			continue
@@ -271,7 +280,6 @@ func loaderBar(index int) string {
 }
 
 func loaderResultBar(ok bool) string {
-	const width = 16
 	fill := Crown
 	if ok {
 		fill = Success
@@ -281,7 +289,7 @@ func loaderResultBar(ok bool) string {
 
 	var builder strings.Builder
 	builder.WriteString(Muted("["))
-	for i := 0; i < width; i++ {
+	for i := 0; i < RoyalLoaderWidth; i++ {
 		builder.WriteString(fill("█"))
 	}
 	builder.WriteString(Muted("]"))

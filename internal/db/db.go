@@ -97,9 +97,7 @@ func (m *Manager) CommandCreate(ctx context.Context, args []string) error {
 	if err := m.prepareAuth(); err != nil {
 		return err
 	}
-	return ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "creating", Subject: name, ShowResult: true}, func() error {
-		return m.mysql(ctx, "-e", "CREATE DATABASE IF NOT EXISTS "+identifier(name)+" CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
-	})
+	return m.ensureDatabase(ctx, name, true)
 }
 
 func (m *Manager) CommandDrop(ctx context.Context) error {
@@ -114,7 +112,7 @@ func (m *Manager) CommandDrop(ctx context.Context) error {
 		return nil
 	}
 	for _, name := range selected {
-		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "dropping", Subject: name, ShowResult: true}, func() error {
+		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "dropping", Subject: "database", Detail: name, ShowResult: true, SuccessAction: "dropped"}, func() error {
 			return m.mysql(ctx, "-e", "DROP DATABASE "+identifier(name)+";")
 		}); err != nil {
 			return err
@@ -136,7 +134,7 @@ func (m *Manager) CommandTruncate(ctx context.Context) error {
 		return nil
 	}
 	for _, name := range selected {
-		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "truncating", Subject: name, ShowResult: true}, func() error {
+		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "truncating", Subject: "database", Detail: name, ShowResult: true, SuccessAction: "truncated"}, func() error {
 			return m.truncate(ctx, name)
 		}); err != nil {
 			return err
@@ -165,7 +163,7 @@ func (m *Manager) CommandClean(ctx context.Context) error {
 	if !ui.Confirm(fmt.Sprintf("Delete %d dump file(s)?", len(selected))) {
 		return nil
 	}
-	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "deleting", Subject: fmt.Sprintf("%d dump file(s)", len(selected)), ShowResult: true}, func() error {
+	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "deleting", Subject: fmt.Sprintf("%d dump file(s)", len(selected)), ShowResult: true, SuccessAction: "deleted"}, func() error {
 		for _, file := range selected {
 			if err := os.Remove(filepath.Join(m.Config.Project.DB.DumpsDir, file)); err != nil {
 				return err
@@ -196,7 +194,7 @@ func (m *Manager) CommandImport(ctx context.Context) error {
 	if !ui.Confirm("Start import?") {
 		return nil
 	}
-	if err := m.CommandCreate(ctx, []string{dbName}); err != nil {
+	if err := m.ensureDatabase(ctx, dbName, false); err != nil {
 		return err
 	}
 	return m.importDump(ctx, dump, dbName)
@@ -352,7 +350,7 @@ func (m *Manager) downloadDump(ctx context.Context) (string, error) {
 	}
 	fileName = normalizeDownloadDumpFileName(fileName, fileID)
 	dest := filepath.Join(m.Config.Project.DB.DumpsDir, filepath.Base(fileName))
-	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "downloading", Subject: filepath.Base(dest), ShowResult: true}, func() error {
+	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "downloading", Subject: filepath.Base(dest), ShowResult: true, SuccessAction: "downloaded"}, func() error {
 		return run.Quiet(ctx, m.Runner, "", "rclone", "backend", "copyid", remote+":", fileID, dest)
 	}); err != nil {
 		return "", err
@@ -431,6 +429,18 @@ func (m *Manager) cleanup() {
 func (m *Manager) mysql(ctx context.Context, args ...string) error {
 	fullArgs := append([]string{"--defaults-extra-file=" + m.defaultsFile}, args...)
 	return run.Quiet(ctx, m.Runner, "", "mysql", fullArgs...)
+}
+
+func (m *Manager) ensureDatabase(ctx context.Context, name string, showResult bool) error {
+	return ui.RunWithRoyalLoader(ui.LoaderOptions{
+		Action:        "preparing",
+		Subject:       "database",
+		Detail:        name,
+		ShowResult:    showResult,
+		SuccessAction: "ready",
+	}, func() error {
+		return m.mysql(ctx, "-e", "CREATE DATABASE IF NOT EXISTS "+identifier(name)+" CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
+	})
 }
 
 func (m *Manager) mysqlOutput(ctx context.Context, args ...string) ([]byte, error) {
@@ -647,6 +657,7 @@ type importProgress struct {
 	total   int64
 	read    atomic.Int64
 	done    chan struct{}
+	stopped chan struct{}
 }
 
 func newImportProgress(subject string, total int64) *importProgress {
@@ -654,6 +665,7 @@ func newImportProgress(subject string, total int64) *importProgress {
 		subject: subject,
 		total:   total,
 		done:    make(chan struct{}),
+		stopped: make(chan struct{}),
 	}
 }
 
@@ -668,6 +680,7 @@ func (p *importProgress) Start() {
 	go func() {
 		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
+		defer close(p.stopped)
 		p.render(false)
 		for {
 			select {
@@ -685,6 +698,7 @@ func (p *importProgress) Finish(ok bool) {
 		return
 	}
 	close(p.done)
+	<-p.stopped
 	p.renderFinal(ok)
 	fmt.Fprint(os.Stderr, "\n")
 }
@@ -706,24 +720,27 @@ func (p *importProgress) render(done bool) {
 }
 
 func (p *importProgress) renderFinal(ok bool) {
-	label := ui.Success("completed")
+	percent := p.percent()
+	if ok {
+		percent = 100
+	}
+	label := ui.Success("imported")
 	if !ok {
 		label = ui.Danger("failed")
 	}
 	fmt.Fprintf(os.Stderr, "\r%s %s %s %s",
-		importProgressBar(100),
+		importProgressBar(percent),
 		label,
 		ui.Accent(p.subject),
-		ui.Muted("100%"),
+		ui.Muted(fmt.Sprintf("%3d%%", percent)),
 	)
 }
 
 func importProgressBar(percent int) string {
-	const width = 18
-	filled := (percent * width) / 100
+	filled := (percent * ui.RoyalLoaderWidth) / 100
 	var builder strings.Builder
 	builder.WriteString(ui.Muted("["))
-	for index := 0; index < width; index++ {
+	for index := 0; index < ui.RoyalLoaderWidth; index++ {
 		if index < filled {
 			builder.WriteString(ui.Crown("█"))
 			continue
@@ -732,6 +749,17 @@ func importProgressBar(percent int) string {
 	}
 	builder.WriteString(ui.Muted("]"))
 	return builder.String()
+}
+
+func (p *importProgress) percent() int {
+	percent := 0
+	if p.total > 0 {
+		percent = int((p.read.Load() * 100) / p.total)
+	}
+	if percent > 100 {
+		return 100
+	}
+	return percent
 }
 
 func sanitizeSQLReader(source io.Reader) (io.Reader, func() int64) {
