@@ -46,7 +46,7 @@ Coverage percentage is a signal, not the only goal. The release target is strong
 ## Track 1: Hardening And Release
 
 - [ ] Define release criteria for replacing the current `main` implementation with the Go version.
-- [ ] Decide final alpha behavior for NPM installs: build locally from Go source or consume prebuilt binaries.
+- [ ] Decide final alpha behavior for NPM installs only after Linux/WSL and macOS support gates are defined.
 - [ ] Add a release packaging note covering `postinstall`, required Go version, platform support, and fallback behavior.
 - [ ] Review `package.json` `files` and decide whether tests/source should ship in alpha packages.
 - [ ] Add an `npm pack --dry-run` release checklist with a cache override example for restricted environments.
@@ -169,6 +169,21 @@ Implemented first-level `dvv config` categories:
 - [ ] Add cross-links from README and `docs/go-version/architecture.md` to the new harness document.
 - [ ] Ensure all agent-facing docs stay in English and avoid private machine paths, hosts, database names, and credentials.
 
+## Track 7: macOS Support Gate Before NPM
+
+This is the last feature/platform gate before NPM packaging decisions. Do not treat `dvv` as a multi-platform NPM package until this track is either complete or the package is explicitly documented as Linux/WSL-only.
+
+- [ ] Create a dedicated `macos-support` branch from `go-version` when implementation starts.
+- [ ] Add macOS terminal tab support for SSH and tmux handoff, including Terminal.app and, if practical, iTerm2.
+- [ ] Keep the public command surface identical across platforms; use runtime platform detection and config preferences, not separate user-facing versions.
+- [ ] Add config for terminal launcher preference with `auto` as the default.
+- [ ] Adapt `dvv resources` for macOS using supported managers such as Docker Desktop, `brew services`, and/or `launchctl`.
+- [ ] Update `dvv doctor` so macOS reports platform-appropriate dependencies and does not warn about Linux-only tools such as `systemctl`.
+- [ ] Document macOS setup with Homebrew dependencies for Go, Node, fzf, tmux, mysql client, rclone, age, Bitwarden CLI, Docker, and editor CLIs.
+- [ ] Add unit tests for macOS terminal launcher behavior, resource manager detection, doctor output, and platform-specific fallbacks.
+- [ ] Add a macOS smoke checklist covering `dvv build`, `dvv setup`, `dvv ssh`, `dvv workspace`, `dvv tmux`, `dvv db`, `dvv resources`, `dvv config`, and `dvv doctor`.
+- [ ] Confirm NPM install behavior on macOS before running `npm pack --dry-run` as a release candidate check.
+
 ## Validation Commands
 
 Run these before marking this plan complete:
@@ -192,6 +207,7 @@ When smoke tests are added, run the documented smoke command or complete the man
 - [ ] Autocomplete matches the final hub-first command surface.
 - [ ] `dvv config` opens a category hub with theme selection and nested config areas.
 - [ ] Maintainer/agent harness documentation exists and is linked from the main docs.
+- [ ] macOS support is implemented and validated, or NPM release docs clearly scope the package to Linux/WSL.
 - [ ] `npm run check` passes.
 - [ ] `npm pack --dry-run` output is reviewed for package contents.
 - [ ] `go-version` is ready for a final review before replacing `main`.
