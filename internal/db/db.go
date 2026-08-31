@@ -739,13 +739,13 @@ func dbActionRow(index int, action Action) string {
 }
 
 func dbActionPreviewCommand() string {
-	return `sh -c 'line=$1
+	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
 display=$(printf "%s" "$line" | cut -f2-)
 set -- $display
-printf "\033[1;38;2;212;175;55mDatabase action\033[0m\n"
-printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Action" "$2"
-printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Command" "$raw"
+printf "%sDatabase action%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Action" "$dvv_reset" "$2"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Command" "$dvv_reset" "$raw"
 ' sh {}`
 }
 

@@ -1,6 +1,6 @@
-# Royal Noir Theme
+# Themes
 
-The default visual identity is `Royal Noir`: black foundation, royal purple interaction, and restrained gold status.
+The default visual identity is `Royal Noir`: black foundation, royal purple interaction, and restrained gold status. Additional terminal themes are available through `dvv config` -> `Theme` or `DVV_THEME`.
 
 ## Palette
 
@@ -53,3 +53,18 @@ Danger              #f87171
 - `internal/ui.FZFHub` is the standard fzf hub component.
 - Feature packages should not define their own color constants.
 - New hubs should expose shortcuts through project config before hard-coding keys.
+
+## Built-In Themes
+
+| Theme | Notes |
+| --- | --- |
+| `royal-noir` | Default dvv identity: black, royal purple, and restrained gold. |
+| `darcula` | JetBrains-style dark gray with calm violet and amber accents. |
+| `tokyo-night` | Deep blue-black terminal palette with violet, cyan, and moonlit yellow. |
+| `dracula` | Dark purple palette with bright classic terminal accents. |
+| `catppuccin-mocha` | Soft dark palette with pastel mauve and peach accents. |
+| `nord` | Cool arctic palette with blue-gray surfaces and frost accents. |
+| `gruvbox-dark` | Warm dark palette with earthy contrast and amber highlights. |
+| `everforest-dark` | Green-tinted dark palette with soft contrast and natural accents. |
+| `solarized-dark` | Classic low-contrast terminal palette with cyan and yellow accents. |
+| `one-dark` | Balanced editor palette with blue, purple, and warm status accents. |

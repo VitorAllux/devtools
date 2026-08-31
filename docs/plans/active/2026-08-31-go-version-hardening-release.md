@@ -120,26 +120,26 @@ Coverage percentage is a signal, not the only goal. The release target is strong
 
 - [x] Redesign `dvv config` as a category hub instead of opening directly on every raw key.
 - [x] Keep raw key editing available inside a `Keys` or `Advanced keys` sub-hub.
-- [ ] Add a `Theme` sub-hub with theme selection, preview, persistence, and validation.
-- [ ] Keep `royal-noir` as the default theme.
-- [ ] Add built-in theme presets: `royal-noir`, `darcula`, `tokyo-night`, `dracula`, `catppuccin-mocha`, `nord`, `gruvbox-dark`, `everforest-dark`, `solarized-dark`, and `one-dark`.
-- [ ] Make theme values drive shared UI helpers, fzf colors, loader colors, prompt colors, and status labels from one theme registry.
-- [ ] Add a theme preview that shows title, prompt, status lines, fzf-like row colors, indeterminate loader, and determinate progress loader.
-- [ ] Add a `Paths` sub-hub for workspace root, project search roots, dumps directory, SSH server file, AGE files, and runtime config file.
-- [ ] Add a `Shortcuts` sub-hub for global shortcuts and hub-local action shortcuts.
-- [ ] Add a `Workspace` sub-hub for opener, project discovery, branch rules, bootstrap, hooks, safety, and workspace harness settings.
-- [ ] Add a `Database` sub-hub for MySQL host, port, user, dumps directory, rclone remote, and import defaults.
-- [ ] Add a `Tmux` sub-hub for session search roots, search depth, default session name, and `Ctrl+F` binding.
-- [ ] Add a `Resources` sub-hub for resource action shortcuts and future detector toggles.
-- [ ] Add an `Integrations` sub-hub for editor detection, terminal launcher preference, Bitwarden item, rclone remote, Docker, and MySQL dependency status.
-- [ ] Add a `Safety` sub-hub for confirmation rules, dirty worktree blocking, direct-child deletion, and destructive action policy.
-- [ ] Add a `Profiles` sub-hub or plan for future machine-specific config profiles, such as `personal`, `work`, `wsl`, and `ci`.
-- [x] Route each config category to a selector, nested key hub, or planned-state screen depending on the category complexity.
+- [x] Add a `Theme` sub-hub with theme selection, preview, persistence, and validation.
+- [x] Keep `royal-noir` as the default theme.
+- [x] Add built-in theme presets: `royal-noir`, `darcula`, `tokyo-night`, `dracula`, `catppuccin-mocha`, `nord`, `gruvbox-dark`, `everforest-dark`, `solarized-dark`, and `one-dark`.
+- [x] Make theme values drive shared UI helpers, fzf colors, loader colors, prompt colors, and status labels from one theme registry.
+- [x] Add a theme preview that shows theme identity, palette values, an indeterminate loader sample, and a determinate progress sample.
+- [x] Add a `Paths` sub-hub for workspace root, project search roots, dumps directory, SSH server file, AGE files, and runtime config file.
+- [x] Add a `Shortcuts` sub-hub for global shortcuts and hub-local action shortcuts.
+- [x] Add a `Workspace` sub-hub for current runtime workspace root, discovery, opener, action keys, and safety defaults.
+- [x] Add a `Database` sub-hub for MySQL host, port, user, dumps directory, rclone remote, and DB safety defaults.
+- [x] Add a `Tmux` sub-hub for session search roots, search depth, default session name, and `Ctrl+F` binding.
+- [x] Add a `Resources` sub-hub for resource action shortcuts.
+- [x] Add an `Integrations` sub-hub for current rclone, Bitwarden, MySQL, and external tool defaults.
+- [x] Add a `Safety` sub-hub for current database and workspace confirmation rules.
+- [x] Keep future `Profiles` work out of the first-level hub until a runtime profile backend exists.
+- [x] Route each visible config category to a selector or nested key hub backed by runtime values.
 - [ ] Keep `dvv config list` and `dvv config set` as script-friendly compatibility routes, but do not make them the primary user surface.
-- [ ] Add tests for category rows, selected category routing, theme registry values, persisted theme changes, shortcut editing, and raw key fallback.
-- [ ] Update README, configuration docs, autocomplete, and smoke checklist after the config hub redesign.
+- [x] Add tests for category rows, selected category routing, theme registry values, persisted theme changes, shortcut editing, and raw key fallback.
+- [x] Update README and configuration docs after the config hub redesign.
 
-Suggested first-level `dvv config` categories:
+Implemented first-level `dvv config` categories:
 
 | Category | Purpose |
 | --- | --- |
@@ -147,13 +147,12 @@ Suggested first-level `dvv config` categories:
 | `Keys` | Edit raw runtime config keys and advanced values. |
 | `Paths` | Manage workspace, dumps, SSH, AGE, and config paths. |
 | `Shortcuts` | Manage shell shortcuts and hub action keys. |
-| `Workspace` | Manage workspace behavior, branch rules, bootstrap, hooks, and harness settings. |
-| `Database` | Manage MySQL and dump import defaults. |
-| `Tmux` | Manage tmux session picker settings. |
-| `Resources` | Manage local resources hub settings. |
-| `Integrations` | Inspect and configure editors, terminal launcher, Bitwarden, rclone, Docker, and MySQL. |
-| `Safety` | Manage destructive-action confirmation rules. |
-| `Profiles` | Future machine-specific config profiles. |
+| `Workspace` | Manage workspace root, discovery, opener, action keys, and safety defaults. |
+| `Database` | Manage MySQL, dump directory, rclone, and DB safety defaults. |
+| `Tmux` | Manage session picker search roots, search depth, default session name, and shortcut binding. |
+| `Resources` | Manage resource hub action shortcuts. |
+| `Integrations` | Configure rclone, Bitwarden, MySQL, and external tool defaults. |
+| `Safety` | Manage database and workspace confirmation rules. |
 
 ## Track 6: Maintainer And Agent Readability Harness
 

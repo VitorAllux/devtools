@@ -62,8 +62,8 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | --- | --- | --- |
 | First screen | `dvv config` opens a category hub. | Keep raw key lists inside `Keys` or focused sub-hubs. |
 | Current raw editor | `Keys` preserves the old key/value editor. | Keep `dvv config list` and `dvv config set` script-friendly. |
-| Planned categories | Theme, Resources, Safety, and Profiles can show planned state until their backend exists. | Do not persist values that the runtime does not read yet. |
-| Runtime keys | Category sub-hubs should expose only keys that affect current behavior. | Add runtime config support before making a setting editable. |
+| Visible categories | Every first-level category must open a working selector or key hub. | Keep future categories hidden until their backend exists. |
+| Runtime keys | Category sub-hubs expose only keys that affect current behavior. | Add runtime config support before making a setting editable. |
 
 ## Loader Coverage
 

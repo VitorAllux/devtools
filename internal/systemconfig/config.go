@@ -77,13 +77,16 @@ func (m Manager) Hub(ctx context.Context) error {
 }
 
 func (m Manager) openCategory(ctx context.Context, category Category) error {
+	if category.ID == "theme" {
+		return m.themeHub(ctx)
+	}
 	entries, err := m.Entries()
 	if err != nil {
 		return err
 	}
 	filtered := entriesForCategory(category.ID, entries)
 	if len(filtered) == 0 {
-		return m.plannedCategory(category)
+		return fmt.Errorf("config category has no editable values: %s", category.Label)
 	}
 	return m.keyHub(ctx, category, filtered)
 }
@@ -100,7 +103,7 @@ func (m Manager) keyHub(ctx context.Context, category Category, initial []Entry)
 			entries = entriesForCategory(category.ID, entries)
 		}
 		if len(entries) == 0 {
-			return m.plannedCategory(category)
+			return fmt.Errorf("config category has no editable values: %s", category.Label)
 		}
 		if _, err := m.Runner.LookPath("fzf"); err != nil {
 			return m.basicHub(entries)
@@ -163,23 +166,15 @@ func (m Manager) selectCategory(ctx context.Context, entries []Entry) (Category,
 	return category, ok, nil
 }
 
-func (m Manager) plannedCategory(category Category) error {
-	ui.Title(category.Label)
-	ui.Info("%s", category.Description)
-	ui.Warn("This config category is planned. Use Keys for raw config values for now.")
-	_, _ = ui.Prompt("Press Enter to return")
-	return nil
-}
-
 func (m Manager) basicCategoryHub(ctx context.Context, entries []Entry) error {
 	categories := configCategories()
 	ui.Title("Configuration")
 	ui.Info("File: %s", m.Config.ConfigFile)
 	for index, category := range categories {
 		count := len(entriesForCategory(category.ID, entries))
-		status := "planned"
-		if count > 0 {
-			status = fmt.Sprintf("%d key(s)", count)
+		status := fmt.Sprintf("%d key(s)", count)
+		if category.ID == "theme" {
+			status = "selector"
 		}
 		fmt.Printf("  %2d  %-14s %-10s %s\n", index+1, category.Label, status, category.Description)
 	}
@@ -203,13 +198,12 @@ func configCategories() []Category {
 		{"keys", "Keys", "Edit raw runtime config keys"},
 		{"paths", "Paths", "Manage workspace, dumps, SSH, AGE, and config paths"},
 		{"shortcuts", "Shortcuts", "Manage shell shortcuts and hub action keys"},
-		{"workspace", "Workspace", "Manage workspace behavior and defaults"},
-		{"database", "Database", "Manage MySQL and dump import defaults"},
-		{"tmux", "Tmux", "Manage tmux environment and directory picker settings"},
-		{"resources", "Resources", "Manage local resources hub settings"},
-		{"integrations", "Integrations", "Inspect and configure external tool defaults"},
-		{"safety", "Safety", "Manage destructive-action confirmation rules"},
-		{"profiles", "Profiles", "Manage future machine-specific config profiles"},
+		{"workspace", "Workspace", "Manage workspace root, discovery, opener, and action keys"},
+		{"database", "Database", "Manage MySQL, dumps, rclone, and DB safety defaults"},
+		{"tmux", "Tmux", "Manage directory picker search and shortcut settings"},
+		{"resources", "Resources", "Manage resource hub action shortcuts"},
+		{"integrations", "Integrations", "Configure rclone, Bitwarden, and local tool defaults"},
+		{"safety", "Safety", "Manage database and workspace confirmation rules"},
 	}
 }
 
@@ -235,9 +229,9 @@ func categoryHeader() string {
 
 func categoryRow(index int, category Category, entries []Entry) string {
 	count := len(entriesForCategory(category.ID, entries))
-	status := "planned"
-	if count > 0 {
-		status = fmt.Sprintf("%d key(s)", count)
+	status := fmt.Sprintf("%d key(s)", count)
+	if category.ID == "theme" {
+		status = "selector"
 	}
 	return strings.Join([]string{
 		ui.Muted(fmt.Sprintf("%02d", index+1)),
@@ -268,17 +262,17 @@ func categoryFZFArgs() []string {
 }
 
 func categoryPreviewCommand() string {
-	return `sh -c 'line=$1
+	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
 category=$(printf "%s" "$line" | cut -f3)
 status=$(printf "%s" "$line" | cut -f4)
 detail=$(printf "%s" "$line" | cut -f5-)
-printf "\033[1;38;2;212;175;55mConfig category\033[0m\n"
-printf "  \033[38;2;196;181;253m%-10s\033[0m %s\n" "Category" "$category"
-printf "  \033[38;2;196;181;253m%-10s\033[0m %s\n" "Status" "$status"
-printf "  \033[38;2;196;181;253m%-10s\033[0m %s\n" "ID" "$raw"
-printf "\n\033[38;2;139;126;163m%s\033[0m\n" "$detail"
-printf "\n\033[38;2;139;126;163mEnter open | Esc exit\033[0m\n"
+printf "%sConfig category%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%-10s%s %s\n" "$dvv_label" "Category" "$dvv_reset" "$category"
+printf "  %s%-10s%s %s\n" "$dvv_label" "Status" "$dvv_reset" "$status"
+printf "  %s%-10s%s %s\n" "$dvv_label" "ID" "$dvv_reset" "$raw"
+printf "\n%s%s%s\n" "$dvv_muted" "$detail" "$dvv_reset"
+printf "\n%sEnter open | Esc exit%s\n" "$dvv_muted" "$dvv_reset"
 ' sh {}`
 }
 
@@ -309,7 +303,7 @@ func entriesForCategory(categoryID string, entries []Entry) []Entry {
 				return false
 			}
 		})
-	case "theme", "resources", "safety", "profiles":
+	case "theme", "resources", "safety":
 		return filterEntriesByCategory(entries, categoryID)
 	default:
 		return nil
@@ -361,6 +355,161 @@ func parseIndex(value string, max int) (int, bool) {
 	}
 	index--
 	return index, index >= 0 && index < max
+}
+
+func (m Manager) themeHub(ctx context.Context) error {
+	for {
+		themes := ui.Themes()
+		if _, err := m.Runner.LookPath("fzf"); err != nil {
+			return m.basicThemeHub(themes)
+		}
+		output, err := m.Runner.OutputWithInput(ctx, "", []byte(themeRows(themes, m.Config.Project.Theme.Name)), "fzf", themeFZFArgs()...)
+		if err != nil && len(output) == 0 {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		raw := ui.FZFSelectedRaw(strings.TrimSpace(string(output)))
+		if raw == "" {
+			return nil
+		}
+		if err := m.setTheme(raw); err != nil {
+			ui.Error("%v", err)
+			continue
+		}
+		return nil
+	}
+}
+
+func (m Manager) basicThemeHub(themes []ui.Theme) error {
+	ui.Title("Theme")
+	for index, theme := range themes {
+		status := ""
+		if theme.Name == m.Config.Project.Theme.Name {
+			status = "active"
+		}
+		fmt.Printf("  %2d  %-20s %-8s %s\n", index+1, theme.Name, status, theme.Description)
+	}
+	value, err := ui.Prompt("Theme")
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	if index, ok := parseIndex(value, len(themes)); ok {
+		return m.setTheme(themes[index].Name)
+	}
+	return m.setTheme(value)
+}
+
+func (m Manager) setTheme(name string) error {
+	theme, ok := ui.ThemeByName(name)
+	if !ok {
+		return fmt.Errorf("unknown theme: %s", name)
+	}
+	if err := m.writeValue("DVV_THEME", theme.Name); err != nil {
+		return err
+	}
+	m.Config.Project.Theme.Name = theme.Name
+	ui.SetTheme(theme.Name)
+	ui.OK("Theme set to %s", theme.Name)
+	return nil
+}
+
+func themeRows(themes []ui.Theme, active string) string {
+	active = ui.NormalizeThemeName(active)
+	var builder strings.Builder
+	builder.WriteString(ui.FZFHiddenHeader(themeHeader()))
+	builder.WriteByte('\n')
+	for index, theme := range themes {
+		builder.WriteString(ui.FZFHiddenRow(theme.Name, themeRow(index, theme, active)))
+		builder.WriteByte('\n')
+	}
+	return builder.String()
+}
+
+func themeHeader() string {
+	return strings.Join([]string{
+		ui.Crown("NO"),
+		ui.Crown(fixedWidth("THEME", 22)),
+		ui.Crown(fixedWidth("STATUS", 10)),
+		ui.Crown("DETAIL"),
+	}, "\t")
+}
+
+func themeRow(index int, theme ui.Theme, active string) string {
+	status := ""
+	if theme.Name == active {
+		status = "active"
+	}
+	return strings.Join([]string{
+		ui.Muted(fmt.Sprintf("%02d", index+1)),
+		ui.Accent(fixedWidth(theme.Name, 22)),
+		ui.Gold(fixedWidth(status, 10)),
+		ui.Muted(theme.Description),
+	}, "\t")
+}
+
+func themeFZFArgs() []string {
+	return ui.FZFHub{
+		Prompt:        ui.Crown("theme") + ui.Muted("> "),
+		BorderLabel:   "dvv config / Theme",
+		Preview:       themePreviewCommand(),
+		PreviewLabel:  "theme panel",
+		PreviewWindow: "right,42%,border-rounded,wrap",
+		Shortcuts: []ui.FZFShortcut{
+			{Label: "Enter", Description: "set theme"},
+			{Label: "Esc", Description: "back"},
+		},
+		ExtraArgs: []string{
+			"--delimiter=\t",
+			"--with-nth=2..",
+			"--nth=1,2,3,4,5",
+			"--header-lines=1",
+		},
+	}.Args()
+}
+
+func themePreviewCommand() string {
+	return `sh -c '` + ui.FZFPreviewShellPrefix() + themePreviewCaseScript() + `line=$1
+raw=$(printf "%s" "$line" | cut -f1)
+name=$(printf "%s" "$line" | cut -f3)
+status=$(printf "%s" "$line" | cut -f4)
+detail=$(printf "%s" "$line" | cut -f5-)
+select_theme "$raw"
+printf "%sTheme%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%-10s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$raw"
+printf "  %s%-10s%s %s\n" "$dvv_label" "Label" "$dvv_reset" "$name"
+printf "  %s%-10s%s %s\n" "$dvv_label" "Status" "$dvv_reset" "$status"
+printf "  %s%-10s%s %s\n" "$dvv_label" "Accent" "$dvv_reset" "$theme_accent"
+printf "  %s%-10s%s %s\n" "$dvv_label" "Status" "$dvv_reset" "$theme_status"
+printf "  %s%-10s%s %s\n" "$dvv_label" "Border" "$dvv_reset" "$theme_border"
+printf "\n%s%s%s\n" "$dvv_muted" "$detail" "$dvv_reset"
+printf "\n%s[█████░░░░░░░░░░░░░] working%s\n" "$dvv_status" "$dvv_reset"
+printf "%s[██████████████████] completed 100%%%s\n" "$dvv_status" "$dvv_reset"
+printf "\n%sEnter set theme | Esc back%s\n" "$dvv_muted" "$dvv_reset"
+' sh {}`
+}
+
+func themePreviewCaseScript() string {
+	var builder strings.Builder
+	builder.WriteString("select_theme() {\n")
+	builder.WriteString("  case \"$1\" in\n")
+	for _, theme := range ui.Themes() {
+		fmt.Fprintf(&builder,
+			"    %s) theme_accent=%s; theme_status=%s; theme_border=%s ;;\n",
+			theme.Name,
+			shellDoubleQuote(theme.Colors.Accent),
+			shellDoubleQuote(theme.Colors.Status),
+			shellDoubleQuote(theme.Colors.Border),
+		)
+	}
+	builder.WriteString("    *) theme_accent=\"-\"; theme_status=\"-\"; theme_border=\"-\" ;;\n")
+	builder.WriteString("  esac\n")
+	builder.WriteString("}\n")
+	return builder.String()
 }
 
 func (m Manager) basicHub(entries []Entry) error {
@@ -469,7 +618,83 @@ func (m Manager) writeValue(key string, value string) error {
 		return err
 	}
 	values[key] = value
-	return writeConfigFile(m.Config.ConfigFile, values)
+	if err := writeConfigFile(m.Config.ConfigFile, values); err != nil {
+		return err
+	}
+	m.applyRuntimeValue(key, value)
+	return nil
+}
+
+func (m Manager) applyRuntimeValue(key string, value string) {
+	switch key {
+	case "DVV_THEME":
+		if theme, ok := ui.ThemeByName(value); ok {
+			m.Config.Project.Theme.Name = theme.Name
+			ui.SetTheme(theme.Name)
+		}
+	case "DVV_SSH_ADD_SHORTCUT":
+		m.Config.Project.SSH.Hub.Shortcuts.Add = value
+	case "DVV_SSH_REMOVE_SHORTCUT":
+		m.Config.Project.SSH.Hub.Shortcuts.Remove = value
+	case "DVV_SSH_NEW_TERMINAL_SHORTCUT":
+		m.Config.Project.SSH.Hub.Shortcuts.NewTerminal = value
+	case "DVV_RESOURCES_START_SHORTCUT":
+		m.Config.Project.Resources.Hub.Shortcuts.Start = value
+	case "DVV_RESOURCES_RESTART_SHORTCUT":
+		m.Config.Project.Resources.Hub.Shortcuts.Restart = value
+	case "DVV_RESOURCES_STOP_SHORTCUT":
+		m.Config.Project.Resources.Hub.Shortcuts.Stop = value
+	case "DVV_TMUX_SESSION_SHORTCUT":
+		m.Config.Project.Tmux.Session.Shortcut = value
+	case "DVV_TMUX_SESSION_SEARCH_ROOTS":
+		m.Config.Project.Tmux.Session.SearchRoots = expandedPathList(value)
+	case "DVV_TMUX_SESSION_SEARCH_DEPTH":
+		if isNumber(value) {
+			fmt.Sscanf(value, "%d", &m.Config.Project.Tmux.Session.SearchDepth)
+		}
+	case "DVV_WORKSPACES_DIR":
+		m.Config.Project.Workspace.Root = config.ExpandPath(value)
+	case "DVV_WORKSPACE_PROJECT_ROOTS":
+		m.Config.Project.Workspace.ProjectSearchRoots = expandedPathList(value)
+	case "DVV_WORKSPACE_PROJECT_SEARCH_DEPTH":
+		if isNumber(value) {
+			fmt.Sscanf(value, "%d", &m.Config.Project.Workspace.ProjectSearchDepth)
+		}
+	case "DVV_WORKSPACE_OPENER":
+		m.Config.Project.Workspace.Interactive.Opener = value
+	case "DVV_WORKSPACE_CREATE_SHORTCUT":
+		m.Config.Project.Workspace.Interactive.Shortcuts.Create = value
+	case "DVV_WORKSPACE_MANAGE_SHORTCUT":
+		m.Config.Project.Workspace.Interactive.Shortcuts.Manage = value
+	case "DVV_WORKSPACE_DELETE_SHORTCUT":
+		m.Config.Project.Workspace.Interactive.Shortcuts.Delete = value
+	case "DVV_DB_HOST":
+		m.Config.Project.DB.Host = value
+	case "DVV_DB_PORT":
+		m.Config.Project.DB.Port = value
+	case "DVV_DB_USER":
+		m.Config.Project.DB.User = value
+	case "DVV_DUMPS_DIR":
+		path := config.ExpandPath(value)
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(m.Config.RootDir, path)
+		}
+		m.Config.Project.DB.DumpsDir = path
+	case "DVV_RCLONE_REMOTE":
+		m.Config.Project.DB.RcloneRemote = value
+	case "DVV_DB_SAFETY_CONFIRM":
+		m.Config.Project.DB.SafetyConfirm = value == "1"
+	case "DVV_WORKSPACE_REQUIRE_CONFIRMATION":
+		m.Config.Project.Workspace.Safety.RequireConfirmation = value == "1"
+	case "DVV_WORKSPACE_BLOCK_DIRTY_PROJECTS":
+		m.Config.Project.Workspace.Safety.BlockRemoveWithDirtyProjects = value == "1"
+	case "DVV_WORKSPACE_ALLOW_FORCE_REMOVE":
+		m.Config.Project.Workspace.Safety.AllowForceRemove = value == "1"
+	case "DVV_WORKSPACE_ONLY_DIRECT_CHILDREN":
+		m.Config.Project.Workspace.Safety.OnlyRemoveDirectChildren = value == "1"
+	case "DVV_WORKSPACE_CONFIRM_LEFTOVER_DELETION":
+		m.Config.Project.Workspace.Safety.ConfirmLeftoverDeletion = value == "1"
+	}
 }
 
 func (m Manager) validate(entry Entry) {
@@ -499,6 +724,12 @@ func (m Manager) validate(entry Entry) {
 			ui.Warn("%v", err)
 		} else {
 			ui.OK("Shortcut value is valid: %s", entry.Value)
+		}
+	case "theme":
+		if theme, ok := ui.ThemeByName(entry.Value); ok {
+			ui.OK("Theme value is valid: %s", theme.Name)
+		} else {
+			ui.Warn("Unknown theme: %s", entry.Value)
 		}
 	default:
 		ui.Info("%s=%s", entry.Key, maskValue(entry))
@@ -578,15 +809,15 @@ func configRow(entry Entry) string {
 }
 
 func configPreviewCommand() string {
-	return `sh -c 'line=$1
+	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
 display=$(printf "%s" "$line" | cut -f2-)
 set -- $display
-printf "\033[1;38;2;212;175;55mConfig entry\033[0m\n"
-printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Key" "$raw"
-printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Group" "$2"
-printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Value" "$4"
-printf "\n\033[38;2;139;126;163mEnter edit | Alt+A add | Alt+C clear | Alt+V validate | Alt+S secrets\033[0m\n"
+printf "%sConfig entry%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Key" "$dvv_reset" "$raw"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Group" "$dvv_reset" "$2"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Value" "$dvv_reset" "$4"
+printf "\n%sEnter edit | Alt+A add | Alt+C clear | Alt+V validate | Alt+S secrets%s\n" "$dvv_muted" "$dvv_reset"
 ' sh {}`
 }
 
@@ -599,6 +830,11 @@ func promptValue(entry Entry) (string, error) {
 		}
 	case "choice":
 		selected, err := chooseOne(entry.Key, []string{"auto", "cursor", "code", "vscode", "opencode", "codex", "shell"})
+		if err == nil && selected != "" {
+			return selected, nil
+		}
+	case "theme":
+		selected, err := chooseOne(entry.Key, ui.ThemeNames())
 		if err == nil && selected != "" {
 			return selected, nil
 		}
@@ -633,6 +869,7 @@ func chooseOne(label string, values []string) (string, error) {
 
 func knownEntries(cfg *config.Config) []Entry {
 	return []Entry{
+		{"Theme", "DVV_THEME", "Active CLI theme", "theme", cfg.Project.Theme.Name, "", false},
 		{"Project", "API_DIR", "Path to default API project", "path", "", "", false},
 		{"Project", "WEB_DIR", "Path to default Web project", "path", "", "", false},
 		{"Tmux", "TMUX_DEFAULT_DIR", "Default root for tmux directory pickers", "path", "~/workspace", "", false},
@@ -641,6 +878,12 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Tmux", "DVV_TMUX_SESSION_SEARCH_ROOTS", "Directory picker search roots", "path-list", strings.Join(cfg.Project.Tmux.Session.SearchRoots, string(os.PathListSeparator)), "", false},
 		{"Tmux", "DVV_TMUX_SESSION_SEARCH_DEPTH", "Directory picker search depth", "number", fmt.Sprintf("%d", cfg.Project.Tmux.Session.SearchDepth), "", false},
 		{"Shortcuts", "DVV_TMUX_SESSION_SHORTCUT", "Managed zsh shortcut for the tmux directory picker", "shortcut", cfg.Project.Tmux.Session.Shortcut, "", false},
+		{"Shortcuts", "DVV_SSH_ADD_SHORTCUT", "SSH hub add action shortcut", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Add, "", false},
+		{"Shortcuts", "DVV_SSH_REMOVE_SHORTCUT", "SSH hub remove action shortcut", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Remove, "", false},
+		{"Shortcuts", "DVV_SSH_NEW_TERMINAL_SHORTCUT", "SSH hub new terminal shortcut", "shortcut", cfg.Project.SSH.Hub.Shortcuts.NewTerminal, "", false},
+		{"Shortcuts", "DVV_WORKSPACE_CREATE_SHORTCUT", "Workspace hub create action shortcut", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Create, "", false},
+		{"Shortcuts", "DVV_WORKSPACE_MANAGE_SHORTCUT", "Workspace hub manage action shortcut", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Manage, "", false},
+		{"Shortcuts", "DVV_WORKSPACE_DELETE_SHORTCUT", "Workspace hub delete action shortcut", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Delete, "", false},
 		{"Workspace", "DVV_WORKSPACES_DIR", "Root directory for workspace-* folders", "path", cfg.Project.Workspace.Root, "", false},
 		{"Workspace", "DVV_WORKSPACE_PROJECT_ROOTS", "Colon-separated roots for project discovery", "path-list", strings.Join(cfg.Project.Workspace.ProjectSearchRoots, string(os.PathListSeparator)), "", false},
 		{"Workspace", "DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "Project discovery depth", "number", fmt.Sprintf("%d", cfg.Project.Workspace.ProjectSearchDepth), "", false},
@@ -650,6 +893,15 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Database", "DVV_DB_USER", "MySQL user for DB actions", "text", cfg.Project.DB.User, "", false},
 		{"Database", "DVV_DUMPS_DIR", "Local dump storage directory", "path", cfg.Project.DB.DumpsDir, "", false},
 		{"Database", "DVV_RCLONE_REMOTE", "Default rclone remote", "text", cfg.Project.DB.RcloneRemote, "", false},
+		{"Resources", "DVV_RESOURCES_START_SHORTCUT", "Resources hub start action shortcut", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Start, "", false},
+		{"Resources", "DVV_RESOURCES_RESTART_SHORTCUT", "Resources hub restart action shortcut", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Restart, "", false},
+		{"Resources", "DVV_RESOURCES_STOP_SHORTCUT", "Resources hub stop action shortcut", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Stop, "", false},
+		{"Safety", "DVV_DB_SAFETY_CONFIRM", "Confirm destructive database actions", "bool", boolValue(cfg.Project.DB.SafetyConfirm), "", false},
+		{"Safety", "DVV_WORKSPACE_REQUIRE_CONFIRMATION", "Require workspace action confirmation", "bool", boolValue(cfg.Project.Workspace.Safety.RequireConfirmation), "", false},
+		{"Safety", "DVV_WORKSPACE_BLOCK_DIRTY_PROJECTS", "Block workspace removal with dirty projects", "bool", boolValue(cfg.Project.Workspace.Safety.BlockRemoveWithDirtyProjects), "", false},
+		{"Safety", "DVV_WORKSPACE_ALLOW_FORCE_REMOVE", "Allow force workspace removal", "bool", boolValue(cfg.Project.Workspace.Safety.AllowForceRemove), "", false},
+		{"Safety", "DVV_WORKSPACE_ONLY_DIRECT_CHILDREN", "Only remove direct workspace children", "bool", boolValue(cfg.Project.Workspace.Safety.OnlyRemoveDirectChildren), "", false},
+		{"Safety", "DVV_WORKSPACE_CONFIRM_LEFTOVER_DELETION", "Confirm leftover workspace directory deletion", "bool", boolValue(cfg.Project.Workspace.Safety.ConfirmLeftoverDeletion), "", false},
 		{"Secrets", "DVV_SERVERS_FILE", "Local SSH server list path", "path", cfg.ServersFile, "", false},
 		{"Secrets", "DVV_AGE_KEY_FILE", "Local AGE private key path", "path", cfg.AgeKeyFile, "", false},
 		{"Secrets", "DVV_AGE_RECIPIENTS_FILE", "AGE recipients file path", "path", cfg.AgeRecipientsFile, "", false},
@@ -786,6 +1038,17 @@ func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 }
 
+func shellDoubleQuote(value string) string {
+	replacer := strings.NewReplacer(
+		`\`, `\\`,
+		`"`, `\"`,
+		`$`, `\$`,
+		"`", "\\`",
+		"\n", `\n`,
+	)
+	return `"` + replacer.Replace(value) + `"`
+}
+
 func fixedWidth(value string, width int) string {
 	value = strings.TrimSpace(value)
 	if len(value) >= width {
@@ -799,6 +1062,33 @@ func defaultString(value string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func splitPathList(value string) []string {
+	parts := strings.Split(value, string(os.PathListSeparator))
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
+func expandedPathList(value string) []string {
+	paths := splitPathList(value)
+	for index, path := range paths {
+		paths[index] = config.ExpandPath(path)
+	}
+	return paths
+}
+
+func boolValue(value bool) string {
+	if value {
+		return "1"
+	}
+	return "0"
 }
 
 func showHelp() {

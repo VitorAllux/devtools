@@ -213,6 +213,9 @@ func Load() (*Config, error) {
 		BitwardenAgeKeyItem:  firstSetEnv("DVV_BW_AGE_KEY_ITEM", "DEVT_BW_AGE_KEY_ITEM"),
 		Project:              projectConfig,
 	}
+	cfg.Project.Theme = resolveThemeConfig(cfg.Project.Theme)
+	cfg.Project.SSH = resolveSSHConfig(cfg.Project.SSH)
+	cfg.Project.Resources = resolveResourcesConfig(cfg.Project.Resources)
 	cfg.Project.Workspace = resolveWorkspaceConfig(cfg.Project.Workspace)
 	cfg.Project.Tmux = resolveTmuxConfig(cfg.Project.Tmux)
 	cfg.Project.DB = resolveDBConfig(cfg.Project.DB, root)
@@ -529,6 +532,43 @@ func mergeResourcesConfigDefaults(target ResourcesConfig, defaults ResourcesConf
 	return target
 }
 
+func resolveThemeConfig(cfg ThemeConfig) ThemeConfig {
+	if value := firstSetEnv("DVV_THEME", "DEVT_THEME"); value != "" {
+		cfg.Name = value
+	}
+	if strings.TrimSpace(cfg.Name) == "" {
+		cfg.Name = DefaultProjectConfig().Theme.Name
+	}
+	cfg.Name = strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(cfg.Name), "_", "-"), " ", "-"))
+	return cfg
+}
+
+func resolveSSHConfig(cfg SSHConfig) SSHConfig {
+	if value := firstSetEnv("DVV_SSH_ADD_SHORTCUT"); value != "" {
+		cfg.Hub.Shortcuts.Add = value
+	}
+	if value := firstSetEnv("DVV_SSH_REMOVE_SHORTCUT"); value != "" {
+		cfg.Hub.Shortcuts.Remove = value
+	}
+	if value := firstSetEnv("DVV_SSH_NEW_TERMINAL_SHORTCUT"); value != "" {
+		cfg.Hub.Shortcuts.NewTerminal = value
+	}
+	return cfg
+}
+
+func resolveResourcesConfig(cfg ResourcesConfig) ResourcesConfig {
+	if value := firstSetEnv("DVV_RESOURCES_START_SHORTCUT"); value != "" {
+		cfg.Hub.Shortcuts.Start = value
+	}
+	if value := firstSetEnv("DVV_RESOURCES_RESTART_SHORTCUT"); value != "" {
+		cfg.Hub.Shortcuts.Restart = value
+	}
+	if value := firstSetEnv("DVV_RESOURCES_STOP_SHORTCUT"); value != "" {
+		cfg.Hub.Shortcuts.Stop = value
+	}
+	return cfg
+}
+
 func mergeTmuxConfigDefaults(target TmuxConfig, defaults TmuxConfig) TmuxConfig {
 	if target.Session.SearchRoots == nil {
 		target.Session.SearchRoots = defaults.Session.SearchRoots
@@ -634,6 +674,9 @@ func resolveDBConfig(cfg DBConfig, root string) DBConfig {
 	if value := firstSetEnv("DVV_RCLONE_REMOTE", "DEVT_RCLONE_REMOTE"); value != "" {
 		cfg.RcloneRemote = value
 	}
+	if value, ok := firstBoolEnv("DVV_DB_SAFETY_CONFIRM"); ok {
+		cfg.SafetyConfirm = value
+	}
 	cfg.DumpsDir = ExpandPath(cfg.DumpsDir)
 	if !filepath.IsAbs(cfg.DumpsDir) {
 		cfg.DumpsDir = filepath.Join(root, cfg.DumpsDir)
@@ -674,6 +717,30 @@ func resolveWorkspaceConfig(cfg WorkspaceConfig) WorkspaceConfig {
 	}
 	if opener := firstSetEnv("DVV_WORKSPACE_OPENER", "DEVT_WORKSPACE_OPENER"); opener != "" {
 		cfg.Interactive.Opener = opener
+	}
+	if shortcut := firstSetEnv("DVV_WORKSPACE_CREATE_SHORTCUT"); shortcut != "" {
+		cfg.Interactive.Shortcuts.Create = shortcut
+	}
+	if shortcut := firstSetEnv("DVV_WORKSPACE_MANAGE_SHORTCUT"); shortcut != "" {
+		cfg.Interactive.Shortcuts.Manage = shortcut
+	}
+	if shortcut := firstSetEnv("DVV_WORKSPACE_DELETE_SHORTCUT"); shortcut != "" {
+		cfg.Interactive.Shortcuts.Delete = shortcut
+	}
+	if value, ok := firstBoolEnv("DVV_WORKSPACE_REQUIRE_CONFIRMATION"); ok {
+		cfg.Safety.RequireConfirmation = value
+	}
+	if value, ok := firstBoolEnv("DVV_WORKSPACE_BLOCK_DIRTY_PROJECTS"); ok {
+		cfg.Safety.BlockRemoveWithDirtyProjects = value
+	}
+	if value, ok := firstBoolEnv("DVV_WORKSPACE_ALLOW_FORCE_REMOVE"); ok {
+		cfg.Safety.AllowForceRemove = value
+	}
+	if value, ok := firstBoolEnv("DVV_WORKSPACE_ONLY_DIRECT_CHILDREN"); ok {
+		cfg.Safety.OnlyRemoveDirectChildren = value
+	}
+	if value, ok := firstBoolEnv("DVV_WORKSPACE_CONFIRM_LEFTOVER_DELETION"); ok {
+		cfg.Safety.ConfirmLeftoverDeletion = value
 	}
 	return cfg
 }
@@ -726,4 +793,24 @@ func parsePositiveInt(value string) int {
 		result = result*10 + int(r-'0')
 	}
 	return result
+}
+
+func firstBoolEnv(keys ...string) (bool, bool) {
+	for _, key := range keys {
+		if value := os.Getenv(key); value != "" {
+			return parseBoolValue(value)
+		}
+	}
+	return false, false
+}
+
+func parseBoolValue(value string) (bool, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "y", "on":
+		return true, true
+	case "0", "false", "no", "n", "off":
+		return false, true
+	default:
+		return false, false
+	}
 }

@@ -131,6 +131,7 @@ func ShortcutLine(shortcuts []FZFShortcut) string {
 
 func FZFPreviewCommandDeck(shortcuts []FZFShortcut) string {
 	var builder strings.Builder
+	builder.WriteString(FZFPreviewShellPrefix())
 	for _, shortcut := range shortcuts {
 		label := strings.TrimSpace(shortcut.Label)
 		if label == "" {
@@ -141,12 +142,25 @@ func FZFPreviewCommandDeck(shortcuts []FZFShortcut) string {
 			continue
 		}
 		fmt.Fprintf(&builder,
-			"  printf \"  \\033[38;2;212;175;55m[%%-7s]\\033[0m \\033[38;2;139;126;163m%%s\\033[0m\\n\" %s %s\n",
+			"  printf \"  %%s[%%-7s]%%s %%s%%s%%s\\n\" \"$dvv_status\" %s \"$dvv_reset\" \"$dvv_muted\" %s \"$dvv_reset\"\n",
 			shellDoubleQuote(label),
 			shellDoubleQuote(description),
 		)
 	}
 	return builder.String()
+}
+
+func FZFPreviewShellPrefix() string {
+	colors := themeColors()
+	return strings.Join([]string{
+		`dvv_heading="` + bold + ansiHex(colors.Status) + `"`,
+		`dvv_status="` + ansiHex(colors.Status) + `"`,
+		`dvv_label="` + ansiHex(colors.AccentSoft) + `"`,
+		`dvv_muted="` + ansiHex(colors.Muted) + `"`,
+		`dvv_danger="` + bold + ansiHex(colors.Danger) + `"`,
+		`dvv_reset="` + reset + `"`,
+		"",
+	}, "\n")
 }
 
 func FZFHiddenRow(raw string, display string) string {

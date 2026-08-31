@@ -809,57 +809,57 @@ func workspaceHubHeaderLines(message string) []string {
 
 func workspacePreviewCommand(shortcuts []ui.FZFShortcut) string {
 	commandDeck := ui.FZFPreviewCommandDeck(shortcuts)
-	return `sh -c 'line=$1
+	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
 display=$(printf "%s" "$line" | cut -f2-)
 print_commands() {
 ` + commandDeck + `
 }
 if [ "$raw" = "__dvv_empty__" ]; then
-  printf "\033[1;38;2;212;175;55mHub commands\033[0m\n"
+  printf "%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
   print_commands
-  printf "\n\033[38;2;139;126;163m--------------------------------\033[0m\n"
-  printf "\033[1;38;2;212;175;55mWorkspace hub\033[0m\n"
-  printf "  \033[38;2;196;181;253mNo workspaces yet\033[0m\n"
-  printf "  \033[38;2;139;126;163mUse the create shortcut to start one.\033[0m\n"
+  printf "\n%s--------------------------------%s\n" "$dvv_muted" "$dvv_reset"
+  printf "%sWorkspace hub%s\n" "$dvv_heading" "$dvv_reset"
+  printf "  %sNo workspaces yet%s\n" "$dvv_label" "$dvv_reset"
+  printf "  %sUse the create shortcut to start one.%s\n" "$dvv_muted" "$dvv_reset"
   exit 0
 fi
 workspace_name=$(basename "$raw")
 project_count=$(printf "%s" "$display" | awk "{print \$3}")
 status=$(printf "%s" "$display" | awk "{print \$4}")
-printf "\033[1;38;2;212;175;55mHub commands\033[0m\n"
+printf "%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
 print_commands
-printf "\n\033[38;2;139;126;163m--------------------------------\033[0m\n"
-printf "\033[1;38;2;212;175;55mWorkspace profile\033[0m\n"
-printf "  \033[38;2;196;181;253m%-9s\033[0m %s\n" "Name" "$workspace_name"
-printf "  \033[38;2;196;181;253m%-9s\033[0m %s\n" "Projects" "$project_count"
-printf "  \033[38;2;196;181;253m%-9s\033[0m %s\n" "Status" "$status"
-printf "  \033[38;2;196;181;253m%-9s\033[0m %s\n" "Path" "$raw"
+printf "\n%s--------------------------------%s\n" "$dvv_muted" "$dvv_reset"
+printf "%sWorkspace profile%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%-9s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$workspace_name"
+printf "  %s%-9s%s %s\n" "$dvv_label" "Projects" "$dvv_reset" "$project_count"
+printf "  %s%-9s%s %s\n" "$dvv_label" "Status" "$dvv_reset" "$status"
+printf "  %s%-9s%s %s\n" "$dvv_label" "Path" "$dvv_reset" "$raw"
 ' sh {}`
 }
 
 func projectPreviewCommand() string {
-	return `sh -c 'line=$1
+	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
 display=$(printf "%s" "$line" | cut -f2-)
 set -- $display
-printf "\033[1;38;2;212;175;55mProject\033[0m\n"
-printf "  \033[38;2;196;181;253m%-7s\033[0m %s\n" "Name" "$2"
-printf "  \033[38;2;196;181;253m%-7s\033[0m %s\n" "Path" "$raw"
+printf "%sProject%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%-7s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$2"
+printf "  %s%-7s%s %s\n" "$dvv_label" "Path" "$dvv_reset" "$raw"
 ' sh {}`
 }
 
 func manageProjectPreviewCommand(ws Workspace) string {
-	return `sh -c 'line=$1
+	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 workspace=$2
 raw=$(printf "%s" "$line" | cut -f1)
 display=$(printf "%s" "$line" | cut -f2-)
 set -- $display
-printf "\033[1;38;2;212;175;55mProject change\033[0m\n"
-printf "  \033[38;2;196;181;253m%-9s\033[0m %s\n" "Workspace" "$workspace"
-printf "  \033[38;2;196;181;253m%-9s\033[0m %s\n" "State" "$2"
-printf "  \033[38;2;196;181;253m%-9s\033[0m %s\n" "Project" "$3"
-printf "  \033[38;2;196;181;253m%-9s\033[0m %s\n" "Source" "$raw"
+printf "%sProject change%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%-9s%s %s\n" "$dvv_label" "Workspace" "$dvv_reset" "$workspace"
+printf "  %s%-9s%s %s\n" "$dvv_label" "State" "$dvv_reset" "$2"
+printf "  %s%-9s%s %s\n" "$dvv_label" "Project" "$dvv_reset" "$3"
+printf "  %s%-9s%s %s\n" "$dvv_label" "Source" "$dvv_reset" "$raw"
 ' sh {} ` + shellQuote(ws.DirName)
 }
 
@@ -1056,16 +1056,22 @@ func fixedWidthParts(value string, width int) (string, string) {
 }
 
 func stripANSI(value string) string {
-	replacer := strings.NewReplacer(
-		"\033[0m", "",
-		"\033[1m", "",
-		"\033[2m", "",
-		"\033[38;2;124;58;237m", "",
-		"\033[38;2;196;181;253m", "",
-		"\033[38;2;212;175;55m", "",
-		"\033[38;2;139;126;163m", "",
-	)
-	return replacer.Replace(value)
+	var builder strings.Builder
+	inEscape := false
+	for _, r := range value {
+		if inEscape {
+			if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') {
+				inEscape = false
+			}
+			continue
+		}
+		if r == '\033' {
+			inEscape = true
+			continue
+		}
+		builder.WriteRune(r)
+	}
+	return builder.String()
 }
 
 func messageFromError(err error, fallback string) string {

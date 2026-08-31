@@ -7,6 +7,7 @@ import (
 )
 
 func TestFZFThemeArgsUseRoyalNoirPalette(t *testing.T) {
+	SetTheme("royal-noir")
 	args := strings.Join(FZFThemeArgs("ssh> "), "\n")
 
 	expected := []string{
@@ -18,6 +19,50 @@ func TestFZFThemeArgsUseRoyalNoirPalette(t *testing.T) {
 		"border:#3b235c",
 	}
 
+	for _, value := range expected {
+		if !strings.Contains(args, value) {
+			t.Fatalf("FZFThemeArgs missing %q in %s", value, args)
+		}
+	}
+}
+
+func TestThemeRegistryNormalizesNames(t *testing.T) {
+	theme, ok := ThemeByName("Tokyo Night")
+	if !ok {
+		t.Fatal("ThemeByName should find Tokyo Night")
+	}
+	if theme.Name != "tokyo-night" {
+		t.Fatalf("theme name = %q, want tokyo-night", theme.Name)
+	}
+	if NormalizeThemeName("Catppuccin_Mocha") != "catppuccin-mocha" {
+		t.Fatalf("NormalizeThemeName should replace underscores and spaces")
+	}
+}
+
+func TestThemeNamesIncludeBuiltins(t *testing.T) {
+	names := strings.Join(ThemeNames(), ",")
+	for _, name := range []string{"royal-noir", "darcula", "tokyo-night", "dracula", "catppuccin-mocha", "nord", "gruvbox-dark", "everforest-dark", "solarized-dark", "one-dark"} {
+		if !strings.Contains(names, name) {
+			t.Fatalf("ThemeNames missing %q in %s", name, names)
+		}
+	}
+}
+
+func TestSetThemeChangesFZFPalette(t *testing.T) {
+	defer SetTheme("royal-noir")
+
+	if !SetTheme("tokyo-night") {
+		t.Fatal("SetTheme should accept tokyo-night")
+	}
+	args := strings.Join(FZFThemeArgs("theme> "), "\n")
+
+	expected := []string{
+		"--prompt=theme> ",
+		"bg:#1a1b26",
+		"hl:#e0af68",
+		"marker:#bb9af7",
+		"border:#414868",
+	}
 	for _, value := range expected {
 		if !strings.Contains(args, value) {
 			t.Fatalf("FZFThemeArgs missing %q in %s", value, args)

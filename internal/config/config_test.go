@@ -93,6 +93,35 @@ func TestLoadProjectConfigMergesResourcesDefaults(t *testing.T) {
 	}
 }
 
+func TestResolveThemeConfigUsesEnvOverride(t *testing.T) {
+	t.Setenv("DVV_THEME", "Tokyo Night")
+
+	cfg := resolveThemeConfig(DefaultProjectConfig().Theme)
+
+	if cfg.Name != "tokyo-night" {
+		t.Fatalf("theme = %q, want tokyo-night", cfg.Name)
+	}
+}
+
+func TestResolveShortcutConfigsUseEnvOverrides(t *testing.T) {
+	t.Setenv("DVV_SSH_ADD_SHORTCUT", "alt-a")
+	t.Setenv("DVV_SSH_REMOVE_SHORTCUT", "alt-r")
+	t.Setenv("DVV_SSH_NEW_TERMINAL_SHORTCUT", "alt-t")
+	t.Setenv("DVV_RESOURCES_START_SHORTCUT", "shift+s")
+	t.Setenv("DVV_RESOURCES_RESTART_SHORTCUT", "shift+r")
+	t.Setenv("DVV_RESOURCES_STOP_SHORTCUT", "shift+x")
+
+	ssh := resolveSSHConfig(DefaultProjectConfig().SSH)
+	resources := resolveResourcesConfig(DefaultProjectConfig().Resources)
+
+	if ssh.Hub.Shortcuts.Add != "alt-a" || ssh.Hub.Shortcuts.Remove != "alt-r" || ssh.Hub.Shortcuts.NewTerminal != "alt-t" {
+		t.Fatalf("ssh shortcuts = %#v", ssh.Hub.Shortcuts)
+	}
+	if resources.Hub.Shortcuts.Start != "shift+s" || resources.Hub.Shortcuts.Restart != "shift+r" || resources.Hub.Shortcuts.Stop != "shift+x" {
+		t.Fatalf("resource shortcuts = %#v", resources.Hub.Shortcuts)
+	}
+}
+
 func TestRuntimeSecretPathPrefersLegacySecretsDirWhenPresent(t *testing.T) {
 	root := t.TempDir()
 	configDir := filepath.Join(root, "config")
@@ -179,6 +208,14 @@ func TestResolveWorkspaceConfigUsesEnvOverrides(t *testing.T) {
 	t.Setenv("DVV_WORKSPACE_PROJECT_ROOTS", "~/a:/opt/projects")
 	t.Setenv("DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "7")
 	t.Setenv("DVV_WORKSPACE_OPENER", "cursor")
+	t.Setenv("DVV_WORKSPACE_CREATE_SHORTCUT", "alt-c")
+	t.Setenv("DVV_WORKSPACE_MANAGE_SHORTCUT", "alt-m")
+	t.Setenv("DVV_WORKSPACE_DELETE_SHORTCUT", "alt-d")
+	t.Setenv("DVV_WORKSPACE_REQUIRE_CONFIRMATION", "0")
+	t.Setenv("DVV_WORKSPACE_BLOCK_DIRTY_PROJECTS", "false")
+	t.Setenv("DVV_WORKSPACE_ALLOW_FORCE_REMOVE", "true")
+	t.Setenv("DVV_WORKSPACE_ONLY_DIRECT_CHILDREN", "no")
+	t.Setenv("DVV_WORKSPACE_CONFIRM_LEFTOVER_DELETION", "off")
 
 	cfg := resolveWorkspaceConfig(defaultWorkspaceConfig())
 
@@ -193,6 +230,12 @@ func TestResolveWorkspaceConfigUsesEnvOverrides(t *testing.T) {
 	}
 	if cfg.Interactive.Opener != "cursor" {
 		t.Fatalf("opener = %q", cfg.Interactive.Opener)
+	}
+	if cfg.Interactive.Shortcuts.Create != "alt-c" || cfg.Interactive.Shortcuts.Manage != "alt-m" || cfg.Interactive.Shortcuts.Delete != "alt-d" {
+		t.Fatalf("workspace shortcuts = %#v", cfg.Interactive.Shortcuts)
+	}
+	if cfg.Safety.RequireConfirmation || cfg.Safety.BlockRemoveWithDirtyProjects || !cfg.Safety.AllowForceRemove || cfg.Safety.OnlyRemoveDirectChildren || cfg.Safety.ConfirmLeftoverDeletion {
+		t.Fatalf("workspace safety overrides were not applied: %#v", cfg.Safety)
 	}
 }
 
@@ -280,6 +323,7 @@ func TestResolveDBConfigUsesEnvOverrides(t *testing.T) {
 	t.Setenv("DVV_DB_USER", "wslroot")
 	t.Setenv("DVV_DUMPS_DIR", "~/dumps")
 	t.Setenv("DVV_RCLONE_REMOTE", "drive")
+	t.Setenv("DVV_DB_SAFETY_CONFIRM", "false")
 
 	cfg := resolveDBConfig(defaultDBConfigForTest(), "/repo")
 
@@ -297,6 +341,9 @@ func TestResolveDBConfigUsesEnvOverrides(t *testing.T) {
 	}
 	if cfg.RcloneRemote != "drive" {
 		t.Fatalf("rclone remote = %q", cfg.RcloneRemote)
+	}
+	if cfg.SafetyConfirm {
+		t.Fatalf("db safety confirm = true, want false")
 	}
 }
 

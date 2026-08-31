@@ -58,7 +58,6 @@ func TestConfigCategoriesUseExpectedOrder(t *testing.T) {
 		"resources",
 		"integrations",
 		"safety",
-		"profiles",
 	}
 	if len(categories) != len(want) {
 		t.Fatalf("len(configCategories()) = %d, want %d", len(categories), len(want))
@@ -105,7 +104,7 @@ func TestCategoryRowsKeepRawIDHidden(t *testing.T) {
 	if raw != "theme" {
 		t.Fatalf("first category raw id = %q, want theme", raw)
 	}
-	if !strings.Contains(rows[2], "Keys") || !strings.Contains(rows[2], "5 key(s)") {
+	if !strings.Contains(rows[2], "Keys") || !strings.Contains(rows[2], "8 key(s)") {
 		t.Fatalf("Keys row should include label and count: %q", rows[2])
 	}
 }
@@ -117,13 +116,15 @@ func TestEntriesForCategoryFiltersExpectedGroups(t *testing.T) {
 		category string
 		keys     []string
 	}{
-		{category: "keys", keys: []string{"API_DIR", "DVV_DB_HOST", "DVV_TMUX_SESSION_SHORTCUT", "DVV_WORKSPACES_DIR", "DVV_RCLONE_REMOTE"}},
+		{category: "keys", keys: []string{"DVV_THEME", "API_DIR", "DVV_DB_HOST", "DVV_TMUX_SESSION_SHORTCUT", "DVV_WORKSPACES_DIR", "DVV_RCLONE_REMOTE", "DVV_RESOURCES_START_SHORTCUT", "DVV_DB_SAFETY_CONFIRM"}},
 		{category: "paths", keys: []string{"API_DIR", "DVV_WORKSPACES_DIR"}},
-		{category: "shortcuts", keys: []string{"DVV_TMUX_SESSION_SHORTCUT"}},
+		{category: "shortcuts", keys: []string{"DVV_TMUX_SESSION_SHORTCUT", "DVV_RESOURCES_START_SHORTCUT"}},
 		{category: "database", keys: []string{"DVV_DB_HOST", "DVV_RCLONE_REMOTE"}},
 		{category: "workspace", keys: []string{"DVV_WORKSPACES_DIR"}},
 		{category: "integrations", keys: []string{"DVV_DB_HOST", "DVV_RCLONE_REMOTE"}},
-		{category: "theme", keys: nil},
+		{category: "theme", keys: []string{"DVV_THEME"}},
+		{category: "resources", keys: []string{"DVV_RESOURCES_START_SHORTCUT"}},
+		{category: "safety", keys: []string{"DVV_DB_SAFETY_CONFIRM"}},
 	}
 
 	for _, test := range tests {
@@ -142,15 +143,108 @@ func TestKnownEntriesIncludesRuntimeShortcutKey(t *testing.T) {
 	if _, ok := findEntry(entries, "DVV_TMUX_SESSION_SHORTCUT"); !ok {
 		t.Fatalf("knownEntries should include DVV_TMUX_SESSION_SHORTCUT")
 	}
+	if _, ok := findEntry(entries, "DVV_THEME"); !ok {
+		t.Fatalf("knownEntries should include DVV_THEME")
+	}
+	if _, ok := findEntry(entries, "DVV_RESOURCES_START_SHORTCUT"); !ok {
+		t.Fatalf("knownEntries should include DVV_RESOURCES_START_SHORTCUT")
+	}
+	if _, ok := findEntry(entries, "DVV_WORKSPACE_REQUIRE_CONFIRMATION"); !ok {
+		t.Fatalf("knownEntries should include DVV_WORKSPACE_REQUIRE_CONFIRMATION")
+	}
+}
+
+func TestThemeRowsKeepRawIDHiddenAndActiveStatus(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	rows := strings.Split(strings.TrimSpace(themeRows(ui.Themes(), "tokyo-night")), "\n")
+	if len(rows) < 3 {
+		t.Fatalf("themeRows returned too few rows: %#v", rows)
+	}
+	if raw := ui.FZFSelectedRaw(rows[3]); raw != "tokyo-night" {
+		t.Fatalf("tokyo-night raw id = %q, want tokyo-night", raw)
+	}
+	if !strings.Contains(rows[3], "active") {
+		t.Fatalf("active theme row should include active status: %q", rows[3])
+	}
+}
+
+func TestSetThemePersistsAndAppliesRuntimeTheme(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	defer ui.SetTheme("royal-noir")
+
+	cfg := &config.Config{
+		ConfigFile: filepath.Join(t.TempDir(), "config.env"),
+		Project:    config.DefaultProjectConfig(),
+	}
+	manager := Manager{Config: cfg}
+
+	if err := manager.setTheme("tokyo night"); err != nil {
+		t.Fatalf("setTheme returned error: %v", err)
+	}
+
+	values, err := readConfigFile(cfg.ConfigFile)
+	if err != nil {
+		t.Fatalf("readConfigFile returned error: %v", err)
+	}
+	if values["DVV_THEME"] != "tokyo-night" {
+		t.Fatalf("persisted theme = %q, want tokyo-night", values["DVV_THEME"])
+	}
+	if cfg.Project.Theme.Name != "tokyo-night" {
+		t.Fatalf("runtime config theme = %q, want tokyo-night", cfg.Project.Theme.Name)
+	}
+	if ui.ActiveTheme().Name != "tokyo-night" {
+		t.Fatalf("active UI theme = %q, want tokyo-night", ui.ActiveTheme().Name)
+	}
+}
+
+func TestWriteValueAppliesRuntimeConfig(t *testing.T) {
+	t.Setenv("HOME", "/home/tester")
+	cfg := &config.Config{
+		RootDir:    "/repo",
+		ConfigFile: filepath.Join(t.TempDir(), "config.env"),
+		Project:    config.DefaultProjectConfig(),
+	}
+	manager := Manager{Config: cfg}
+
+	if err := manager.writeValue("DVV_RESOURCES_START_SHORTCUT", "shift+s"); err != nil {
+		t.Fatalf("writeValue resources shortcut returned error: %v", err)
+	}
+	if cfg.Project.Resources.Hub.Shortcuts.Start != "shift+s" {
+		t.Fatalf("resources start shortcut = %q", cfg.Project.Resources.Hub.Shortcuts.Start)
+	}
+
+	if err := manager.writeValue("DVV_WORKSPACE_PROJECT_ROOTS", "~/one:/opt/two"); err != nil {
+		t.Fatalf("writeValue project roots returned error: %v", err)
+	}
+	if got := cfg.Project.Workspace.ProjectSearchRoots; len(got) != 2 || got[0] != "/home/tester/one" || got[1] != "/opt/two" {
+		t.Fatalf("workspace project roots = %#v", got)
+	}
+
+	if err := manager.writeValue("DVV_DUMPS_DIR", "dumps-local"); err != nil {
+		t.Fatalf("writeValue dumps dir returned error: %v", err)
+	}
+	if cfg.Project.DB.DumpsDir != "/repo/dumps-local" {
+		t.Fatalf("dumps dir = %q", cfg.Project.DB.DumpsDir)
+	}
+
+	if err := manager.writeValue("DVV_WORKSPACE_REQUIRE_CONFIRMATION", "0"); err != nil {
+		t.Fatalf("writeValue safety returned error: %v", err)
+	}
+	if cfg.Project.Workspace.Safety.RequireConfirmation {
+		t.Fatalf("workspace require confirmation = true, want false")
+	}
 }
 
 func testEntries() []Entry {
 	return []Entry{
+		{Category: "Theme", Key: "DVV_THEME", Kind: "theme"},
 		{Category: "Project", Key: "API_DIR", Kind: "path"},
 		{Category: "Database", Key: "DVV_DB_HOST", Kind: "text"},
 		{Category: "Shortcuts", Key: "DVV_TMUX_SESSION_SHORTCUT", Kind: "shortcut"},
 		{Category: "Workspace", Key: "DVV_WORKSPACES_DIR", Kind: "path"},
 		{Category: "Database", Key: "DVV_RCLONE_REMOTE", Kind: "text"},
+		{Category: "Resources", Key: "DVV_RESOURCES_START_SHORTCUT", Kind: "shortcut"},
+		{Category: "Safety", Key: "DVV_DB_SAFETY_CONFIRM", Kind: "bool"},
 	}
 }
 

@@ -31,6 +31,7 @@ func Run(args []string) int {
 		ui.Error("%v", err)
 		return 1
 	}
+	ui.SetTheme(cfg.Project.Theme.Name)
 
 	runner := run.ExecRunner{}
 	if len(args) == 0 || isHelpArg(args[0]) {

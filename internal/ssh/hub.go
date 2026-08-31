@@ -383,7 +383,7 @@ func sshPreviewCommand(shortcuts []ui.FZFShortcut) string {
 		shortcutArgs = append(shortcutArgs, shellQuote(label), shellQuote(description))
 	}
 
-	return `sh -c 'line=$1
+	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 shift
 raw=$(printf "%s" "$line" | cut -f1)
 name=${raw%% *}
@@ -394,17 +394,17 @@ if [ "$user" = "$target" ]; then
   user="-"
   host="$target"
 fi
-printf "\033[1;38;2;212;175;55mTarget profile\033[0m\n"
-printf "  \033[38;2;196;181;253m%-7s\033[0m %s\n" "Name" "$name"
-printf "  \033[38;2;196;181;253m%-7s\033[0m %s\n" "User" "$user"
-printf "  \033[38;2;196;181;253m%-7s\033[0m %s\n" "Host" "$host"
-printf "  \033[38;2;196;181;253m%-7s\033[0m %s\n" "Target" "$target"
-printf "\n\033[38;2;139;126;163m--------------------------------\033[0m\n"
-printf "\033[1;38;2;212;175;55mHub commands\033[0m\n"
+printf "%sTarget profile%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%-7s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$name"
+printf "  %s%-7s%s %s\n" "$dvv_label" "User" "$dvv_reset" "$user"
+printf "  %s%-7s%s %s\n" "$dvv_label" "Host" "$dvv_reset" "$host"
+printf "  %s%-7s%s %s\n" "$dvv_label" "Target" "$dvv_reset" "$target"
+printf "\n%s--------------------------------%s\n" "$dvv_muted" "$dvv_reset"
+printf "%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
 while [ "$#" -gt 1 ]; do
-  printf "  \033[38;2;212;175;55m[%-7s]\033[0m \033[38;2;139;126;163m%s\033[0m\n" "$1" "$2"
+  printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "$1" "$dvv_reset" "$dvv_muted" "$2" "$dvv_reset"
   shift 2
 done
-printf "\n\033[38;2;139;126;163mConfigured in dvv.config.json.\033[0m\n"
+printf "\n%sConfigured in dvv.config.json.%s\n" "$dvv_muted" "$dvv_reset"
 ' sh {} ` + strings.Join(shortcutArgs, " ")
 }

@@ -11,15 +11,9 @@ import (
 const (
 	RoyalLoaderWidth = 18
 
-	reset      = "\033[0m"
-	bold       = "\033[1m"
-	dim        = "\033[2m"
-	purple     = "\033[38;2;124;58;237m"
-	purpleSoft = "\033[38;2;196;181;253m"
-	gold       = "\033[38;2;212;175;55m"
-	success    = "\033[38;2;34;197;94m"
-	muted      = "\033[38;2;139;126;163m"
-	danger     = "\033[38;2;248;113;113m"
+	reset = "\033[0m"
+	bold  = "\033[1m"
+	dim   = "\033[2m"
 )
 
 func useColor() bool {
@@ -41,71 +35,72 @@ func Bold(text string) string {
 }
 
 func Dim(text string) string {
-	return color(dim+muted, text)
+	return color(dim+ansiHex(themeColors().Muted), text)
 }
 
 func Muted(text string) string {
-	return color(muted, text)
+	return color(ansiHex(themeColors().Muted), text)
 }
 
 func Purple(text string) string {
-	return color(purple, text)
+	return color(ansiHex(themeColors().Accent), text)
 }
 
 func Accent(text string) string {
-	return color(bold+purpleSoft, text)
+	return color(bold+ansiHex(themeColors().AccentSoft), text)
 }
 
 func Cyan(text string) string {
-	return color(purpleSoft, text)
+	return color(ansiHex(themeColors().AccentSoft), text)
 }
 
 func Gold(text string) string {
-	return color(gold, text)
+	return color(ansiHex(themeColors().Status), text)
 }
 
 func Success(text string) string {
-	return color(bold+success, text)
+	return color(bold+ansiHex(themeColors().Success), text)
 }
 
 func Danger(text string) string {
-	return color(bold+danger, text)
+	return color(bold+ansiHex(themeColors().Danger), text)
 }
 
 func Crown(text string) string {
-	return color(bold+gold, text)
+	return color(bold+ansiHex(themeColors().Status), text)
 }
 
 func Badge(text string) string {
-	return color(muted, "[") + color(bold+gold, text) + color(muted, "]")
+	colors := themeColors()
+	return color(ansiHex(colors.Muted), "[") + color(bold+ansiHex(colors.Status), text) + color(ansiHex(colors.Muted), "]")
 }
 
 func Title(text string) {
 	fmt.Printf("\n%s %s\n%s\n\n",
-		color(bold+gold, "dvv"),
-		color(bold+purpleSoft, text),
-		color(muted, strings.Repeat("-", 48)),
+		Crown("dvv"),
+		Accent(text),
+		Muted(strings.Repeat("-", 48)),
 	)
 }
 
 func Info(format string, args ...any) {
-	fmt.Printf("%s %s %s\n", color(bold+gold, "dvv"), color(purple, "::"), fmt.Sprintf(format, args...))
+	fmt.Printf("%s %s %s\n", Crown("dvv"), Purple("::"), fmt.Sprintf(format, args...))
 }
 
 func OK(format string, args ...any) {
-	fmt.Printf("%s %s %s\n", color(bold+gold, "dvv"), color(gold, "ok"), fmt.Sprintf(format, args...))
+	fmt.Printf("%s %s %s\n", Crown("dvv"), Gold("ok"), fmt.Sprintf(format, args...))
 }
 
 func Warn(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, "%s %s %s\n", color(bold+gold, "dvv"), color(gold, "!"), fmt.Sprintf(format, args...))
+	fmt.Fprintf(os.Stderr, "%s %s %s\n", Crown("dvv"), Gold("!"), fmt.Sprintf(format, args...))
 }
 
 func Error(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, "%s %s %s\n", color(bold+gold, "dvv"), color(danger, "x"), fmt.Sprintf(format, args...))
+	fmt.Fprintf(os.Stderr, "%s %s %s\n", Crown("dvv"), Danger("x"), fmt.Sprintf(format, args...))
 }
 
 func Prompt(label string) (string, error) {
-	fmt.Printf("%s %s %s: ", color(bold+gold, "dvv"), color(purple, "?"), label)
+	fmt.Printf("%s %s %s: ", Crown("dvv"), Purple("?"), label)
 	reader := bufio.NewReader(os.Stdin)
 	value, err := reader.ReadString('\n')
 	if err != nil && len(value) == 0 {
@@ -317,7 +312,7 @@ func FZFThemeArgs(prompt ...string) []string {
 		"--prompt=" + value,
 		"--pointer=>>",
 		"--marker=+",
-		"--color=fg:#f8f5ff,bg:#05020a,hl:#d4af37,fg+:#ffffff,bg+:#170f24,hl+:#e6c76a,pointer:#d4af37,marker:#7c3aed,prompt:#c4b5fd,spinner:#d4af37,header:#c4b5fd,border:#3b235c",
+		"--color=" + fzfColorSpec(themeColors()),
 	}
 }
 

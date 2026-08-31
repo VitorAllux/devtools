@@ -257,7 +257,7 @@ The configuration hub edits persisted runtime values in:
 ~/.config/devv/config.env
 ```
 
-`dvv config` opens a category hub first. Use `Keys` for raw key editing, or choose a focused area such as `Paths`, `Shortcuts`, `Workspace`, `Database`, `Tmux`, or `Integrations`.
+`dvv config` opens a category hub first. Use `Theme` to switch the CLI theme, `Keys` for raw key editing, or choose a focused area such as `Paths`, `Shortcuts`, `Workspace`, `Database`, `Tmux`, `Resources`, `Integrations`, or `Safety`.
 
 Shortcuts:
 
@@ -306,6 +306,12 @@ DVV_WORKSPACE_PROJECT_SEARCH_DEPTH=4
 DVV_WORKSPACE_OPENER=cursor
 ```
 
+Theme:
+
+```bash
+DVV_THEME=royal-noir
+```
+
 Tmux directory picker:
 
 ```bash
@@ -337,7 +343,7 @@ DVV_BW_AGE_KEY_ITEM=<bitwarden-item-name-or-id>
 | Deletion safety | Dirty worktrees and leftover content require explicit confirmation. |
 | Secrets | `dvv bootstrap` restores AGE/Bitwarden-backed SSH data without committing private files. |
 | Long operations | Confirmed actions use Royal Noir loaders; imports use a percentage bar that fills to `completed`. |
-| Colors/loaders | Theme is Royal Noir. Set `NO_COLOR=1` or `DVV_NO_LOADER=1` to disable color/loader behavior. |
+| Colors/loaders | Default theme is Royal Noir. Use `dvv config` -> `Theme` or `DVV_THEME` to switch themes. Set `NO_COLOR=1` or `DVV_NO_LOADER=1` to disable color/loader behavior. |
 
 More detail lives in [docs/go-version/operational-map.md](docs/go-version/operational-map.md).
 
@@ -347,7 +353,7 @@ More detail lives in [docs/go-version/operational-map.md](docs/go-version/operat
 | --- | --- |
 | [Architecture](docs/go-version/architecture.md) | Package layout, command routing, and implementation boundaries. |
 | [Configuration](docs/go-version/configuration.md) | Project config, runtime config, environment overrides, hooks, and bootstrap rules. |
-| [Theme](docs/go-version/theme.md) | Royal Noir colors, fzf hub conventions, loaders, and CLI presentation rules. |
+| [Themes](docs/go-version/theme.md) | Built-in themes, fzf hub conventions, loaders, and CLI presentation rules. |
 | [Operational map](docs/go-version/operational-map.md) | Practical edge cases, local paths, install behavior, and troubleshooting details. |
 | [Migration roadmap](docs/go-version/migration-roadmap.md) | Porting status and remaining migration work. |
 

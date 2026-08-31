@@ -93,7 +93,7 @@ See `dvv.config.json` for the full default file, including bootstrap rules, work
 
 ## Config Hub UX
 
-`dvv config` opens a first-level category hub instead of opening directly on every raw key. Categories backed by current runtime keys route to filtered key hubs. Categories that are designed but not implemented yet show a planned-state message and return to the category hub.
+`dvv config` opens a first-level category hub instead of opening directly on every raw key. Every visible category is backed by runtime settings or a real selector. Future categories should stay out of the first-level hub until their backend exists.
 
 First-level categories:
 
@@ -103,17 +103,16 @@ First-level categories:
 | `Keys` | Edit raw runtime config keys and advanced values. |
 | `Paths` | Manage workspace, dumps, SSH, AGE, and config paths. |
 | `Shortcuts` | Manage shell shortcuts and hub action keys. |
-| `Workspace` | Manage workspace behavior, branch rules, bootstrap, hooks, and harness settings. |
-| `Database` | Manage MySQL and dump import defaults. |
-| `Tmux` | Manage tmux session picker settings. |
-| `Resources` | Manage local resources hub settings. |
-| `Integrations` | Inspect and configure editors, terminal launcher, Bitwarden, rclone, Docker, and MySQL. |
-| `Safety` | Manage destructive-action confirmation rules. |
-| `Profiles` | Future machine-specific config profiles. |
+| `Workspace` | Manage workspace root, project discovery, opener, and action keys. |
+| `Database` | Manage MySQL, dump directory, rclone, and database safety defaults. |
+| `Tmux` | Manage directory picker search and shortcut settings. |
+| `Resources` | Manage resource hub action shortcuts. |
+| `Integrations` | Configure rclone, Bitwarden, and local tool defaults. |
+| `Safety` | Manage database and workspace confirmation rules. |
 
 The `Keys` category keeps the current raw key editing flow available for advanced usage and script compatibility. The main config UX prefers categorized selectors so common settings are easier to find.
 
-Planned built-in themes:
+Built-in themes:
 
 | Theme | Notes |
 | --- | --- |
@@ -128,7 +127,9 @@ Planned built-in themes:
 | `solarized-dark` | Classic low-contrast terminal palette. |
 | `one-dark` | Atom-style dark palette with balanced accent colors. |
 
-Theme selection should update shared UI helpers, `fzf` colors, loader colors, prompts, status labels, and previews from one theme registry.
+Theme selection persists `DVV_THEME` in `~/.config/devv/config.env` and updates shared UI helpers, `fzf` colors, loader colors, prompts, status labels, and config previews from one theme registry.
+
+Profiles are intentionally not visible yet. Machine-specific profiles such as `personal`, `work`, `wsl`, and `ci` need a separate merge strategy before they become an editable config category.
 
 ## DB Config
 

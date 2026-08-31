@@ -431,7 +431,7 @@ func tmuxHubHeaderLines(message string) []string {
 
 func tmuxPreviewCommand(shortcuts []ui.FZFShortcut) string {
 	commandDeck := ui.FZFPreviewCommandDeck(shortcuts)
-	return `sh -c 'line=$1
+	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
 display=$(printf "%s" "$line" | cut -f2-)
 print_commands() {
@@ -439,12 +439,12 @@ print_commands() {
 }
 target_name=$(printf "%s" "$display" | awk "{print \$2}")
 target_status=$(printf "%s" "$display" | awk "{print \$3}")
-printf "\033[1;38;2;212;175;55mTmux target\033[0m\n"
-printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Name" "$target_name"
-printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Status" "$target_status"
-printf "  \033[38;2;196;181;253m%-8s\033[0m %s\n" "Session" "$raw"
-printf "\n\033[38;2;139;126;163m--------------------------------\033[0m\n"
-printf "\033[1;38;2;212;175;55mCommands\033[0m\n"
+printf "%sTmux target%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$target_name"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Status" "$dvv_reset" "$target_status"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Session" "$dvv_reset" "$raw"
+printf "\n%s--------------------------------%s\n" "$dvv_muted" "$dvv_reset"
+printf "%sCommands%s\n" "$dvv_heading" "$dvv_reset"
 print_commands
 ' sh {}`
 }
