@@ -58,11 +58,11 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 
 ## Loader Coverage
 
-Use `internal/ui.RunWithRoyalLoader` for actions that can leave the terminal visually idle after confirmation. Keep prompts, listings, and script-friendly output clean.
+Use `internal/ui.RunWithRoyalLoader` for actions that can leave the terminal visually idle after confirmation and do not expose measurable progress. Use `internal/ui.NewRoyalProgressLoader` when the operation has a known total and can report bytes, items, or steps.
 
 Commands executed under a loader should capture routine stdout/stderr with `internal/run.Quiet` unless the command is intentionally interactive. This keeps tool output from being printed on the same terminal line as the animated loader.
 
-Final loader labels should be action-specific, such as `ready`, `created`, `deleted`, `imported`, or `restarted`. Avoid generic labels when the next step starts another loader.
+Final indeterminate loader labels should be action-specific, such as `ready`, `created`, `deleted`, or `restarted`. Progress loaders fill to `100%` and use `completed` by default. Avoid a final loader line when the next step immediately starts another visible loader.
 
 | Area | Loader points |
 | --- | --- |

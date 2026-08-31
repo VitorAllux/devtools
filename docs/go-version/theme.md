@@ -27,8 +27,9 @@ Danger              #f87171
 - Success uses `dvv ok`.
 - Warnings use `dvv !`.
 - Errors use `dvv x`.
-- Loaders use the shared short bar loader from `internal/ui.RunWithRoyalLoader`.
-- Confirmed long-running actions may keep a final full bar with an action-specific green status such as `ready`, `created`, or `imported`; failures use `failed` in red.
+- Loaders use the shared Royal Noir loader APIs from `internal/ui`.
+- Indeterminate operations use `RunWithRoyalLoader`: the bar moves while the process runs and may finish with action-specific statuses such as `ready`, `created`, or `deleted`.
+- Determinate operations use `NewRoyalProgressLoader`: the bar fills from `0%` to `100%` and finishes as `completed` by default; failures use `failed` at the current percentage.
 - Loaders write to stderr so list commands can keep stdout script-friendly.
 - For interactive processes such as SSH, show loaders only before handoff; do not keep loaders running over the interactive session.
 - `NO_COLOR` disables color.

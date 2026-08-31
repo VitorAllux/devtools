@@ -13,7 +13,6 @@ import (
 	"sort"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/VitorAllux/devtools/internal/config"
 	"github.com/VitorAllux/devtools/internal/run"
@@ -501,7 +500,11 @@ func (m *Manager) importDump(ctx context.Context, dump string, dbName string) er
 	if err != nil {
 		return err
 	}
-	progress := newImportProgress(filepath.Base(dump), info.Size())
+	progress := ui.NewRoyalProgressLoader(ui.ProgressOptions{
+		Action:  "importing",
+		Subject: filepath.Base(dump),
+		Total:   info.Size(),
+	})
 	counting := &countingReader{reader: file, onRead: progress.Add}
 	var source io.Reader = counting
 	if compressed {
@@ -650,116 +653,6 @@ func (r *countingReader) Read(p []byte) (int, error) {
 		r.onRead(n)
 	}
 	return n, err
-}
-
-type importProgress struct {
-	subject string
-	total   int64
-	read    atomic.Int64
-	done    chan struct{}
-	stopped chan struct{}
-}
-
-func newImportProgress(subject string, total int64) *importProgress {
-	return &importProgress{
-		subject: subject,
-		total:   total,
-		done:    make(chan struct{}),
-		stopped: make(chan struct{}),
-	}
-}
-
-func (p *importProgress) Add(n int) {
-	p.read.Add(int64(n))
-}
-
-func (p *importProgress) Start() {
-	if !ui.LoaderEnabled() || p.total <= 0 {
-		return
-	}
-	go func() {
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
-		defer close(p.stopped)
-		p.render(false)
-		for {
-			select {
-			case <-ticker.C:
-				p.render(false)
-			case <-p.done:
-				return
-			}
-		}
-	}()
-}
-
-func (p *importProgress) Finish(ok bool) {
-	if !ui.LoaderEnabled() || p.total <= 0 {
-		return
-	}
-	close(p.done)
-	<-p.stopped
-	p.renderFinal(ok)
-	fmt.Fprint(os.Stderr, "\n")
-}
-
-func (p *importProgress) render(done bool) {
-	percent := 0
-	if p.total > 0 {
-		percent = int((p.read.Load() * 100) / p.total)
-	}
-	if done || percent > 100 {
-		percent = 100
-	}
-	fmt.Fprintf(os.Stderr, "\r%s %s %s %s",
-		importProgressBar(percent),
-		ui.Crown("importing"),
-		ui.Accent(p.subject),
-		ui.Muted(fmt.Sprintf("%3d%%", percent)),
-	)
-}
-
-func (p *importProgress) renderFinal(ok bool) {
-	percent := p.percent()
-	if ok {
-		percent = 100
-	}
-	label := ui.Success("imported")
-	if !ok {
-		label = ui.Danger("failed")
-	}
-	fmt.Fprintf(os.Stderr, "\r%s %s %s %s",
-		importProgressBar(percent),
-		label,
-		ui.Accent(p.subject),
-		ui.Muted(fmt.Sprintf("%3d%%", percent)),
-	)
-}
-
-func importProgressBar(percent int) string {
-	filled := (percent * ui.RoyalLoaderWidth) / 100
-	var builder strings.Builder
-	builder.WriteString(ui.Muted("["))
-	for index := 0; index < ui.RoyalLoaderWidth; index++ {
-		if index < filled {
-			builder.WriteString(ui.Crown("█"))
-			continue
-		}
-		builder.WriteString(ui.Purple("░"))
-	}
-	builder.WriteString(ui.Muted("]"))
-	return builder.String()
-}
-
-func (p *importProgress) percent() int {
-	percent := 0
-	if p.total > 0 {
-		percent = int((p.read.Load() * 100) / p.total)
-	}
-	if percent > 100 {
-		return 100
-	}
-	return percent
 }
 
 func sanitizeSQLReader(source io.Reader) (io.Reader, func() int64) {

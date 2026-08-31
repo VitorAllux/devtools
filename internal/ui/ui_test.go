@@ -79,3 +79,64 @@ func TestRenderRoyalLoaderResultUsesCustomSuccessAction(t *testing.T) {
 		t.Fatalf("loader result should use custom action: %q", frame)
 	}
 }
+
+func TestRenderRoyalProgressFrame(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	frame := renderRoyalProgressFrame(ProgressOptions{
+		Action:  "importing",
+		Subject: "adami.sql.gz",
+	}, 50, progressRunning)
+
+	expected := []string{
+		"[█████████░░░░░░░░░]",
+		"importing",
+		"adami.sql.gz",
+		" 50%",
+	}
+	for _, value := range expected {
+		if !strings.Contains(frame, value) {
+			t.Fatalf("progress frame missing %q in %q", value, frame)
+		}
+	}
+}
+
+func TestRenderRoyalProgressFrameCompletes(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	frame := renderRoyalProgressFrame(ProgressOptions{
+		Action:  "importing",
+		Subject: "adami.sql.gz",
+	}, 100, progressSuccess)
+
+	expected := []string{
+		"[██████████████████]",
+		"completed",
+		"adami.sql.gz",
+		"100%",
+	}
+	for _, value := range expected {
+		if !strings.Contains(frame, value) {
+			t.Fatalf("completed progress frame missing %q in %q", value, frame)
+		}
+	}
+}
+
+func TestProgressPercentClamps(t *testing.T) {
+	tests := []struct {
+		name    string
+		current int64
+		total   int64
+		want    int
+	}{
+		{name: "zero total", current: 10, total: 0, want: 0},
+		{name: "half", current: 50, total: 100, want: 50},
+		{name: "over", current: 150, total: 100, want: 100},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := progressPercent(test.current, test.total); got != test.want {
+				t.Fatalf("progressPercent(%d, %d) = %d, want %d", test.current, test.total, got, test.want)
+			}
+		})
+	}
+}

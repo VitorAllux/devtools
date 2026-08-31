@@ -8,7 +8,9 @@ These rules document the local conventions for future agents and maintainers wor
 - Keep output direct and practical. Prefer actionable command names and short descriptions.
 - The CLI visual identity is `Royal Noir`: black foundation, royal purple interaction, and restrained gold status.
 - Use shared theme helpers and the `FZFHub` component from `internal/ui`; do not add one-off color palettes in feature packages.
-- Loaders should use the shared short bar loader from `internal/ui.RunWithRoyalLoader` and write to stderr.
+- Loaders should use the shared Royal Noir loader APIs from `internal/ui` and write to stderr.
+- Use `internal/ui.RunWithRoyalLoader` for indeterminate operations where no total is known.
+- Use `internal/ui.NewRoyalProgressLoader` for determinate operations where progress can be measured by bytes, items, or steps.
 - For interactive processes such as SSH, show loaders before terminal handoff and stop them before the child process owns the terminal.
 - Avoid global shell keybindings unless the project explicitly defines one. They can conflict with terminals, shells, editors, and IDEs.
 - Prefer explicit `dvv ...` commands. Personal shell shortcuts belong in the user's own shell config.
