@@ -222,10 +222,10 @@ func (m *Manager) selectAction(ctx context.Context) (string, error) {
 		return actions[index].Name, nil
 	}
 	var builder strings.Builder
-	builder.WriteString(ui.FZFHiddenHeader(dbActionHeader()))
+	builder.WriteString(dbActionLine("__dvv_header__", "", "", dbActionHeader()))
 	builder.WriteByte('\n')
 	for index, action := range actions {
-		builder.WriteString(ui.FZFHiddenRow(action.Name, dbActionRow(index, action)))
+		builder.WriteString(dbActionLine(action.Name, action.Label, action.Description, dbActionRow(index, action)))
 		builder.WriteByte('\n')
 	}
 	args := ui.FZFHub{
@@ -238,7 +238,12 @@ func (m *Manager) selectAction(ctx context.Context) (string, error) {
 			{Label: "Enter", Description: "run action"},
 			{Label: "Esc", Description: "exit"},
 		},
-		ExtraArgs: append(ui.FZFHiddenRowArgs(), "--header-lines=1"),
+		ExtraArgs: []string{
+			"--delimiter=\t",
+			"--with-nth=4",
+			"--nth=1,2,3,4",
+			"--header-lines=1",
+		},
 	}.Args()
 	output, err := m.Runner.OutputWithInput(ctx, "", []byte(builder.String()), "fzf", args...)
 	if err != nil && len(output) == 0 {
@@ -732,21 +737,39 @@ func sqlString(value string) string {
 }
 
 func dbActionHeader() string {
-	return fmt.Sprintf(" %s  %s  %s", ui.Crown("NO"), ui.Crown(fixedWidth("ACTION", 24)), ui.Crown("DETAIL"))
+	return fmt.Sprintf(" %s  %s", ui.Crown("NO"), ui.Crown(fixedWidth("ACTION", 24)))
 }
 
 func dbActionRow(index int, action Action) string {
-	return fmt.Sprintf("%s  %s  %s", ui.Muted(fmt.Sprintf("%02d", index+1)), ui.Accent(fixedWidth(action.Label, 24)), ui.Muted(action.Description))
+	return fmt.Sprintf("%s  %s", ui.Muted(fmt.Sprintf("%02d", index+1)), ui.Accent(fixedWidth(action.Label, 24)))
+}
+
+func dbActionLine(raw string, label string, description string, display string) string {
+	return strings.Join([]string{
+		cleanFZFField(raw),
+		cleanFZFField(label),
+		cleanFZFField(description),
+		display,
+	}, "\t")
+}
+
+func cleanFZFField(value string) string {
+	value = strings.ReplaceAll(value, "\t", " ")
+	value = strings.ReplaceAll(value, "\r", " ")
+	value = strings.ReplaceAll(value, "\n", " ")
+	return value
 }
 
 func dbActionPreviewCommand() string {
 	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
-display=$(printf "%s" "$line" | cut -f2-)
-set -- $display
+label=$(printf "%s" "$line" | cut -f2)
+description=$(printf "%s" "$line" | cut -f3)
 printf "%sDatabase action%s\n" "$dvv_heading" "$dvv_reset"
-printf "  %s%-8s%s %s\n" "$dvv_label" "Action" "$dvv_reset" "$2"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Action" "$dvv_reset" "$label"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Command" "$dvv_reset" "$raw"
+printf "\n%sWhat it does%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%s%s\n" "$dvv_muted" "$description" "$dvv_reset"
 ' sh {}`
 }
 

@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/VitorAllux/devtools/internal/ui"
 )
 
 func TestTmuxPreviewPreservesCommandArgs(t *testing.T) {
@@ -22,6 +20,30 @@ func TestTmuxPreviewPreservesCommandArgs(t *testing.T) {
 		if !strings.Contains(preview, want) {
 			t.Fatalf("preview missing %q: %s", want, preview)
 		}
+	}
+	for _, want := range []string{"target_details=", "Details"} {
+		if !strings.Contains(preview, want) {
+			t.Fatalf("preview missing detail field %q: %s", want, preview)
+		}
+	}
+}
+
+func TestTmuxRowsKeepDetailsInPreviewFields(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	target := Target{Label: "Default config", Status: "running", Session: "dev", Details: "API: /very/long/path | Web: /very/long/web"}
+
+	rows := tmuxRows([]Target{target})
+	line := strings.Split(strings.TrimSpace(rows), "\n")[1]
+	fields := strings.Split(line, "\t")
+
+	if len(fields) != 5 {
+		t.Fatalf("tmux row fields = %#v", fields)
+	}
+	if fields[3] != target.Details {
+		t.Fatalf("hidden details = %q, want %q", fields[3], target.Details)
+	}
+	if strings.Contains(fields[4], target.Details) {
+		t.Fatalf("visible tmux row should keep details in preview only: %q", fields[4])
 	}
 }
 
@@ -61,7 +83,7 @@ func TestFZFEnvironmentHubRoutesStopShortcut(t *testing.T) {
 	runner := &fakeRunner{
 		paths:            map[string]bool{"fzf": true, "tmux": true},
 		existingSessions: map[string]bool{"dev": true},
-		fzfOutput:        []byte("alt-d\n" + ui.FZFHiddenRow("dev", tmuxRow(0, target)) + "\n"),
+		fzfOutput:        []byte("alt-d\n" + tmuxLine(target.Session, target.Label, target.Status, target.Details, tmuxRow(0, target)) + "\n"),
 	}
 	manager := NewManager(testConfig(t.TempDir()), runner)
 

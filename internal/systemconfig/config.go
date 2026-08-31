@@ -209,10 +209,11 @@ func configCategories() []Category {
 
 func categoryRows(entries []Entry) string {
 	var builder strings.Builder
-	builder.WriteString(ui.FZFHiddenHeader(categoryHeader()))
+	builder.WriteString(categoryLine("__dvv_header__", "", "", "", categoryHeader()))
 	builder.WriteByte('\n')
 	for index, category := range configCategories() {
-		builder.WriteString(ui.FZFHiddenRow(category.ID, categoryRow(index, category, entries)))
+		status := categoryStatus(category, entries)
+		builder.WriteString(categoryLine(category.ID, category.Label, status, category.Description, categoryRow(index, category, status)))
 		builder.WriteByte('\n')
 	}
 	return builder.String()
@@ -223,21 +224,33 @@ func categoryHeader() string {
 		ui.Crown("NO"),
 		ui.Crown(fixedWidth("CATEGORY", 16)),
 		ui.Crown(fixedWidth("STATUS", 12)),
-		ui.Crown("DETAIL"),
 	}, "\t")
 }
 
-func categoryRow(index int, category Category, entries []Entry) string {
+func categoryStatus(category Category, entries []Entry) string {
 	count := len(entriesForCategory(category.ID, entries))
 	status := fmt.Sprintf("%d key(s)", count)
 	if category.ID == "theme" {
 		status = "selector"
 	}
+	return status
+}
+
+func categoryRow(index int, category Category, status string) string {
 	return strings.Join([]string{
 		ui.Muted(fmt.Sprintf("%02d", index+1)),
 		ui.Accent(fixedWidth(category.Label, 16)),
 		ui.Gold(fixedWidth(status, 12)),
-		ui.Muted(category.Description),
+	}, "\t")
+}
+
+func categoryLine(raw string, label string, status string, description string, display string) string {
+	return strings.Join([]string{
+		cleanField(raw),
+		cleanField(label),
+		cleanField(status),
+		cleanField(description),
+		display,
 	}, "\t")
 }
 
@@ -254,8 +267,8 @@ func categoryFZFArgs() []string {
 		},
 		ExtraArgs: []string{
 			"--delimiter=\t",
-			"--with-nth=2..",
-			"--nth=1,2,3,4,5",
+			"--with-nth=5..",
+			"--nth=1,2,3,4,5..",
 			"--header-lines=1",
 		},
 	}.Args()
@@ -264,9 +277,9 @@ func categoryFZFArgs() []string {
 func categoryPreviewCommand() string {
 	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
-category=$(printf "%s" "$line" | cut -f3)
-status=$(printf "%s" "$line" | cut -f4)
-detail=$(printf "%s" "$line" | cut -f5-)
+category=$(printf "%s" "$line" | cut -f2)
+status=$(printf "%s" "$line" | cut -f3)
+detail=$(printf "%s" "$line" | cut -f4)
 printf "%sConfig category%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-10s%s %s\n" "$dvv_label" "Category" "$dvv_reset" "$category"
 printf "  %s%-10s%s %s\n" "$dvv_label" "Status" "$dvv_reset" "$status"
@@ -421,10 +434,11 @@ func (m Manager) setTheme(name string) error {
 func themeRows(themes []ui.Theme, active string) string {
 	active = ui.NormalizeThemeName(active)
 	var builder strings.Builder
-	builder.WriteString(ui.FZFHiddenHeader(themeHeader()))
+	builder.WriteString(themeLine("__dvv_header__", "", "", "", themeHeader()))
 	builder.WriteByte('\n')
 	for index, theme := range themes {
-		builder.WriteString(ui.FZFHiddenRow(theme.Name, themeRow(index, theme, active)))
+		status := themeStatus(theme, active)
+		builder.WriteString(themeLine(theme.Name, theme.Name, status, theme.Description, themeRow(index, theme, status)))
 		builder.WriteByte('\n')
 	}
 	return builder.String()
@@ -435,20 +449,32 @@ func themeHeader() string {
 		ui.Crown("NO"),
 		ui.Crown(fixedWidth("THEME", 22)),
 		ui.Crown(fixedWidth("STATUS", 10)),
-		ui.Crown("DETAIL"),
 	}, "\t")
 }
 
-func themeRow(index int, theme ui.Theme, active string) string {
+func themeStatus(theme ui.Theme, active string) string {
 	status := ""
 	if theme.Name == active {
 		status = "active"
 	}
+	return status
+}
+
+func themeRow(index int, theme ui.Theme, status string) string {
 	return strings.Join([]string{
 		ui.Muted(fmt.Sprintf("%02d", index+1)),
 		ui.Accent(fixedWidth(theme.Name, 22)),
 		ui.Gold(fixedWidth(status, 10)),
-		ui.Muted(theme.Description),
+	}, "\t")
+}
+
+func themeLine(raw string, name string, status string, description string, display string) string {
+	return strings.Join([]string{
+		cleanField(raw),
+		cleanField(name),
+		cleanField(status),
+		cleanField(description),
+		display,
 	}, "\t")
 }
 
@@ -465,8 +491,8 @@ func themeFZFArgs() []string {
 		},
 		ExtraArgs: []string{
 			"--delimiter=\t",
-			"--with-nth=2..",
-			"--nth=1,2,3,4,5",
+			"--with-nth=5..",
+			"--nth=1,2,3,4,5..",
 			"--header-lines=1",
 		},
 	}.Args()
@@ -475,9 +501,9 @@ func themeFZFArgs() []string {
 func themePreviewCommand() string {
 	return `sh -c '` + ui.FZFPreviewShellPrefix() + themePreviewCaseScript() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
-name=$(printf "%s" "$line" | cut -f3)
-status=$(printf "%s" "$line" | cut -f4)
-detail=$(printf "%s" "$line" | cut -f5-)
+name=$(printf "%s" "$line" | cut -f2)
+status=$(printf "%s" "$line" | cut -f3)
+detail=$(printf "%s" "$line" | cut -f4)
 select_theme "$raw"
 printf "%sTheme%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-10s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$raw"

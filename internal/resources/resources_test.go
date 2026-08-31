@@ -295,6 +295,13 @@ func TestResourceRowsKeepRawIDHidden(t *testing.T) {
 	if !strings.Contains(rows, "container:web\tContainer\tweb\trunning\tdocker\tnginx | Up\t") {
 		t.Fatalf("rows = %q", rows)
 	}
+	visible := strings.Split(strings.Split(strings.TrimSpace(rows), "\n")[1], "\t")[6]
+	if strings.Contains(visible, "nginx | Up") {
+		t.Fatalf("visible resource row should keep details in preview only: %q", visible)
+	}
+	if !strings.Contains(visible, "docker") {
+		t.Fatalf("visible resource row should keep manager column: %q", visible)
+	}
 }
 
 func testConfig() *config.Config {

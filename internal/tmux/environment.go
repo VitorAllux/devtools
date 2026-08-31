@@ -149,9 +149,12 @@ func (m *Manager) fzfEnvironmentHub(ctx context.Context, targets []Target, defau
 		PreviewLabel:  "target panel",
 		PreviewWindow: "right,40%,border-rounded,wrap",
 		Shortcuts:     shortcuts,
-		ExtraArgs: append(ui.FZFHiddenRowArgs(),
+		ExtraArgs: []string{
+			"--delimiter=\t",
+			"--with-nth=5",
+			"--nth=1,2,3,4,5",
 			"--header-lines=1",
-		),
+		},
 	}.Args()
 	output, err := m.Runner.OutputWithInput(ctx, "", []byte(tmuxRows(targets)), "fzf", args...)
 	if err != nil && len(output) == 0 {
@@ -390,31 +393,46 @@ func (m *Manager) shouldUseFZF() bool {
 
 func tmuxRows(targets []Target) string {
 	var builder strings.Builder
-	builder.WriteString(ui.FZFHiddenHeader(tmuxTableHeader()))
+	builder.WriteString(tmuxLine("__dvv_header__", "", "", "", tmuxTableHeader()))
 	builder.WriteByte('\n')
 	for index, target := range targets {
-		builder.WriteString(ui.FZFHiddenRow(target.Session, tmuxRow(index, target)))
+		builder.WriteString(tmuxLine(target.Session, target.Label, target.Status, target.Details, tmuxRow(index, target)))
 		builder.WriteByte('\n')
 	}
 	return builder.String()
 }
 
 func tmuxRow(index int, target Target) string {
-	return fmt.Sprintf("%s  %s  %s  %s",
+	return fmt.Sprintf("%s  %s  %s",
 		ui.Muted(fmt.Sprintf("%02d", index+1)),
 		ui.Accent(fixedWidth(target.Label, 28)),
 		ui.Gold(fixedWidth(target.Status, 14)),
-		ui.Muted(target.Details),
 	)
 }
 
 func tmuxTableHeader() string {
-	return fmt.Sprintf(" %s  %s  %s  %s",
+	return fmt.Sprintf(" %s  %s  %s",
 		ui.Crown("NO"),
 		ui.Crown(fixedWidth("TARGET", 28)),
 		ui.Crown(fixedWidth("STATUS", 14)),
-		ui.Crown("DETAILS"),
 	)
+}
+
+func tmuxLine(raw string, label string, status string, details string, display string) string {
+	return strings.Join([]string{
+		cleanFZFField(raw),
+		cleanFZFField(label),
+		cleanFZFField(status),
+		cleanFZFField(details),
+		display,
+	}, "\t")
+}
+
+func cleanFZFField(value string) string {
+	value = strings.ReplaceAll(value, "\t", " ")
+	value = strings.ReplaceAll(value, "\r", " ")
+	value = strings.ReplaceAll(value, "\n", " ")
+	return value
 }
 
 func tmuxHubShortcuts() []ui.FZFShortcut {
@@ -440,16 +458,18 @@ func tmuxPreviewCommand(shortcuts []ui.FZFShortcut) string {
 	commandDeck := ui.FZFPreviewCommandDeck(shortcuts)
 	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
-display=$(printf "%s" "$line" | cut -f2-)
+target_name=$(printf "%s" "$line" | cut -f2)
+target_status=$(printf "%s" "$line" | cut -f3)
+target_details=$(printf "%s" "$line" | cut -f4)
 print_commands() {
 ` + commandDeck + `
 }
-target_name=$(printf "%s" "$display" | awk "{print \$2}")
-target_status=$(printf "%s" "$display" | awk "{print \$3}")
 printf "%sTmux target%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$target_name"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Status" "$dvv_reset" "$target_status"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Session" "$dvv_reset" "$raw"
+printf "\n%sDetails%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%s%s\n" "$dvv_muted" "$target_details" "$dvv_reset"
 printf "\n%s--------------------------------%s\n" "$dvv_muted" "$dvv_reset"
 printf "%sCommands%s\n" "$dvv_heading" "$dvv_reset"
 print_commands

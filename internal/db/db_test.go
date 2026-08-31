@@ -363,14 +363,20 @@ func TestSelectionParsingHelpers(t *testing.T) {
 
 func TestDBHubFormattingHelpers(t *testing.T) {
 	action := Action{Name: "import", Label: "Import dump", Description: "Import a local or Google Drive SQL dump"}
-	if header := dbActionHeader(); !strings.Contains(header, "ACTION") || !strings.Contains(header, "DETAIL") {
+	if header := dbActionHeader(); !strings.Contains(header, "ACTION") || strings.Contains(header, "DETAIL") {
 		t.Fatalf("header = %q", header)
 	}
 	if row := dbActionRow(0, action); !strings.Contains(row, "01") || !strings.Contains(row, "Import dump") {
 		t.Fatalf("row = %q", row)
+	} else if strings.Contains(row, action.Description) {
+		t.Fatalf("visible action row should keep description in preview only: %q", row)
+	}
+	line := dbActionLine(action.Name, action.Label, action.Description, dbActionRow(0, action))
+	if !strings.Contains(line, action.Description) {
+		t.Fatalf("hidden action line should keep description for preview: %q", line)
 	}
 	preview := dbActionPreviewCommand()
-	for _, want := range []string{"Action", "Command"} {
+	for _, want := range []string{"Action", "Command", "What it does", "description="} {
 		if !strings.Contains(preview, want) {
 			t.Fatalf("preview missing %q: %s", want, preview)
 		}

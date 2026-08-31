@@ -107,6 +107,14 @@ func TestCategoryRowsKeepRawIDHidden(t *testing.T) {
 	if !strings.Contains(rows[2], "Keys") || !strings.Contains(rows[2], "11 key(s)") {
 		t.Fatalf("Keys row should include label and count: %q", rows[2])
 	}
+	fields := strings.Split(rows[2], "\t")
+	if len(fields) < 5 {
+		t.Fatalf("category row fields = %#v", fields)
+	}
+	visible := strings.Join(fields[4:], "\t")
+	if strings.Contains(visible, "Edit raw runtime") {
+		t.Fatalf("visible category row should keep description in preview only: %q", visible)
+	}
 }
 
 func TestConfigRowsKeepDescriptionsForPreviewAndSearch(t *testing.T) {
@@ -225,6 +233,14 @@ func TestThemeRowsKeepRawIDHiddenAndActiveStatus(t *testing.T) {
 	}
 	if !strings.Contains(rows[3], "active") {
 		t.Fatalf("active theme row should include active status: %q", rows[3])
+	}
+	fields := strings.Split(rows[3], "\t")
+	if len(fields) < 5 {
+		t.Fatalf("theme row fields = %#v", fields)
+	}
+	visible := strings.Join(fields[4:], "\t")
+	if strings.Contains(visible, "Deep blue-black") {
+		t.Fatalf("visible theme row should keep description in preview only: %q", visible)
 	}
 }
 

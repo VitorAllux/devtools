@@ -721,7 +721,7 @@ func resourceRow(index int, resource Resource) string {
 		ui.Accent(fixedWidth(resource.Kind, 12)),
 		ui.Accent(fixedWidth(resource.Name, 28)),
 		ui.Gold(fixedWidth(resource.State, 14)),
-		ui.Muted(fixedWidth(resource.Manager, 14)+" "+resource.Details),
+		ui.Muted(fixedWidth(resource.Manager, 14)),
 	)
 }
 
@@ -731,7 +731,7 @@ func resourceTableHeader() string {
 		ui.Crown(fixedWidth("KIND", 12)),
 		ui.Crown(fixedWidth("NAME", 28)),
 		ui.Crown(fixedWidth("STATE", 14)),
-		ui.Crown("MANAGER / DETAILS"),
+		ui.Crown("MANAGER"),
 	)
 }
 
