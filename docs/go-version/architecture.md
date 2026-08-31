@@ -7,6 +7,7 @@ The `go-version` branch is a clean Go rewrite for `dvv`.
 - `main` keeps the previous Bash implementation for reference.
 - This branch should contain only the new Go project, packaging files, docs, examples, and tests.
 - Do not bring legacy scripts back into this branch. If behavior is needed, inspect `main` and port it intentionally.
+- Use `docs/go-version/maintainer-harness.md` as the command ownership and testing map before changing cross-package behavior.
 
 ## Current Package Layout
 
@@ -82,6 +83,8 @@ dvv config
 `dvv tmux:session` exists as the command behind the managed `Ctrl+F` shell shortcut. `dvv env:bootstrap` is kept as a compatibility route for the previous bootstrap command.
 
 Compatibility routes used by tests or scripts may exist during migration, but root help and autocomplete should stay hub-first unless a script command is intentionally promoted.
+
+See `docs/go-version/maintainer-harness.md` for the command-to-package map, shared UI contracts, and smoke/testing conventions.
 
 ## Packaging
 

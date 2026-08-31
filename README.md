@@ -357,6 +357,7 @@ More detail lives in [docs/go-version/operational-map.md](docs/go-version/operat
 | [Configuration](docs/go-version/configuration.md) | Project config, runtime config, environment overrides, hooks, and bootstrap rules. |
 | [Themes](docs/go-version/theme.md) | Built-in themes, fzf hub conventions, loaders, and CLI presentation rules. |
 | [Operational map](docs/go-version/operational-map.md) | Practical edge cases, local paths, install behavior, and troubleshooting details. |
+| [Maintainer harness](docs/go-version/maintainer-harness.md) | Command ownership map, shared UI contracts, workspace harness rules, and test conventions. |
 | [Migration roadmap](docs/go-version/migration-roadmap.md) | Porting status and remaining migration work. |
 
 ## Troubleshooting

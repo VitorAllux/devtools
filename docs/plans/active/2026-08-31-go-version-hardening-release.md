@@ -95,16 +95,16 @@ Implemented first-level `dvv config` categories:
 
 ## Track 2: Maintainer And Agent Readability Harness
 
-- [ ] Add a dedicated agent/maintainer harness document for the Go rewrite.
-- [ ] Map each public command to packages, config sections, runtime files, test files, and docs.
-- [ ] Document the expected read order for future agents before changing each major area.
-- [ ] Document the shared UI contracts: `FZFHub`, indeterminate loader, determinate progress loader, prompts, status lines, and theme colors.
-- [ ] Document how workspace harness generation works and what belongs in generated workspace `AGENTS.md` files.
-- [ ] Add fixture and fake-runner conventions so tests are easier for humans and agents to extend.
-- [ ] Add a short troubleshooting map for frequent local edge cases: stale binary, invalid workspace names, WSL editor paths, compressed dumps, and old `devv` aliases.
-- [ ] Keep code comments sparse and rule-focused; improve names, tests, and docs before adding explanatory comments.
-- [ ] Add cross-links from README and `docs/go-version/architecture.md` to the new harness document.
-- [ ] Ensure all agent-facing docs stay in English and avoid private machine paths, hosts, database names, and credentials.
+- [x] Add a dedicated agent/maintainer harness document for the Go rewrite.
+- [x] Map each public command to packages, config sections, runtime files, test files, and docs.
+- [x] Document the expected read order for future agents before changing each major area.
+- [x] Document the shared UI contracts: `FZFHub`, indeterminate loader, determinate progress loader, prompts, status lines, and theme colors.
+- [x] Document how workspace harness generation works and what belongs in generated workspace `AGENTS.md` files.
+- [x] Add fixture and fake-runner conventions so tests are easier for humans and agents to extend.
+- [x] Add a short troubleshooting map for frequent local edge cases: stale binary, invalid workspace names, WSL editor paths, compressed dumps, and old `devv` aliases.
+- [x] Keep code comments sparse and rule-focused; improve names, tests, and docs before adding explanatory comments.
+- [x] Add cross-links from README and `docs/go-version/architecture.md` to the new harness document.
+- [x] Ensure all agent-facing docs stay in English and avoid private machine paths, hosts, database names, and credentials.
 
 ## Track 3: Unit Test Expansion
 
@@ -216,7 +216,7 @@ When smoke tests are added, run the documented smoke command or complete the man
 - [ ] Smoke validation exists for real or realistic CLI flows.
 - [ ] Autocomplete matches the final hub-first command surface.
 - [ ] `dvv config` opens a category hub with theme selection and nested config areas.
-- [ ] Maintainer/agent harness documentation exists and is linked from the main docs.
+- [x] Maintainer/agent harness documentation exists and is linked from the main docs.
 - [ ] macOS support is implemented and validated, or NPM release docs clearly scope the package to Linux/WSL.
 - [ ] `npm run check` passes.
 - [ ] `npm pack --dry-run` output is reviewed for package contents.

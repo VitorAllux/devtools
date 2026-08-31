@@ -157,6 +157,7 @@ dvv bootstrap
 ```text
 docs/go-version/architecture.md
 docs/go-version/configuration.md
+docs/go-version/maintainer-harness.md
 docs/go-version/theme.md
 docs/go-version/migration-roadmap.md
 docs/go-version/operational-map.md
