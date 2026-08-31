@@ -350,9 +350,7 @@ func (m *Manager) downloadDump(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if strings.TrimSpace(fileName) == "" {
-		fileName = fileID + ".sql.gz"
-	}
+	fileName = normalizeDownloadDumpFileName(fileName, fileID)
 	dest := filepath.Join(m.Config.Project.DB.DumpsDir, filepath.Base(fileName))
 	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "downloading", Subject: filepath.Base(dest), ShowResult: true}, func() error {
 		return run.Quiet(ctx, m.Runner, "", "rclone", "backend", "copyid", remote+":", fileID, dest)
@@ -489,10 +487,14 @@ func (m *Manager) importDump(ctx context.Context, dump string, dbName string) er
 	}
 	defer file.Close()
 
+	compressed, err := isGzipFile(file)
+	if err != nil {
+		return err
+	}
 	progress := newImportProgress(filepath.Base(dump), info.Size())
 	counting := &countingReader{reader: file, onRead: progress.Add}
 	var source io.Reader = counting
-	if strings.HasSuffix(dump, ".gz") {
+	if compressed {
 		gz, err := gzip.NewReader(counting)
 		if err != nil {
 			return err
@@ -536,16 +538,95 @@ func (m *Manager) dumpFiles() ([]string, error) {
 	}
 	files := []string{}
 	for _, entry := range entries {
-		if !entry.Type().IsRegular() {
+		info, err := entry.Info()
+		if err != nil || !info.Mode().IsRegular() {
 			continue
 		}
 		name := entry.Name()
-		if strings.HasSuffix(name, ".sql") || strings.HasSuffix(name, ".sql.gz") {
+		if isDumpFile(filepath.Join(m.Config.Project.DB.DumpsDir, name), name) {
 			files = append(files, name)
 		}
 	}
 	sort.Strings(files)
 	return files, nil
+}
+
+func normalizeDownloadDumpFileName(fileName string, fallbackID string) string {
+	name := filepath.Base(strings.TrimSpace(fileName))
+	if name == "." || name == string(filepath.Separator) || name == "" {
+		name = strings.TrimSpace(fallbackID)
+	}
+	if name == "" {
+		name = "dump"
+	}
+	lower := strings.ToLower(name)
+	if strings.HasSuffix(lower, ".sql") || strings.HasSuffix(lower, ".sql.gz") || strings.HasSuffix(lower, ".gz") {
+		return name
+	}
+	return name + ".sql.gz"
+}
+
+func isDumpFile(path string, name string) bool {
+	lower := strings.ToLower(name)
+	if strings.HasSuffix(lower, ".sql") || strings.HasSuffix(lower, ".sql.gz") {
+		return true
+	}
+	if fileHasGzipHeader(path) {
+		return true
+	}
+	return fileLooksLikeSQLDump(path)
+}
+
+func fileHasGzipHeader(path string) bool {
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+	ok, err := isGzipFile(file)
+	return err == nil && ok
+}
+
+func isGzipFile(file *os.File) (bool, error) {
+	current, err := file.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return false, err
+	}
+	header := make([]byte, 2)
+	n, readErr := file.Read(header)
+	if _, err := file.Seek(current, io.SeekStart); err != nil {
+		return false, err
+	}
+	if readErr != nil && readErr != io.EOF {
+		return false, readErr
+	}
+	return n == 2 && header[0] == 0x1f && header[1] == 0x8b, nil
+}
+
+func fileLooksLikeSQLDump(path string) bool {
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+
+	buffer := make([]byte, 512)
+	n, err := file.Read(buffer)
+	if err != nil && err != io.EOF {
+		return false
+	}
+	if n == 0 || bytes.IndexByte(buffer[:n], 0) >= 0 {
+		return false
+	}
+
+	sample := strings.TrimSpace(strings.TrimPrefix(string(buffer[:n]), "\xef\xbb\xbf"))
+	sample = strings.ToLower(sample)
+	for _, prefix := range []string{"--", "/*", "create ", "insert ", "drop ", "set ", "lock tables", "delimiter ", "use "} {
+		if strings.HasPrefix(sample, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 type countingReader struct {

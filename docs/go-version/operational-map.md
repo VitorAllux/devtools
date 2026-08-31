@@ -71,6 +71,15 @@ Commands executed under a loader should capture routine stdout/stderr with `inte
 | Resources | Resource scan and start/stop/restart actions. |
 | Secrets | AGE key preparation, SSH backup decrypt/encrypt. |
 
+## Database Dumps
+
+| Detail | Current rule | Action |
+| --- | --- | --- |
+| Download name | A Google Drive download name without `.sql`, `.gz`, or `.sql.gz` is saved with `.sql.gz`. | Type `adami` and the stored file becomes `adami.sql.gz`. |
+| Import compression | Import detects gzip from the file header, not only from the extension. | Extensionless gzip downloads can still import correctly. |
+| Dump listing | The dump picker lists `.sql`, `.sql.gz`, gzip-header files, and extensionless files that look like SQL. | Avoid hiding valid local dumps just because the name is incomplete. |
+| ASCII null error | `ASCII '\\0' appeared` usually means compressed bytes reached MySQL as raw SQL. | Rebuild and import again with the content-detection path. |
+
 ## Local Data And Secrets
 
 | Detail | Current rule | Action |

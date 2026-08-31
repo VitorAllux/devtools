@@ -51,6 +51,12 @@ func TestDumpFilesAreSortedAndFiltered(t *testing.T) {
 			t.Fatalf("WriteFile failed: %v", err)
 		}
 	}
+	if err := os.WriteFile(filepath.Join(dir, "adami"), []byte{0x1f, 0x8b, 0x08}, 0o600); err != nil {
+		t.Fatalf("WriteFile gzip dump failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "plain-dump"), []byte("-- MySQL dump\nCREATE TABLE users (id int);\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile SQL dump failed: %v", err)
+	}
 	cfg := &config.Config{Project: config.DefaultProjectConfig()}
 	cfg.Project.DB.DumpsDir = dir
 	manager := Manager{Config: cfg}
@@ -59,9 +65,49 @@ func TestDumpFilesAreSortedAndFiltered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dumpFiles returned error: %v", err)
 	}
-	want := []string{"a.sql", "b.sql.gz"}
+	want := []string{"a.sql", "adami", "b.sql.gz", "plain-dump"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("dumpFiles = %#v, want %#v", got, want)
+	}
+}
+
+func TestNormalizeDownloadDumpFileNameAddsDefaultExtension(t *testing.T) {
+	tests := map[string]string{
+		"":             "file-id.sql.gz",
+		"adami":        "adami.sql.gz",
+		"adami.sql":    "adami.sql",
+		"adami.sql.gz": "adami.sql.gz",
+		"adami.gz":     "adami.gz",
+		"../adami":     "adami.sql.gz",
+	}
+	for input, expected := range tests {
+		got := normalizeDownloadDumpFileName(input, "file-id")
+		if got != expected {
+			t.Fatalf("normalizeDownloadDumpFileName(%q) = %q, want %q", input, got, expected)
+		}
+	}
+}
+
+func TestIsGzipFileUsesContentHeader(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dump-without-extension")
+	if err := os.WriteFile(path, []byte{0x1f, 0x8b, 0x08}, 0o600); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer file.Close()
+
+	got, err := isGzipFile(file)
+	if err != nil {
+		t.Fatalf("isGzipFile returned error: %v", err)
+	}
+	if !got {
+		t.Fatal("expected gzip header to be detected")
+	}
+	if offset, err := file.Seek(0, io.SeekCurrent); err != nil || offset != 0 {
+		t.Fatalf("file offset = %d, err=%v; want 0, nil", offset, err)
 	}
 }
 

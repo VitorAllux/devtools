@@ -213,6 +213,8 @@ The database hub supports:
 - Dropping databases.
 - Cleaning local dump files.
 
+When downloading from Google Drive, a local name without extension is saved as `.sql.gz`. The import step detects gzip by file content, so older extensionless downloads can still be listed and imported when they contain a valid gzip or SQL dump.
+
 Database config can come from `dvv.config.json`, `.env`, or `~/.config/devv/config.env`.
 
 Common overrides:
@@ -365,6 +367,7 @@ Common cases:
 | Workspace opens as missing in VS Code | Run `dvv doctor` and check for invalid workspace names or stale VS Code recent entries. |
 | `dvv workspace` does not show a workspace | Confirm it is a direct child of `workspace.root`, starts with `workspace-`, and has a valid UTF-8 name. |
 | SSH list is empty | Run `dvv bootstrap` or check `~/.config/devv/servers.list`. |
+| Database import fails with `ASCII '\\0'` | The file is probably compressed without a `.gz` suffix. Rebuild with `dvv build`; current imports detect gzip by content. |
 | Database import fails at SQL line | The dump reached MySQL; inspect the SQL/version compatibility at the reported line. |
 
 Inspect suspicious workspace names:
