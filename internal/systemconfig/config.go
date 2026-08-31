@@ -790,7 +790,7 @@ func configFZFArgs(category Category) []string {
 		BorderLabel:   borderLabel,
 		Preview:       configPreviewCommand(),
 		PreviewLabel:  "config panel",
-		PreviewWindow: "right,40%,border-rounded,wrap",
+		PreviewWindow: "right,46%,border-rounded,wrap",
 		Shortcuts: []ui.FZFShortcut{
 			{Label: "Enter", Description: "edit"},
 			{Key: "alt-a", Label: "Alt+A", Description: "add custom"},
@@ -801,8 +801,8 @@ func configFZFArgs(category Category) []string {
 		},
 		ExtraArgs: []string{
 			"--delimiter=\t",
-			"--with-nth=2,3,4,5,6",
-			"--nth=1,3,4,5,6,9,10,11",
+			"--with-nth=2,3,4,5",
+			"--nth=1,3,4,5,10",
 			"--header-lines=1",
 		},
 	}.Args()
@@ -825,8 +825,6 @@ func configHeader() string {
 		ui.Crown(fixedWidth("GROUP", 12)),
 		ui.Crown(fixedWidth("KEY", 34)),
 		ui.Crown(fixedWidth("VALUE", 26)),
-		ui.Crown("DESCRIPTION"),
-		"",
 		"",
 		"",
 		"",
@@ -848,7 +846,6 @@ func configRow(entry Entry) string {
 		ui.Muted(fixedWidth(entry.Category, 12)),
 		ui.Accent(fixedWidth(entry.Key, 34)),
 		ui.Muted(compactField(value, 26)),
-		ui.Muted(compactField(entry.Description, 56)),
 		cleanField(entry.Kind),
 		cleanField(entrySource(entry)),
 		cleanField(defaultPreviewValue(entry)),
@@ -861,22 +858,24 @@ func configPreviewCommand() string {
 	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
 category=$(printf "%s" "$line" | cut -f3)
-value=$(printf "%s" "$line" | cut -f10)
-description=$(printf "%s" "$line" | cut -f11-)
-kind=$(printf "%s" "$line" | cut -f7)
-source=$(printf "%s" "$line" | cut -f8)
-default_value=$(printf "%s" "$line" | cut -f9)
+value=$(printf "%s" "$line" | cut -f9)
+description=$(printf "%s" "$line" | cut -f10-)
+kind=$(printf "%s" "$line" | cut -f6)
+source=$(printf "%s" "$line" | cut -f7)
+default_value=$(printf "%s" "$line" | cut -f8)
 printf "%sConfig entry%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Key" "$dvv_reset" "$raw"
-printf "  %s%-8s%s %s\n" "$dvv_label" "Group" "$dvv_reset" "$category"
-printf "  %s%-8s%s %s\n" "$dvv_label" "Type" "$dvv_reset" "$kind"
-printf "  %s%-8s%s %s\n" "$dvv_label" "Source" "$dvv_reset" "$source"
+printf "\n%sWhat it does%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%s%s\n" "$dvv_muted" "$description" "$dvv_reset"
+printf "\n%sCurrent value%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Value" "$dvv_reset" "$value"
 if [ -n "$default_value" ]; then
   printf "  %s%-8s%s %s\n" "$dvv_label" "Default" "$dvv_reset" "$default_value"
 fi
-printf "\n%sWhat it does%s\n" "$dvv_heading" "$dvv_reset"
-printf "  %s%s%s\n" "$dvv_muted" "$description" "$dvv_reset"
+printf "\n%sMetadata%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Group" "$dvv_reset" "$category"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Type" "$dvv_reset" "$kind"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Source" "$dvv_reset" "$source"
 printf "\n%sEnter edit | Alt+A add | Alt+C clear | Alt+V validate | Alt+S secrets%s\n" "$dvv_muted" "$dvv_reset"
 ' sh {}`
 }

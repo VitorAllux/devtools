@@ -135,7 +135,7 @@ Coverage percentage is a signal, not the only goal. The release target is strong
 - [x] Add a `Safety` sub-hub for current database and workspace confirmation rules.
 - [x] Keep future `Profiles` work out of the first-level hub until a runtime profile backend exists.
 - [x] Route each visible config category to a selector or nested key hub backed by runtime values.
-- [x] Show a concise explanation for every known config key in table rows and previews.
+- [x] Show a concise explanation for every known config key in fzf previews and `config list`.
 - [x] Keep custom persisted config keys visible in the raw `Keys` hub.
 - [ ] Keep `dvv config list` and `dvv config set` as script-friendly compatibility routes, but do not make them the primary user surface.
 - [x] Add tests for category rows, selected category routing, theme registry values, persisted theme changes, shortcut editing, and raw key fallback.

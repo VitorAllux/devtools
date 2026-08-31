@@ -112,7 +112,7 @@ First-level categories:
 
 The `Keys` category keeps the current raw key editing flow available for advanced usage and script compatibility. The main config UX prefers categorized selectors so common settings are easier to find.
 
-Every known key includes a short `What it does` explanation in the preview panel and a compact `DESCRIPTION` column in the table. Custom persisted keys are listed under the `Custom` group with a generic description so values added through the hub do not disappear from the UI.
+Every known key includes a short `What it does` explanation in the preview panel. `dvv config list` also prints a `DESCRIPTION` column for non-interactive review. Custom persisted keys are listed under the `Custom` group with a generic description so values added through the hub do not disappear from the UI.
 
 Built-in themes:
 

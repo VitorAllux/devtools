@@ -109,20 +109,20 @@ func TestCategoryRowsKeepRawIDHidden(t *testing.T) {
 	}
 }
 
-func TestConfigRowsExposeDescriptions(t *testing.T) {
+func TestConfigRowsKeepDescriptionsForPreviewAndSearch(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	rows := strings.Split(strings.TrimSpace(configRows(testEntries())), "\n")
 	if len(rows) < 2 {
 		t.Fatalf("configRows returned too few rows: %#v", rows)
 	}
-	if !strings.Contains(rows[0], "DESCRIPTION") {
-		t.Fatalf("config header should include description column: %q", rows[0])
+	if strings.Contains(rows[0], "DESCRIPTION") {
+		t.Fatalf("fzf header should keep description out of visible columns: %q", rows[0])
 	}
 	if raw := ui.FZFSelectedRaw(rows[1]); raw != "DVV_THEME" {
 		t.Fatalf("first config raw key = %q, want DVV_THEME", raw)
 	}
 	if !strings.Contains(rows[1], "Selects the CLI color theme.") {
-		t.Fatalf("config row should include the entry description: %q", rows[1])
+		t.Fatalf("config row should keep description in hidden fields: %q", rows[1])
 	}
 }
 
