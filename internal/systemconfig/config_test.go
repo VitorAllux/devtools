@@ -109,6 +109,32 @@ func TestCategoryRowsKeepRawIDHidden(t *testing.T) {
 	}
 }
 
+func TestConfigRowsExposeDescriptions(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	rows := strings.Split(strings.TrimSpace(configRows(testEntries())), "\n")
+	if len(rows) < 2 {
+		t.Fatalf("configRows returned too few rows: %#v", rows)
+	}
+	if !strings.Contains(rows[0], "DESCRIPTION") {
+		t.Fatalf("config header should include description column: %q", rows[0])
+	}
+	if raw := ui.FZFSelectedRaw(rows[1]); raw != "DVV_THEME" {
+		t.Fatalf("first config raw key = %q, want DVV_THEME", raw)
+	}
+	if !strings.Contains(rows[1], "Selects the CLI color theme.") {
+		t.Fatalf("config row should include the entry description: %q", rows[1])
+	}
+}
+
+func TestConfigPreviewExplainsSelectedKey(t *testing.T) {
+	preview := configPreviewCommand()
+	for _, want := range []string{"What it does", "description=", "kind=", "source=", "default_value="} {
+		if !strings.Contains(preview, want) {
+			t.Fatalf("config preview missing %q: %s", want, preview)
+		}
+	}
+}
+
 func TestEntriesForCategoryFiltersExpectedGroups(t *testing.T) {
 	entries := testEntries()
 
@@ -134,6 +160,30 @@ func TestEntriesForCategoryFiltersExpectedGroups(t *testing.T) {
 				t.Fatalf("entriesForCategory(%q) = %#v, want %#v", test.category, got, test.keys)
 			}
 		})
+	}
+}
+
+func TestEntriesIncludesCustomPersistedKeys(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.env")
+	if err := writeConfigFile(path, map[string]string{"CUSTOM_FLAG": "1"}); err != nil {
+		t.Fatalf("writeConfigFile returned error: %v", err)
+	}
+
+	manager := Manager{Config: &config.Config{
+		ConfigFile: path,
+		Project:    config.DefaultProjectConfig(),
+	}}
+	entries, err := manager.Entries()
+	if err != nil {
+		t.Fatalf("Entries returned error: %v", err)
+	}
+
+	entry, ok := findEntry(entries, "CUSTOM_FLAG")
+	if !ok {
+		t.Fatalf("custom persisted key should be listed")
+	}
+	if entry.Category != "Custom" || entry.Description != "Custom runtime config value." || !entry.Persisted {
+		t.Fatalf("custom entry = %#v", entry)
 	}
 }
 
@@ -237,14 +287,14 @@ func TestWriteValueAppliesRuntimeConfig(t *testing.T) {
 
 func testEntries() []Entry {
 	return []Entry{
-		{Category: "Theme", Key: "DVV_THEME", Kind: "theme"},
-		{Category: "Project", Key: "API_DIR", Kind: "path"},
-		{Category: "Database", Key: "DVV_DB_HOST", Kind: "text"},
-		{Category: "Shortcuts", Key: "DVV_TMUX_SESSION_SHORTCUT", Kind: "shortcut"},
-		{Category: "Workspace", Key: "DVV_WORKSPACES_DIR", Kind: "path"},
-		{Category: "Database", Key: "DVV_RCLONE_REMOTE", Kind: "text"},
-		{Category: "Resources", Key: "DVV_RESOURCES_START_SHORTCUT", Kind: "shortcut"},
-		{Category: "Safety", Key: "DVV_DB_SAFETY_CONFIRM", Kind: "bool"},
+		{Category: "Theme", Key: "DVV_THEME", Description: "Selects the CLI color theme.", Kind: "theme"},
+		{Category: "Project", Key: "API_DIR", Description: "Sets the default API project path.", Kind: "path"},
+		{Category: "Database", Key: "DVV_DB_HOST", Description: "Sets the MySQL host.", Kind: "text"},
+		{Category: "Shortcuts", Key: "DVV_TMUX_SESSION_SHORTCUT", Description: "Sets the tmux picker shortcut.", Kind: "shortcut"},
+		{Category: "Workspace", Key: "DVV_WORKSPACES_DIR", Description: "Sets where workspace folders are created.", Kind: "path"},
+		{Category: "Database", Key: "DVV_RCLONE_REMOTE", Description: "Sets the rclone remote.", Kind: "text"},
+		{Category: "Resources", Key: "DVV_RESOURCES_START_SHORTCUT", Description: "Sets the resource start shortcut.", Kind: "shortcut"},
+		{Category: "Safety", Key: "DVV_DB_SAFETY_CONFIRM", Description: "Confirms destructive database actions.", Kind: "bool"},
 	}
 }
 

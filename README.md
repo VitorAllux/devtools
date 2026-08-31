@@ -259,6 +259,8 @@ The configuration hub edits persisted runtime values in:
 
 `dvv config` opens a category hub first. Use `Theme` to switch the CLI theme, `Keys` for raw key editing, or choose a focused area such as `Paths`, `Shortcuts`, `Workspace`, `Database`, `Tmux`, `Resources`, `Integrations`, or `Safety`.
 
+Every known config key shows a short description in the table and preview panel. Custom keys saved through the hub are kept visible in `Keys` under the `Custom` group.
+
 Shortcuts:
 
 | Shortcut | Action |

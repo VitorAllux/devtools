@@ -571,7 +571,9 @@ func (m Manager) Entries() ([]Entry, error) {
 		return nil, err
 	}
 	entries := knownEntries(m.Config)
+	known := map[string]bool{}
 	for index := range entries {
+		known[entries[index].Key] = true
 		if value, ok := values[entries[index].Key]; ok {
 			entries[index].Value = value
 			entries[index].Persisted = true
@@ -582,6 +584,24 @@ func (m Manager) Entries() ([]Entry, error) {
 			continue
 		}
 		entries[index].Value = entries[index].Default
+	}
+	customKeys := make([]string, 0)
+	for key := range values {
+		if known[key] || !validKey(key) {
+			continue
+		}
+		customKeys = append(customKeys, key)
+	}
+	sort.Strings(customKeys)
+	for _, key := range customKeys {
+		entries = append(entries, Entry{
+			Category:    "Custom",
+			Key:         key,
+			Description: "Custom runtime config value.",
+			Kind:        "text",
+			Value:       values[key],
+			Persisted:   true,
+		})
 	}
 	return entries, nil
 }
@@ -739,6 +759,7 @@ func (m Manager) validate(entry Entry) {
 func (m Manager) print(entries []Entry) {
 	ui.Title("Configuration")
 	ui.Info("File: %s", m.Config.ConfigFile)
+	fmt.Printf("  %-3s %-12s %-34s %-26s %s\n", "SET", "GROUP", "KEY", "VALUE", "DESCRIPTION")
 	for _, entry := range entries {
 		status := "[ ]"
 		if entry.Default != "" {
@@ -747,7 +768,7 @@ func (m Manager) print(entries []Entry) {
 		if entry.Persisted {
 			status = "[x]"
 		}
-		fmt.Printf("  %-3s %-12s %-34s %s\n", status, entry.Category, entry.Key, maskValue(entry))
+		fmt.Printf("  %-3s %-12s %-34s %-26s %s\n", status, entry.Category, entry.Key, compactField(maskValue(entry), 26), entry.Description)
 	}
 }
 
@@ -778,7 +799,12 @@ func configFZFArgs(category Category) []string {
 			{Key: "alt-s", Label: "Alt+S", Description: "secrets"},
 			{Label: "Esc", Description: "exit"},
 		},
-		ExtraArgs: append(ui.FZFHiddenRowArgs(), "--header-lines=1"),
+		ExtraArgs: []string{
+			"--delimiter=\t",
+			"--with-nth=2,3,4,5,6",
+			"--nth=1,3,4,5,6,9,10,11",
+			"--header-lines=1",
+		},
 	}.Args()
 }
 
@@ -794,7 +820,18 @@ func configRows(entries []Entry) string {
 }
 
 func configHeader() string {
-	return fmt.Sprintf(" %s  %s  %s  %s", ui.Crown("SET"), ui.Crown(fixedWidth("GROUP", 12)), ui.Crown(fixedWidth("KEY", 34)), ui.Crown("VALUE"))
+	return strings.Join([]string{
+		ui.Crown("SET"),
+		ui.Crown(fixedWidth("GROUP", 12)),
+		ui.Crown(fixedWidth("KEY", 34)),
+		ui.Crown(fixedWidth("VALUE", 26)),
+		ui.Crown("DESCRIPTION"),
+		"",
+		"",
+		"",
+		"",
+		"",
+	}, "\t")
 }
 
 func configRow(entry Entry) string {
@@ -805,18 +842,41 @@ func configRow(entry Entry) string {
 	if entry.Persisted {
 		status = "[x]"
 	}
-	return fmt.Sprintf("%s  %s  %s  %s", ui.Gold(status), ui.Muted(fixedWidth(entry.Category, 12)), ui.Accent(fixedWidth(entry.Key, 34)), ui.Muted(maskValue(entry)))
+	value := maskValue(entry)
+	return strings.Join([]string{
+		ui.Gold(status),
+		ui.Muted(fixedWidth(entry.Category, 12)),
+		ui.Accent(fixedWidth(entry.Key, 34)),
+		ui.Muted(compactField(value, 26)),
+		ui.Muted(compactField(entry.Description, 56)),
+		cleanField(entry.Kind),
+		cleanField(entrySource(entry)),
+		cleanField(defaultPreviewValue(entry)),
+		cleanField(value),
+		cleanField(entry.Description),
+	}, "\t")
 }
 
 func configPreviewCommand() string {
 	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
-display=$(printf "%s" "$line" | cut -f2-)
-set -- $display
+category=$(printf "%s" "$line" | cut -f3)
+value=$(printf "%s" "$line" | cut -f10)
+description=$(printf "%s" "$line" | cut -f11-)
+kind=$(printf "%s" "$line" | cut -f7)
+source=$(printf "%s" "$line" | cut -f8)
+default_value=$(printf "%s" "$line" | cut -f9)
 printf "%sConfig entry%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Key" "$dvv_reset" "$raw"
-printf "  %s%-8s%s %s\n" "$dvv_label" "Group" "$dvv_reset" "$2"
-printf "  %s%-8s%s %s\n" "$dvv_label" "Value" "$dvv_reset" "$4"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Group" "$dvv_reset" "$category"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Type" "$dvv_reset" "$kind"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Source" "$dvv_reset" "$source"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Value" "$dvv_reset" "$value"
+if [ -n "$default_value" ]; then
+  printf "  %s%-8s%s %s\n" "$dvv_label" "Default" "$dvv_reset" "$default_value"
+fi
+printf "\n%sWhat it does%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%s%s\n" "$dvv_muted" "$description" "$dvv_reset"
 printf "\n%sEnter edit | Alt+A add | Alt+C clear | Alt+V validate | Alt+S secrets%s\n" "$dvv_muted" "$dvv_reset"
 ' sh {}`
 }
@@ -869,44 +929,44 @@ func chooseOne(label string, values []string) (string, error) {
 
 func knownEntries(cfg *config.Config) []Entry {
 	return []Entry{
-		{"Theme", "DVV_THEME", "Active CLI theme", "theme", cfg.Project.Theme.Name, "", false},
-		{"Project", "API_DIR", "Path to default API project", "path", "", "", false},
-		{"Project", "WEB_DIR", "Path to default Web project", "path", "", "", false},
-		{"Tmux", "TMUX_DEFAULT_DIR", "Default root for tmux directory pickers", "path", "~/workspace", "", false},
-		{"Tmux", "TMUX_SESSION", "Default tmux environment session name", "text", "eloverde", "", false},
-		{"Tmux", "TMUX_WIN", "Default tmux environment window name", "text", "dev", "", false},
-		{"Tmux", "DVV_TMUX_SESSION_SEARCH_ROOTS", "Directory picker search roots", "path-list", strings.Join(cfg.Project.Tmux.Session.SearchRoots, string(os.PathListSeparator)), "", false},
-		{"Tmux", "DVV_TMUX_SESSION_SEARCH_DEPTH", "Directory picker search depth", "number", fmt.Sprintf("%d", cfg.Project.Tmux.Session.SearchDepth), "", false},
-		{"Shortcuts", "DVV_TMUX_SESSION_SHORTCUT", "Managed zsh shortcut for the tmux directory picker", "shortcut", cfg.Project.Tmux.Session.Shortcut, "", false},
-		{"Shortcuts", "DVV_SSH_ADD_SHORTCUT", "SSH hub add action shortcut", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Add, "", false},
-		{"Shortcuts", "DVV_SSH_REMOVE_SHORTCUT", "SSH hub remove action shortcut", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Remove, "", false},
-		{"Shortcuts", "DVV_SSH_NEW_TERMINAL_SHORTCUT", "SSH hub new terminal shortcut", "shortcut", cfg.Project.SSH.Hub.Shortcuts.NewTerminal, "", false},
-		{"Shortcuts", "DVV_WORKSPACE_CREATE_SHORTCUT", "Workspace hub create action shortcut", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Create, "", false},
-		{"Shortcuts", "DVV_WORKSPACE_MANAGE_SHORTCUT", "Workspace hub manage action shortcut", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Manage, "", false},
-		{"Shortcuts", "DVV_WORKSPACE_DELETE_SHORTCUT", "Workspace hub delete action shortcut", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Delete, "", false},
-		{"Workspace", "DVV_WORKSPACES_DIR", "Root directory for workspace-* folders", "path", cfg.Project.Workspace.Root, "", false},
-		{"Workspace", "DVV_WORKSPACE_PROJECT_ROOTS", "Colon-separated roots for project discovery", "path-list", strings.Join(cfg.Project.Workspace.ProjectSearchRoots, string(os.PathListSeparator)), "", false},
-		{"Workspace", "DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "Project discovery depth", "number", fmt.Sprintf("%d", cfg.Project.Workspace.ProjectSearchDepth), "", false},
-		{"Workspace", "DVV_WORKSPACE_OPENER", "Workspace opener", "choice", defaultString(cfg.Project.Workspace.Interactive.Opener, "auto"), "", false},
-		{"Database", "DVV_DB_HOST", "MySQL host; empty uses local socket", "text", cfg.Project.DB.Host, "", false},
-		{"Database", "DVV_DB_PORT", "MySQL port when host is set", "number", cfg.Project.DB.Port, "", false},
-		{"Database", "DVV_DB_USER", "MySQL user for DB actions", "text", cfg.Project.DB.User, "", false},
-		{"Database", "DVV_DUMPS_DIR", "Local dump storage directory", "path", cfg.Project.DB.DumpsDir, "", false},
-		{"Database", "DVV_RCLONE_REMOTE", "Default rclone remote", "text", cfg.Project.DB.RcloneRemote, "", false},
-		{"Resources", "DVV_RESOURCES_START_SHORTCUT", "Resources hub start action shortcut", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Start, "", false},
-		{"Resources", "DVV_RESOURCES_RESTART_SHORTCUT", "Resources hub restart action shortcut", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Restart, "", false},
-		{"Resources", "DVV_RESOURCES_STOP_SHORTCUT", "Resources hub stop action shortcut", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Stop, "", false},
-		{"Safety", "DVV_DB_SAFETY_CONFIRM", "Confirm destructive database actions", "bool", boolValue(cfg.Project.DB.SafetyConfirm), "", false},
-		{"Safety", "DVV_WORKSPACE_REQUIRE_CONFIRMATION", "Require workspace action confirmation", "bool", boolValue(cfg.Project.Workspace.Safety.RequireConfirmation), "", false},
-		{"Safety", "DVV_WORKSPACE_BLOCK_DIRTY_PROJECTS", "Block workspace removal with dirty projects", "bool", boolValue(cfg.Project.Workspace.Safety.BlockRemoveWithDirtyProjects), "", false},
-		{"Safety", "DVV_WORKSPACE_ALLOW_FORCE_REMOVE", "Allow force workspace removal", "bool", boolValue(cfg.Project.Workspace.Safety.AllowForceRemove), "", false},
-		{"Safety", "DVV_WORKSPACE_ONLY_DIRECT_CHILDREN", "Only remove direct workspace children", "bool", boolValue(cfg.Project.Workspace.Safety.OnlyRemoveDirectChildren), "", false},
-		{"Safety", "DVV_WORKSPACE_CONFIRM_LEFTOVER_DELETION", "Confirm leftover workspace directory deletion", "bool", boolValue(cfg.Project.Workspace.Safety.ConfirmLeftoverDeletion), "", false},
-		{"Secrets", "DVV_SERVERS_FILE", "Local SSH server list path", "path", cfg.ServersFile, "", false},
-		{"Secrets", "DVV_AGE_KEY_FILE", "Local AGE private key path", "path", cfg.AgeKeyFile, "", false},
-		{"Secrets", "DVV_AGE_RECIPIENTS_FILE", "AGE recipients file path", "path", cfg.AgeRecipientsFile, "", false},
-		{"Secrets", "DVV_ENCRYPTED_SERVERS_FILE", "Encrypted SSH backup path", "path", cfg.EncryptedServersFile, "", false},
-		{"Secrets", "DVV_BW_AGE_KEY_ITEM", "Bitwarden item storing the AGE private key", "secret", cfg.BitwardenAgeKeyItem, "", false},
+		{"Theme", "DVV_THEME", "Selects the CLI color theme.", "theme", cfg.Project.Theme.Name, "", false},
+		{"Project", "API_DIR", "Sets the default API project path for legacy tmux flows.", "path", "", "", false},
+		{"Project", "WEB_DIR", "Sets the default Web project path for legacy tmux flows.", "path", "", "", false},
+		{"Tmux", "TMUX_DEFAULT_DIR", "Sets the legacy default root for directory pickers.", "path", "~/workspace", "", false},
+		{"Tmux", "TMUX_SESSION", "Sets the legacy tmux environment session name.", "text", "eloverde", "", false},
+		{"Tmux", "TMUX_WIN", "Sets the legacy tmux environment window name.", "text", "dev", "", false},
+		{"Tmux", "DVV_TMUX_SESSION_SEARCH_ROOTS", "Sets roots scanned by the tmux directory picker.", "path-list", strings.Join(cfg.Project.Tmux.Session.SearchRoots, string(os.PathListSeparator)), "", false},
+		{"Tmux", "DVV_TMUX_SESSION_SEARCH_DEPTH", "Limits directory picker search depth.", "number", fmt.Sprintf("%d", cfg.Project.Tmux.Session.SearchDepth), "", false},
+		{"Shortcuts", "DVV_TMUX_SESSION_SHORTCUT", "Sets the zsh shortcut for the tmux directory picker.", "shortcut", cfg.Project.Tmux.Session.Shortcut, "", false},
+		{"Shortcuts", "DVV_SSH_ADD_SHORTCUT", "Sets the SSH hub shortcut for adding an entry.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Add, "", false},
+		{"Shortcuts", "DVV_SSH_REMOVE_SHORTCUT", "Sets the SSH hub shortcut for removing an entry.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Remove, "", false},
+		{"Shortcuts", "DVV_SSH_NEW_TERMINAL_SHORTCUT", "Sets the SSH hub shortcut for opening a new tab.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.NewTerminal, "", false},
+		{"Shortcuts", "DVV_WORKSPACE_CREATE_SHORTCUT", "Sets the workspace hub shortcut for creating a workspace.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Create, "", false},
+		{"Shortcuts", "DVV_WORKSPACE_MANAGE_SHORTCUT", "Sets the workspace hub shortcut for managing projects.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Manage, "", false},
+		{"Shortcuts", "DVV_WORKSPACE_DELETE_SHORTCUT", "Sets the workspace hub shortcut for deleting workspaces.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Delete, "", false},
+		{"Workspace", "DVV_WORKSPACES_DIR", "Sets where workspace-* folders are created.", "path", cfg.Project.Workspace.Root, "", false},
+		{"Workspace", "DVV_WORKSPACE_PROJECT_ROOTS", "Sets roots scanned for base git repositories.", "path-list", strings.Join(cfg.Project.Workspace.ProjectSearchRoots, string(os.PathListSeparator)), "", false},
+		{"Workspace", "DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "Limits repository discovery depth.", "number", fmt.Sprintf("%d", cfg.Project.Workspace.ProjectSearchDepth), "", false},
+		{"Workspace", "DVV_WORKSPACE_OPENER", "Sets how a selected workspace opens.", "choice", defaultString(cfg.Project.Workspace.Interactive.Opener, "auto"), "", false},
+		{"Database", "DVV_DB_HOST", "Sets the MySQL host; empty uses client defaults.", "text", cfg.Project.DB.Host, "", false},
+		{"Database", "DVV_DB_PORT", "Sets the MySQL TCP port when a host is set.", "number", cfg.Project.DB.Port, "", false},
+		{"Database", "DVV_DB_USER", "Sets the MySQL user for database actions.", "text", cfg.Project.DB.User, "", false},
+		{"Database", "DVV_DUMPS_DIR", "Sets where downloaded and local dump files live.", "path", cfg.Project.DB.DumpsDir, "", false},
+		{"Database", "DVV_RCLONE_REMOTE", "Sets the rclone remote used for Drive downloads.", "text", cfg.Project.DB.RcloneRemote, "", false},
+		{"Resources", "DVV_RESOURCES_START_SHORTCUT", "Sets the resources hub shortcut for start.", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Start, "", false},
+		{"Resources", "DVV_RESOURCES_RESTART_SHORTCUT", "Sets the resources hub shortcut for restart.", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Restart, "", false},
+		{"Resources", "DVV_RESOURCES_STOP_SHORTCUT", "Sets the resources hub shortcut for stop.", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Stop, "", false},
+		{"Safety", "DVV_DB_SAFETY_CONFIRM", "Requires confirmation for destructive database actions.", "bool", boolValue(cfg.Project.DB.SafetyConfirm), "", false},
+		{"Safety", "DVV_WORKSPACE_REQUIRE_CONFIRMATION", "Requires confirmation before workspace changes.", "bool", boolValue(cfg.Project.Workspace.Safety.RequireConfirmation), "", false},
+		{"Safety", "DVV_WORKSPACE_BLOCK_DIRTY_PROJECTS", "Blocks workspace deletion when projects are dirty.", "bool", boolValue(cfg.Project.Workspace.Safety.BlockRemoveWithDirtyProjects), "", false},
+		{"Safety", "DVV_WORKSPACE_ALLOW_FORCE_REMOVE", "Allows force deletion paths in workspace removal.", "bool", boolValue(cfg.Project.Workspace.Safety.AllowForceRemove), "", false},
+		{"Safety", "DVV_WORKSPACE_ONLY_DIRECT_CHILDREN", "Restricts deletion to direct workspace children.", "bool", boolValue(cfg.Project.Workspace.Safety.OnlyRemoveDirectChildren), "", false},
+		{"Safety", "DVV_WORKSPACE_CONFIRM_LEFTOVER_DELETION", "Requires extra confirmation for leftover files.", "bool", boolValue(cfg.Project.Workspace.Safety.ConfirmLeftoverDeletion), "", false},
+		{"Secrets", "DVV_SERVERS_FILE", "Sets the local SSH server list path.", "path", cfg.ServersFile, "", false},
+		{"Secrets", "DVV_AGE_KEY_FILE", "Sets the AGE private key file path.", "path", cfg.AgeKeyFile, "", false},
+		{"Secrets", "DVV_AGE_RECIPIENTS_FILE", "Sets the AGE recipients file path.", "path", cfg.AgeRecipientsFile, "", false},
+		{"Secrets", "DVV_ENCRYPTED_SERVERS_FILE", "Sets the encrypted SSH backup file path.", "path", cfg.EncryptedServersFile, "", false},
+		{"Secrets", "DVV_BW_AGE_KEY_ITEM", "Sets the Bitwarden item that stores the AGE key.", "secret", cfg.BitwardenAgeKeyItem, "", false},
 	}
 }
 
@@ -966,13 +1026,56 @@ func writeConfigFile(path string, values map[string]string) error {
 }
 
 func maskValue(entry Entry) string {
-	if entry.Value == "" {
+	return maskText(entry.Value, entry.Kind, entry.Key)
+}
+
+func maskText(value string, kind string, key string) string {
+	if value == "" {
 		return "<empty>"
 	}
-	if entry.Kind == "secret" || strings.Contains(entry.Key, "COOKIE") || strings.Contains(entry.Key, "TOKEN") {
+	upperKey := strings.ToUpper(key)
+	if kind == "secret" || strings.Contains(upperKey, "COOKIE") || strings.Contains(upperKey, "TOKEN") {
 		return "<set>"
 	}
-	return entry.Value
+	return value
+}
+
+func entrySource(entry Entry) string {
+	if entry.Persisted {
+		return "config.env"
+	}
+	if strings.TrimSpace(entry.Default) != "" {
+		return "default"
+	}
+	if strings.TrimSpace(entry.Value) != "" {
+		return "environment"
+	}
+	return "empty"
+}
+
+func defaultPreviewValue(entry Entry) string {
+	if strings.TrimSpace(entry.Default) == "" {
+		return ""
+	}
+	return maskText(entry.Default, entry.Kind, entry.Key)
+}
+
+func compactField(value string, width int) string {
+	value = cleanField(value)
+	runes := []rune(value)
+	if width > 0 && len(runes) > width {
+		if width <= 3 {
+			return string(runes[:width])
+		}
+		return string(runes[:width-3]) + "..."
+	}
+	return fixedWidth(value, width)
+}
+
+func cleanField(value string) string {
+	value = strings.ReplaceAll(value, "\t", " ")
+	value = strings.ReplaceAll(value, "\n", " ")
+	return strings.TrimSpace(value)
 }
 
 func validKey(key string) bool {
