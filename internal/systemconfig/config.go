@@ -200,7 +200,7 @@ func configCategories() []Category {
 		{"shortcuts", "Shortcuts", "Manage shell shortcuts and hub action keys"},
 		{"workspace", "Workspace", "Manage workspace root, discovery, opener, and action keys"},
 		{"database", "Database", "Manage MySQL, dumps, rclone, and DB safety defaults"},
-		{"tmux", "Tmux", "Manage directory picker search and shortcut settings"},
+		{"tmux", "Tmux", "Manage directory picker and home session settings"},
 		{"resources", "Resources", "Manage resource hub action shortcuts"},
 		{"integrations", "Integrations", "Configure terminal, rclone, Bitwarden, and local tool defaults"},
 		{"safety", "Safety", "Manage database and workspace confirmation rules"},
@@ -672,6 +672,12 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		if isNumber(value) {
 			fmt.Sscanf(value, "%d", &m.Config.Project.Tmux.Session.SearchDepth)
 		}
+	case "DVV_TMUX_HOME_DIR":
+		m.Config.Project.Tmux.Home.Directory = config.ExpandPath(value)
+	case "DVV_TMUX_HOME_SESSION_NAME":
+		m.Config.Project.Tmux.Home.SessionName = value
+	case "DVV_TMUX_HOME_SHORTCUT":
+		m.Config.Project.Tmux.Home.Shortcut = value
 	case "DVV_WORKSPACES_DIR":
 		m.Config.Project.Workspace.Root = config.ExpandPath(value)
 	case "DVV_WORKSPACE_PROJECT_ROOTS":
@@ -939,7 +945,10 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Tmux", "TMUX_WIN", "Sets the legacy tmux environment window name.", "text", "dev", "", false},
 		{"Tmux", "DVV_TMUX_SESSION_SEARCH_ROOTS", "Sets roots scanned by the tmux directory picker.", "path-list", strings.Join(cfg.Project.Tmux.Session.SearchRoots, string(os.PathListSeparator)), "", false},
 		{"Tmux", "DVV_TMUX_SESSION_SEARCH_DEPTH", "Limits directory picker search depth.", "number", fmt.Sprintf("%d", cfg.Project.Tmux.Session.SearchDepth), "", false},
+		{"Tmux", "DVV_TMUX_HOME_DIR", "Sets the directory opened by the direct home tmux shortcut.", "path", cfg.Project.Tmux.Home.Directory, "", false},
+		{"Tmux", "DVV_TMUX_HOME_SESSION_NAME", "Sets the tmux session name used by the direct home shortcut.", "text", cfg.Project.Tmux.Home.SessionName, "", false},
 		{"Shortcuts", "DVV_TMUX_SESSION_SHORTCUT", "Sets the zsh shortcut for the tmux directory picker.", "shortcut", cfg.Project.Tmux.Session.Shortcut, "", false},
+		{"Shortcuts", "DVV_TMUX_HOME_SHORTCUT", "Sets the zsh shortcut for opening a home tmux tab.", "shortcut", cfg.Project.Tmux.Home.Shortcut, "", false},
 		{"Shortcuts", "DVV_SSH_ADD_SHORTCUT", "Sets the SSH hub shortcut for adding an entry.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Add, "", false},
 		{"Shortcuts", "DVV_SSH_REMOVE_SHORTCUT", "Sets the SSH hub shortcut for removing an entry.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Remove, "", false},
 		{"Shortcuts", "DVV_SSH_NEW_TERMINAL_SHORTCUT", "Sets the SSH hub shortcut for opening a new tab.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.NewTerminal, "", false},

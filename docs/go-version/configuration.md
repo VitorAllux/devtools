@@ -55,6 +55,11 @@ The file is versioned because it defines project behavior, theme identity, and d
       "searchDepth": 3,
       "defaultSessionName": "space",
       "shortcut": "ctrl+f"
+    },
+    "home": {
+      "directory": "~",
+      "sessionName": "home",
+      "shortcut": "ctrl+shift+f"
     }
   },
   "workspace": {
@@ -108,7 +113,7 @@ First-level categories:
 | `Shortcuts` | Manage shell shortcuts and hub action keys. |
 | `Workspace` | Manage workspace root, project discovery, opener, and action keys. |
 | `Database` | Manage MySQL, dump directory, rclone, and database safety defaults. |
-| `Tmux` | Manage directory picker search and shortcut settings. |
+| `Tmux` | Manage directory picker and home session settings. |
 | `Resources` | Manage resource hub action shortcuts. |
 | `Integrations` | Configure rclone, Bitwarden, terminal launcher, and local tool defaults. |
 | `Safety` | Manage database and workspace confirmation rules. |
@@ -180,6 +185,12 @@ The `tmux.session` section contains the standalone directory session picker used
 
 Default search root priority mirrors the previous Bash implementation: `TMUX_DEFAULT_DIR`, then the configured `searchRoots` defaults `~/workspace`, `~/Work/Development/dev`, `~/Work/Development`, and `~/Development`, then the common parent of `API_DIR` and `WEB_DIR`, then `$HOME`.
 
+The `tmux.home` section contains the no-picker session used by `dvv tmux:home` and the zsh `Ctrl+Shift+F` shortcut:
+
+- `directory`: directory opened in the new tmux tab. Defaults to `~`.
+- `sessionName`: base tmux session name. Existing sessions append `_1`, `_2`, and so on.
+- `shortcut`: zsh keybinding installed by shell integration. Set to `none` to skip the direct home binding.
+
 Shortcut changes are applied by running `dvv setup`; `dvv build` and `npm run build` do not edit shell files.
 
 ## Workspace Config
@@ -215,12 +226,15 @@ Supported shortcut formats:
 shift+a
 alt+a
 ctrl+a
+ctrl+shift+a
 enter
 tab
 esc
 ```
 
 For letter keys, `shift+a` maps to the uppercase key `A` in fzf. That is how most terminals expose Shift+letter.
+
+The shell integration writes `ctrl+shift+letter` as a CSI-u zsh binding, such as `\e[70;6u` for `Ctrl+Shift+F`. Terminal applications may reserve that chord for their own UI; when that happens, use the command directly or remap the terminal shortcut.
 
 ## Local Runtime Data
 
@@ -268,13 +282,16 @@ DVV_WORKSPACE_PROJECT_SEARCH_DEPTH
 DVV_WORKSPACE_OPENER
 ```
 
-Tmux session overrides:
+Tmux overrides:
 
 ```text
 DVV_TMUX_SESSION_SEARCH_ROOTS
 DVV_TMUX_SESSION_SEARCH_DEPTH
 DVV_TMUX_SESSION_NAME
 DVV_TMUX_SESSION_SHORTCUT
+DVV_TMUX_HOME_DIR
+DVV_TMUX_HOME_SESSION_NAME
+DVV_TMUX_HOME_SHORTCUT
 ```
 
 Database overrides:
@@ -324,7 +341,7 @@ API_DIR
 WEB_DIR
 ```
 
-Legacy tmux session equivalents:
+Legacy tmux equivalents:
 
 ```text
 DVV_SESSION_SEARCH_ROOTS
@@ -333,6 +350,9 @@ DEVT_SESSION_SEARCH_ROOTS
 DEVT_SESSION_SEARCH_MAX_DEPTH
 DEVT_TMUX_SESSION_NAME
 DEVT_TMUX_SESSION_SHORTCUT
+DEVT_TMUX_HOME_DIR
+DEVT_TMUX_HOME_SESSION_NAME
+DEVT_TMUX_HOME_SHORTCUT
 ```
 
 When `DVV_WORKSPACES_DIR` and `DEVT_WORKSPACES_DIR` are unset, `TMUX_DEFAULT_DIR` is accepted as a legacy workspace root fallback. When explicit project search roots are unset, `API_DIR`, `WEB_DIR`, and `TMUX_DEFAULT_DIR` are used to seed workspace project discovery before the versioned defaults.

@@ -563,7 +563,7 @@ func valueOr(value string, fallback string) string {
 	return value
 }
 
-func showTmuxHelp(_ *config.Config) {
+func showTmuxHelp(cfg *config.Config) {
 	ui.Title("Tmux Hub")
 	fmt.Printf("  %s dvv tmux\n\n", ui.Bold("Usage:"))
 	helpSection("Hub")
@@ -580,4 +580,8 @@ func showTmuxHelp(_ *config.Config) {
 	helpEntry("Alt+A", "Restart API and Horizon")
 	helpEntry("Alt+W", "Restart Web")
 	helpEntry("Esc", "Exit")
+	fmt.Println()
+	helpSection("Shell Shortcuts")
+	helpEntry(shortcutLabel(cfg.Project.Tmux.Session.Shortcut, "ctrl+f"), "Run dvv tmux:session")
+	helpEntry(shortcutLabel(cfg.Project.Tmux.Home.Shortcut, "ctrl+shift+f"), "Run dvv tmux:home without picker")
 }

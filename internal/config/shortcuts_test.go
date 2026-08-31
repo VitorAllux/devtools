@@ -12,6 +12,7 @@ func TestNormalizeKey(t *testing.T) {
 		{input: "Shift+R", fzf: "R", label: "Shift+R"},
 		{input: "alt-a", fzf: "alt-a", label: "Alt+A"},
 		{input: "ctrl+t", fzf: "ctrl-t", label: "Ctrl+T"},
+		{input: "ctrl+shift+f", fzf: "ctrl-shift-f", label: "Ctrl+Shift+F"},
 		{input: "enter", fzf: "enter", label: "Enter"},
 	}
 

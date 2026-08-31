@@ -42,6 +42,11 @@
       "searchDepth": 3,
       "defaultSessionName": "space",
       "shortcut": "ctrl+f"
+    },
+    "home": {
+      "directory": "~",
+      "sessionName": "home",
+      "shortcut": "ctrl+shift+f"
     }
   },
   "workspace": {
@@ -80,7 +85,7 @@
       }
     },
     "bootstrap": {
-      "onCreate": false,
+      "onCreate": true,
       "onAdd": true,
       "copyRules": [
         {

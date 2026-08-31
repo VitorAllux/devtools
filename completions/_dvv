@@ -37,6 +37,7 @@ _dvv() {
           "ssh:remove:Remove SSH entries"
           "ssh:list:List SSH entries"
           "tmux:session:Open the directory picker used by Ctrl+F"
+          "tmux:home:Open the configured home tmux tab used by Ctrl+Shift+F"
           "workspace:list:List worktree workspaces"
         )
       fi

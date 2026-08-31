@@ -134,6 +134,7 @@ npm install -g @vitorallux/dvv@alpha
 | `dvv workspace` | Open the workspace hub. |
 | `dvv tmux` | Open the tmux environment hub. |
 | `dvv tmux:session` | Open the directory picker used by `Ctrl+F`. |
+| `dvv tmux:home` | Open the configured home tmux tab used by `Ctrl+Shift+F`. |
 | `dvv db` | Open the database hub. |
 | `dvv resources` | Open the local resources hub. |
 | `dvv config` | Open the configuration hub. |
@@ -151,9 +152,10 @@ Compatibility routes such as `dvv ssh:list`, `dvv workspace:list`, `dvv db impor
 | Shortcut | Command |
 | --- | --- |
 | `Ctrl+F` | `dvv tmux:session` |
+| `Ctrl+Shift+F` | `dvv tmux:home` |
 | `Alt+S` | `dvv ssh` |
 
-The managed block is written to `~/.zshrc`. Set `DVV_SKIP_SHELL_INTEGRATION=1` before setup to skip shortcut installation.
+The managed block is written to `~/.zshrc`. Set `DVV_SKIP_SHELL_INTEGRATION=1` before setup to skip shortcut installation. Some terminals reserve `Ctrl+Shift+F` for search; if the key does not reach zsh, run `dvv tmux:home` directly or remap the terminal shortcut.
 
 ## SSH Hub
 
@@ -238,6 +240,14 @@ The directory picker is available through:
 ```bash
 dvv tmux:session
 ```
+
+The direct home tab is available through:
+
+```bash
+dvv tmux:home
+```
+
+`dvv tmux:home` opens a new terminal tab attached to a tmux session in `tmux.home.directory`, defaulting to `~`. It does not show the directory picker.
 
 Default search root priority follows the previous Bash implementation: `TMUX_DEFAULT_DIR`, `~/workspace`, `~/Work/Development/dev`, `~/Work/Development`, `~/Development`, common parent of `API_DIR` and `WEB_DIR`, then `$HOME`.
 
@@ -364,6 +374,9 @@ DVV_TMUX_SESSION_SEARCH_ROOTS=~/workspace:~/Work/Development/dev:~/Work/Developm
 DVV_TMUX_SESSION_SEARCH_DEPTH=3
 DVV_TMUX_SESSION_NAME=space
 DVV_TMUX_SESSION_SHORTCUT=ctrl+f
+DVV_TMUX_HOME_DIR=~
+DVV_TMUX_HOME_SESSION_NAME=home
+DVV_TMUX_HOME_SHORTCUT=ctrl+shift+f
 ```
 
 Terminal:

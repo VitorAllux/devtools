@@ -77,6 +77,7 @@ type SSHHubShortcuts struct {
 
 type TmuxConfig struct {
 	Session TmuxSessionConfig `json:"session"`
+	Home    TmuxHomeConfig    `json:"home"`
 }
 
 type TmuxSessionConfig struct {
@@ -84,6 +85,12 @@ type TmuxSessionConfig struct {
 	SearchDepth        int      `json:"searchDepth"`
 	DefaultSessionName string   `json:"defaultSessionName"`
 	Shortcut           string   `json:"shortcut"`
+}
+
+type TmuxHomeConfig struct {
+	Directory   string `json:"directory"`
+	SessionName string `json:"sessionName"`
+	Shortcut    string `json:"shortcut"`
 }
 
 type WorkspaceConfig struct {
@@ -400,6 +407,11 @@ func defaultTmuxConfig() TmuxConfig {
 			DefaultSessionName: "space",
 			Shortcut:           "ctrl+f",
 		},
+		Home: TmuxHomeConfig{
+			Directory:   "~",
+			SessionName: "home",
+			Shortcut:    "ctrl+shift+f",
+		},
 	}
 }
 
@@ -605,6 +617,15 @@ func mergeTmuxConfigDefaults(target TmuxConfig, defaults TmuxConfig) TmuxConfig 
 	if strings.TrimSpace(target.Session.Shortcut) == "" {
 		target.Session.Shortcut = defaults.Session.Shortcut
 	}
+	if strings.TrimSpace(target.Home.Directory) == "" {
+		target.Home.Directory = defaults.Home.Directory
+	}
+	if strings.TrimSpace(target.Home.SessionName) == "" {
+		target.Home.SessionName = defaults.Home.SessionName
+	}
+	if strings.TrimSpace(target.Home.Shortcut) == "" {
+		target.Home.Shortcut = defaults.Home.Shortcut
+	}
 	return target
 }
 
@@ -677,6 +698,16 @@ func resolveTmuxConfig(cfg TmuxConfig) TmuxConfig {
 	}
 	if shortcut := firstSetEnv("DVV_TMUX_SESSION_SHORTCUT", "DEVT_TMUX_SESSION_SHORTCUT"); shortcut != "" {
 		cfg.Session.Shortcut = shortcut
+	}
+	if dir := firstSetEnv("DVV_TMUX_HOME_DIR", "DEVT_TMUX_HOME_DIR"); dir != "" {
+		cfg.Home.Directory = dir
+	}
+	cfg.Home.Directory = ExpandPath(cfg.Home.Directory)
+	if name := firstSetEnv("DVV_TMUX_HOME_SESSION_NAME", "DEVT_TMUX_HOME_SESSION_NAME"); name != "" {
+		cfg.Home.SessionName = name
+	}
+	if shortcut := firstSetEnv("DVV_TMUX_HOME_SHORTCUT", "DEVT_TMUX_HOME_SHORTCUT"); shortcut != "" {
+		cfg.Home.Shortcut = shortcut
 	}
 	return cfg
 }

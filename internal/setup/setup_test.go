@@ -125,6 +125,9 @@ func TestZshCompletionKeepsHubFirstSurface(t *testing.T) {
 	if !strings.Contains(text, "tmux:session:Open the directory picker used by Ctrl+F") {
 		t.Fatal("completion should keep the Ctrl+F compatibility command documented")
 	}
+	if !strings.Contains(text, "tmux:home:Open the configured home tmux tab used by Ctrl+Shift+F") {
+		t.Fatal("completion should keep the Ctrl+Shift+F shortcut command documented")
+	}
 }
 
 func TestInvalidWorkspaceNamesDetectsBrokenUTF8(t *testing.T) {

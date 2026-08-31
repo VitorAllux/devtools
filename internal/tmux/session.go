@@ -46,6 +46,18 @@ func Run(ctx context.Context, cfg *config.Config, runner run.Runner, args []stri
 	return manager.PickAndOpenSession(ctx)
 }
 
+func RunHome(ctx context.Context, cfg *config.Config, runner run.Runner, args []string) error {
+	manager := NewManager(cfg, runner)
+	if len(args) > 0 && isHelpArg(args[0]) {
+		showHomeHelp(cfg)
+		return nil
+	}
+	if len(args) > 0 {
+		return fmt.Errorf("tmux home does not accept arguments")
+	}
+	return manager.OpenHomeSession(ctx)
+}
+
 func PrintBrowseFeed(args []string) error {
 	if len(args) < 3 {
 		return fmt.Errorf("browse feed requires current directory, query, and search root")
@@ -116,15 +128,31 @@ func (m *Manager) SelectDirectory(ctx context.Context) (string, error) {
 }
 
 func (m *Manager) OpenSession(ctx context.Context, selected string) error {
+	return m.openSession(ctx, selected, m.Config.Project.Tmux.Session.DefaultSessionName, "dvv tmux:session")
+}
+
+func (m *Manager) OpenHomeSession(ctx context.Context) error {
+	directory := strings.TrimSpace(m.Config.Project.Tmux.Home.Directory)
+	if directory == "" {
+		directory = "~"
+	}
+	sessionName := strings.TrimSpace(m.Config.Project.Tmux.Home.SessionName)
+	if sessionName == "" {
+		sessionName = "home"
+	}
+	return m.openSession(ctx, directory, sessionName, "dvv tmux:home")
+}
+
+func (m *Manager) openSession(ctx context.Context, selected string, baseSessionName string, commandName string) error {
 	if _, err := m.Runner.LookPath("tmux"); err != nil {
-		return fmt.Errorf("tmux is required for `dvv tmux:session`")
+		return fmt.Errorf("tmux is required for `%s`", commandName)
 	}
 
 	path, err := realDir(selected)
 	if err != nil {
 		return err
 	}
-	sessionName := m.nextSessionName(ctx, m.Config.Project.Tmux.Session.DefaultSessionName)
+	sessionName := m.nextSessionName(ctx, baseSessionName)
 	windowName := windowName(path)
 
 	return ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "opening", Subject: sessionName, ShowResult: true, SuccessAction: "opened"}, func() error {
@@ -504,7 +532,34 @@ func showHelp(cfg *config.Config) {
 	helpEntry("Esc", "Exit")
 	fmt.Println()
 	helpSection("Shell Shortcut")
-	helpEntry(shortcut, "Runs dvv tmux:session when shell integration is installed")
+	helpEntry(shortcutLabel(shortcut, "ctrl+f"), "Runs dvv tmux:session when shell integration is installed")
+}
+
+func showHomeHelp(cfg *config.Config) {
+	shortcut := cfg.Project.Tmux.Home.Shortcut
+	if strings.TrimSpace(shortcut) == "" {
+		shortcut = "ctrl+shift+f"
+	}
+	directory := cfg.Project.Tmux.Home.Directory
+	if strings.TrimSpace(directory) == "" {
+		directory = "~"
+	}
+	ui.Title("Tmux Home")
+	fmt.Printf("  %s dvv tmux:home\n\n", ui.Bold("Usage:"))
+	helpSection("Command")
+	helpEntry("dvv tmux:home", "Open a new terminal tab attached to a tmux session in "+directory)
+	fmt.Println()
+	helpSection("Shell Shortcut")
+	helpEntry(shortcutLabel(shortcut, "ctrl+shift+f"), "Runs dvv tmux:home when shell integration is installed")
+}
+
+func shortcutLabel(value string, fallback string) string {
+	value = firstNonEmpty(value, fallback)
+	binding, err := config.NormalizeKey(value)
+	if err != nil {
+		return value
+	}
+	return binding.Label
 }
 
 func helpSection(title string) {

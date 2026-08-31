@@ -133,6 +133,30 @@ func TestOpenSessionCreatesUniqueDetachedSessionAndAttaches(t *testing.T) {
 	}
 }
 
+func TestOpenHomeSessionUsesConfiguredDirectoryAndSessionName(t *testing.T) {
+	t.Setenv("TMUX", "")
+	root := t.TempDir()
+	selected := filepath.Join(root, "terminal-home")
+	mustMkdir(t, selected)
+
+	runner := &fakeRunner{paths: map[string]bool{"tmux": true, "x-terminal-emulator": true}}
+	cfg := testConfig(root)
+	cfg.Project.Tmux.Home.Directory = selected
+	cfg.Project.Tmux.Home.SessionName = "home"
+	manager := NewManager(cfg, runner)
+
+	if err := manager.OpenHomeSession(context.Background()); err != nil {
+		t.Fatalf("OpenHomeSession returned error: %v", err)
+	}
+
+	if !runner.hasRun("tmux new-session -ds home -n terminal_home -c " + selected) {
+		t.Fatalf("new-session was not executed as expected: %#v", runner.runs)
+	}
+	if !runner.hasStart("x-terminal-emulator -e tmux attach -t home") {
+		t.Fatalf("terminal attach was not executed as expected: %#v", runner.starts)
+	}
+}
+
 func TestOpenSessionFallsBackToSwitchClientInsideTmux(t *testing.T) {
 	t.Setenv("TMUX", "/tmp/tmux")
 	root := t.TempDir()

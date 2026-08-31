@@ -267,7 +267,7 @@ func showSetupHelp() {
 	fmt.Printf("  %s dvv setup\n\n", ui.Bold("Usage:"))
 	helpSection("Actions")
 	helpEntry("zsh completion", "Copy completions/_dvv to ~/.zfunc/_dvv when possible")
-	helpEntry("shell shortcuts", "Install the managed Ctrl+F and Alt+S zsh shortcuts")
+	helpEntry("shell shortcuts", "Install managed Ctrl+F, Ctrl+Shift+F, and Alt+S zsh shortcuts")
 }
 
 func showDoctorHelp() {

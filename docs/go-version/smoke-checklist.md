@@ -39,6 +39,7 @@ Run these checks on the machine that will use the CLI daily:
 | Workspace | `dvv workspace` | Hub opens even when empty, existing `workspace-*` dirs are adopted, create/manage/delete flows show loaders. |
 | Tmux | `dvv tmux` | Environment hub opens and selected actions route to tmux commands. |
 | Directory picker | `Ctrl+F` or `dvv tmux:session` | Directory picker lists current directory, configured roots, and child directories. |
+| Home tmux tab | `Ctrl+Shift+F` or `dvv tmux:home` | New terminal tab opens in WSL/macOS/Linux terminal and attaches to a tmux session in `~`. |
 | Database | `dvv db` | Create/import/truncate/drop/clean actions show confirmation and loader/progress states. |
 | Resources | `dvv resources` | Services, Docker, containers, and Compose projects render when available. |
 
@@ -55,7 +56,7 @@ Run after installing Homebrew dependencies listed in the README:
 | Terminal | `DVV_TERMINAL_LAUNCHER=terminal dvv ssh` | SSH handoff opens in Terminal.app. |
 | iTerm2 | `DVV_TERMINAL_LAUNCHER=iterm2 dvv ssh` | SSH handoff opens in iTerm2 when installed. |
 | Workspace | `dvv workspace` | Editor openers resolve `code`, `cursor`, `opencode`, `codex`, or shell according to local tools. |
-| Tmux | `dvv tmux` and `dvv tmux:session` | Tmux sessions open in the configured terminal launcher. |
+| Tmux | `dvv tmux`, `dvv tmux:session`, and `dvv tmux:home` | Tmux sessions open in the configured terminal launcher. |
 | Database | `dvv db` | MySQL client and rclone flows work with local credentials. |
 | Resources | `dvv resources` | `brew services` and Docker Desktop resources are detected when available. |
 | Config | `dvv config` | Theme and terminal launcher config persist in `~/.config/devv/config.env`. |

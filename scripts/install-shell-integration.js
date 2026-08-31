@@ -17,17 +17,22 @@ if (!home) {
 
 const zshrc = path.join(home, ".zshrc");
 const config = readProjectConfig(path.join(root, "dvv.config.json"));
-const tmuxShortcut = shortcutToZshSequence(
+const tmuxShortcut = shortcutToZshSequences(
   process.env.DVV_TMUX_SESSION_SHORTCUT ||
     process.env.DEVT_TMUX_SESSION_SHORTCUT ||
     config?.tmux?.session?.shortcut ||
     "ctrl+f",
 );
+const tmuxHomeShortcut = shortcutToZshSequences(
+  process.env.DVV_TMUX_HOME_SHORTCUT ||
+    process.env.DEVT_TMUX_HOME_SHORTCUT ||
+    config?.tmux?.home?.shortcut ||
+    "ctrl+shift+f",
+);
 
 const bindings = [];
-if (tmuxShortcut) {
-  bindings.push(`bindkey -s "${tmuxShortcut}" "dvv tmux:session\\n"`);
-}
+addBindings(bindings, tmuxShortcut, "dvv tmux:session");
+addBindings(bindings, tmuxHomeShortcut, "dvv tmux:home");
 bindings.push(`bindkey -s "\\es" "dvv ssh\\n"`);
 
 if (bindings.length === 0) {
@@ -77,28 +82,40 @@ function readProjectConfig(file) {
   }
 }
 
-function shortcutToZshSequence(value) {
+function addBindings(bindings, sequences, command) {
+  for (const sequence of sequences) {
+    bindings.push(`bindkey -s "${sequence}" "${command}\\n"`);
+  }
+}
+
+function shortcutToZshSequences(value) {
   const normalized = String(value || "")
     .trim()
     .toLowerCase()
     .replace(/\s+/g, "")
-    .replace("-", "+");
+    .replace(/-/g, "+");
 
   if (!normalized || ["none", "off", "disabled"].includes(normalized)) {
-    return "";
+    return [];
+  }
+
+  const ctrlShift = normalized.match(/^ctrl\+shift\+(.+)$/);
+  if (ctrlShift && ctrlShift[1].length === 1) {
+    const codepoint = ctrlShift[1].toUpperCase().codePointAt(0);
+    return [`\\e[${codepoint};6u`];
   }
 
   const ctrl = normalized.match(/^ctrl\+(.+)$/);
   if (ctrl && ctrl[1].length === 1) {
-    return `^${ctrl[1].toUpperCase()}`;
+    return [`^${ctrl[1].toUpperCase()}`];
   }
 
   const alt = normalized.match(/^alt\+(.+)$/);
   if (alt && alt[1].length === 1) {
-    return `\\e${alt[1]}`;
+    return [`\\e${alt[1]}`];
   }
 
-  return "";
+  return [];
 }
 
 function removeManagedBlock(content, begin, end) {
@@ -122,6 +139,7 @@ function isLegacyShortcutLine(line) {
   return [
     'bindkey -s "^F" "devv tmux:session\\n"',
     'bindkey -s "^F" "dvv tmux:session\\n"',
+    'bindkey -s "\\e[70;6u" "dvv tmux:home\\n"',
     'bindkey -s "\\es" "devv ssh\\n"',
     'bindkey -s "\\es" "dvv ssh\\n"',
     'bindkey -s "\\es" "devv ssh:connect\\n"',

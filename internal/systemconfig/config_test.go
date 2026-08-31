@@ -104,7 +104,7 @@ func TestCategoryRowsKeepRawIDHidden(t *testing.T) {
 	if raw != "theme" {
 		t.Fatalf("first category raw id = %q, want theme", raw)
 	}
-	if !strings.Contains(rows[2], "Keys") || !strings.Contains(rows[2], "9 key(s)") {
+	if !strings.Contains(rows[2], "Keys") || !strings.Contains(rows[2], "11 key(s)") {
 		t.Fatalf("Keys row should include label and count: %q", rows[2])
 	}
 }
@@ -142,9 +142,10 @@ func TestEntriesForCategoryFiltersExpectedGroups(t *testing.T) {
 		category string
 		keys     []string
 	}{
-		{category: "keys", keys: []string{"DVV_THEME", "DVV_TERMINAL_LAUNCHER", "API_DIR", "DVV_DB_HOST", "DVV_TMUX_SESSION_SHORTCUT", "DVV_WORKSPACES_DIR", "DVV_RCLONE_REMOTE", "DVV_RESOURCES_START_SHORTCUT", "DVV_DB_SAFETY_CONFIRM"}},
-		{category: "paths", keys: []string{"API_DIR", "DVV_WORKSPACES_DIR"}},
-		{category: "shortcuts", keys: []string{"DVV_TMUX_SESSION_SHORTCUT", "DVV_RESOURCES_START_SHORTCUT"}},
+		{category: "keys", keys: []string{"DVV_THEME", "DVV_TERMINAL_LAUNCHER", "API_DIR", "DVV_DB_HOST", "DVV_TMUX_SESSION_SHORTCUT", "DVV_TMUX_HOME_DIR", "DVV_TMUX_HOME_SHORTCUT", "DVV_WORKSPACES_DIR", "DVV_RCLONE_REMOTE", "DVV_RESOURCES_START_SHORTCUT", "DVV_DB_SAFETY_CONFIRM"}},
+		{category: "paths", keys: []string{"API_DIR", "DVV_TMUX_HOME_DIR", "DVV_WORKSPACES_DIR"}},
+		{category: "shortcuts", keys: []string{"DVV_TMUX_SESSION_SHORTCUT", "DVV_TMUX_HOME_SHORTCUT", "DVV_RESOURCES_START_SHORTCUT"}},
+		{category: "tmux", keys: []string{"DVV_TMUX_HOME_DIR"}},
 		{category: "database", keys: []string{"DVV_DB_HOST", "DVV_RCLONE_REMOTE"}},
 		{category: "workspace", keys: []string{"DVV_WORKSPACES_DIR"}},
 		{category: "integrations", keys: []string{"DVV_TERMINAL_LAUNCHER", "DVV_DB_HOST", "DVV_RCLONE_REMOTE"}},
@@ -192,6 +193,12 @@ func TestKnownEntriesIncludesRuntimeShortcutKey(t *testing.T) {
 	entries := knownEntries(cfg)
 	if _, ok := findEntry(entries, "DVV_TMUX_SESSION_SHORTCUT"); !ok {
 		t.Fatalf("knownEntries should include DVV_TMUX_SESSION_SHORTCUT")
+	}
+	if _, ok := findEntry(entries, "DVV_TMUX_HOME_SHORTCUT"); !ok {
+		t.Fatalf("knownEntries should include DVV_TMUX_HOME_SHORTCUT")
+	}
+	if _, ok := findEntry(entries, "DVV_TMUX_HOME_DIR"); !ok {
+		t.Fatalf("knownEntries should include DVV_TMUX_HOME_DIR")
 	}
 	if _, ok := findEntry(entries, "DVV_THEME"); !ok {
 		t.Fatalf("knownEntries should include DVV_THEME")
@@ -266,6 +273,27 @@ func TestWriteValueAppliesRuntimeConfig(t *testing.T) {
 		t.Fatalf("resources start shortcut = %q", cfg.Project.Resources.Hub.Shortcuts.Start)
 	}
 
+	if err := manager.writeValue("DVV_TMUX_HOME_DIR", "~/terminal-home"); err != nil {
+		t.Fatalf("writeValue tmux home dir returned error: %v", err)
+	}
+	if cfg.Project.Tmux.Home.Directory != "/home/tester/terminal-home" {
+		t.Fatalf("tmux home dir = %q", cfg.Project.Tmux.Home.Directory)
+	}
+
+	if err := manager.writeValue("DVV_TMUX_HOME_SESSION_NAME", "root"); err != nil {
+		t.Fatalf("writeValue tmux home session returned error: %v", err)
+	}
+	if cfg.Project.Tmux.Home.SessionName != "root" {
+		t.Fatalf("tmux home session name = %q", cfg.Project.Tmux.Home.SessionName)
+	}
+
+	if err := manager.writeValue("DVV_TMUX_HOME_SHORTCUT", "ctrl+shift+p"); err != nil {
+		t.Fatalf("writeValue tmux home shortcut returned error: %v", err)
+	}
+	if cfg.Project.Tmux.Home.Shortcut != "ctrl+shift+p" {
+		t.Fatalf("tmux home shortcut = %q", cfg.Project.Tmux.Home.Shortcut)
+	}
+
 	if err := manager.writeValue("DVV_WORKSPACE_PROJECT_ROOTS", "~/one:/opt/two"); err != nil {
 		t.Fatalf("writeValue project roots returned error: %v", err)
 	}
@@ -327,6 +355,8 @@ func testEntries() []Entry {
 		{Category: "Project", Key: "API_DIR", Description: "Sets the default API project path.", Kind: "path"},
 		{Category: "Database", Key: "DVV_DB_HOST", Description: "Sets the MySQL host.", Kind: "text"},
 		{Category: "Shortcuts", Key: "DVV_TMUX_SESSION_SHORTCUT", Description: "Sets the tmux picker shortcut.", Kind: "shortcut"},
+		{Category: "Tmux", Key: "DVV_TMUX_HOME_DIR", Description: "Sets the direct tmux home directory.", Kind: "path"},
+		{Category: "Shortcuts", Key: "DVV_TMUX_HOME_SHORTCUT", Description: "Sets the direct tmux home shortcut.", Kind: "shortcut"},
 		{Category: "Workspace", Key: "DVV_WORKSPACES_DIR", Description: "Sets where workspace folders are created.", Kind: "path"},
 		{Category: "Database", Key: "DVV_RCLONE_REMOTE", Description: "Sets the rclone remote.", Kind: "text"},
 		{Category: "Resources", Key: "DVV_RESOURCES_START_SHORTCUT", Description: "Sets the resource start shortcut.", Kind: "shortcut"},

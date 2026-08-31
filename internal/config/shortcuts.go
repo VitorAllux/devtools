@@ -80,6 +80,13 @@ func NormalizeKey(value string) (KeyBinding, error) {
 	if len(parts) == 1 {
 		return singleKey(raw, parts[0])
 	}
+	if len(parts) == 3 && parts[0] == "ctrl" && parts[1] == "shift" {
+		key := parts[2]
+		if len([]rune(key)) != 1 {
+			return KeyBinding{}, fmt.Errorf("ctrl+shift shortcuts only support single character keys: %s", raw)
+		}
+		return KeyBinding{Raw: raw, FZFKey: "ctrl-shift-" + key, Label: "Ctrl+Shift+" + strings.ToUpper(key)}, nil
+	}
 	if len(parts) != 2 {
 		return KeyBinding{}, fmt.Errorf("unsupported shortcut key: %s", raw)
 	}

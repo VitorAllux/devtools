@@ -65,7 +65,8 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | Hub-first UX | Public commands should open hubs: `dvv ssh`, `dvv workspace`, `dvv tmux`, `dvv db`, `dvv resources`, `dvv config`. | Keep mutation flows inside hubs where possible. |
 | Shortcut config | Hub action keys are configurable in `dvv.config.json`. | Read from config, do not hard-code feature shortcuts in command handlers. |
 | fzf previews | Detailed shortcut decks belong in the side preview panel. | Use shared `internal/ui.FZFHub` and `FZFPreviewCommandDeck`. |
-| Global shortcuts | Only `Ctrl+F` and `Alt+S` are project-managed zsh shortcuts. | Avoid adding new global `Ctrl-*` bindings. |
+| Global shortcuts | Project-managed zsh shortcuts are `Ctrl+F`, `Ctrl+Shift+F`, and `Alt+S`. | Avoid adding more global `Ctrl-*` bindings without explicit need. |
+| Home tmux tab | `Ctrl+Shift+F` runs `dvv tmux:home`, opening `tmux.home.directory` without fzf. | If the terminal captures the chord for search, run `dvv tmux:home` directly or remap the terminal. |
 | Completion | Root completion lists public hubs by default. Compatibility routes are shown only when `DVV_COMPLETE_COMPAT=1`. | Keep root help, completion, and README aligned. |
 
 ## Config Hub

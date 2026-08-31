@@ -80,7 +80,7 @@ dvv resources
 dvv config
 ```
 
-`dvv tmux:session` exists as the command behind the managed `Ctrl+F` shell shortcut. `dvv env:bootstrap` is kept as a compatibility route for the previous bootstrap command.
+`dvv tmux:session` exists as the command behind the managed `Ctrl+F` shell shortcut. `dvv tmux:home` exists as the command behind the managed `Ctrl+Shift+F` shortcut and opens the configured home tmux tab without a picker. `dvv env:bootstrap` is kept as a compatibility route for the previous bootstrap command.
 
 Compatibility routes used by tests or scripts may exist during migration, but root help and autocomplete should stay hub-first unless a script command is intentionally promoted.
 

@@ -192,6 +192,9 @@ func TestLoadProjectConfigMergesWorkspaceDefaults(t *testing.T) {
 	if cfg.Tmux.Session.Shortcut != "ctrl+p" {
 		t.Fatalf("tmux shortcut = %q", cfg.Tmux.Session.Shortcut)
 	}
+	if cfg.Tmux.Home.Directory != "~" || cfg.Tmux.Home.SessionName != "home" || cfg.Tmux.Home.Shortcut != "ctrl+shift+f" {
+		t.Fatalf("tmux home defaults = %#v", cfg.Tmux.Home)
+	}
 	if cfg.Tmux.Session.SearchDepth != 3 {
 		t.Fatalf("tmux search depth = %d", cfg.Tmux.Session.SearchDepth)
 	}
@@ -284,6 +287,9 @@ func TestResolveTmuxConfigUsesEnvOverrides(t *testing.T) {
 	t.Setenv("DVV_TMUX_SESSION_SEARCH_DEPTH", "5")
 	t.Setenv("DVV_TMUX_SESSION_NAME", "code")
 	t.Setenv("DVV_TMUX_SESSION_SHORTCUT", "ctrl+p")
+	t.Setenv("DVV_TMUX_HOME_DIR", "~/terminal-home")
+	t.Setenv("DVV_TMUX_HOME_SESSION_NAME", "root")
+	t.Setenv("DVV_TMUX_HOME_SHORTCUT", "ctrl+shift+p")
 
 	cfg := resolveTmuxConfig(defaultTmuxConfig())
 
@@ -298,6 +304,15 @@ func TestResolveTmuxConfigUsesEnvOverrides(t *testing.T) {
 	}
 	if cfg.Session.Shortcut != "ctrl+p" {
 		t.Fatalf("tmux shortcut = %q", cfg.Session.Shortcut)
+	}
+	if cfg.Home.Directory != "/home/tester/terminal-home" {
+		t.Fatalf("tmux home directory = %q", cfg.Home.Directory)
+	}
+	if cfg.Home.SessionName != "root" {
+		t.Fatalf("tmux home session name = %q", cfg.Home.SessionName)
+	}
+	if cfg.Home.Shortcut != "ctrl+shift+p" {
+		t.Fatalf("tmux home shortcut = %q", cfg.Home.Shortcut)
 	}
 }
 

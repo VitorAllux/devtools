@@ -14,7 +14,7 @@ These rules document the local conventions for future agents and maintainers wor
 - For interactive processes such as SSH, show loaders before terminal handoff and stop them before the child process owns the terminal.
 - Avoid global shell keybindings unless the project explicitly defines one. They can conflict with terminals, shells, editors, and IDEs.
 - Prefer explicit `dvv ...` commands. Personal shell shortcuts belong in the user's own shell config.
-- Project-managed zsh shortcuts are `Ctrl+F` for `dvv tmux:session` and `Alt+S` for `dvv ssh`.
+- Project-managed zsh shortcuts are `Ctrl+F` for `dvv tmux:session`, `Ctrl+Shift+F` for `dvv tmux:home`, and `Alt+S` for `dvv ssh`.
 
 ## Help And Command Lists
 
@@ -38,8 +38,9 @@ These rules document the local conventions for future agents and maintainers wor
 ## Shortcuts
 
 - Avoid new `Ctrl-*` shortcuts for dvv features. They commonly conflict with shells, terminal apps, VS Code, Cursor, and fzf defaults.
-- `Ctrl+F` is the only approved global `Ctrl-*` shortcut, preserved from the previous Bash implementation for the tmux directory session picker.
-- Root help should present the tmux hub as `dvv tmux` and the directory picker as the `Ctrl+F` shortcut.
+- `Ctrl+F` is approved for the tmux directory session picker, preserved from the previous Bash implementation.
+- `Ctrl+Shift+F` is approved for opening a configured home tmux tab without the directory picker.
+- Root help should present the tmux hub as `dvv tmux`, the directory picker as the `Ctrl+F` shortcut, and the home tmux tab as the `Ctrl+Shift+F` shortcut.
 - Do not use `Ctrl+S`; many terminals treat it as XOFF flow control and appear frozen.
 - Interactive hubs should use local `Shift+letter` shortcuts for hub actions by default.
 - Hub shortcuts must be configurable in `dvv.config.json` before a hub is exposed.
@@ -120,6 +121,7 @@ dvv config
 ```
 
 - `dvv tmux:session` is kept for the managed `Ctrl+F` shortcut.
+- `dvv tmux:home` is kept for the managed `Ctrl+Shift+F` shortcut and should open the configured home directory without fzf selection.
 - Script-friendly compatibility routes may exist, but should not make root help noisy:
 
 ```text
