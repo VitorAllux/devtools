@@ -22,6 +22,7 @@ type Config struct {
 
 type ProjectConfig struct {
 	Theme     ThemeConfig     `json:"theme"`
+	Terminal  TerminalConfig  `json:"terminal"`
 	DB        DBConfig        `json:"db"`
 	Resources ResourcesConfig `json:"resources"`
 	SSH       SSHConfig       `json:"ssh"`
@@ -31,6 +32,10 @@ type ProjectConfig struct {
 
 type ThemeConfig struct {
 	Name string `json:"name"`
+}
+
+type TerminalConfig struct {
+	Launcher string `json:"launcher"`
 }
 
 type DBConfig struct {
@@ -214,6 +219,7 @@ func Load() (*Config, error) {
 		Project:              projectConfig,
 	}
 	cfg.Project.Theme = resolveThemeConfig(cfg.Project.Theme)
+	cfg.Project.Terminal = resolveTerminalConfig(cfg.Project.Terminal)
 	cfg.Project.SSH = resolveSSHConfig(cfg.Project.SSH)
 	cfg.Project.Resources = resolveResourcesConfig(cfg.Project.Resources)
 	cfg.Project.Workspace = resolveWorkspaceConfig(cfg.Project.Workspace)
@@ -347,6 +353,9 @@ func ExpandPath(value string) string {
 func DefaultProjectConfig() ProjectConfig {
 	return ProjectConfig{
 		Theme: ThemeConfig{Name: "royal-noir"},
+		Terminal: TerminalConfig{
+			Launcher: "auto",
+		},
 		DB: DBConfig{
 			Host:          "",
 			Port:          "3306",
@@ -485,6 +494,9 @@ func mergeProjectConfigDefaults(target *ProjectConfig) {
 	if strings.TrimSpace(target.Theme.Name) == "" {
 		target.Theme.Name = defaults.Theme.Name
 	}
+	if strings.TrimSpace(target.Terminal.Launcher) == "" {
+		target.Terminal.Launcher = defaults.Terminal.Launcher
+	}
 	target.DB = mergeDBConfigDefaults(target.DB, defaults.DB)
 	target.Resources = mergeResourcesConfigDefaults(target.Resources, defaults.Resources)
 	if strings.TrimSpace(target.SSH.Hub.Shortcuts.Add) == "" {
@@ -540,6 +552,17 @@ func resolveThemeConfig(cfg ThemeConfig) ThemeConfig {
 		cfg.Name = DefaultProjectConfig().Theme.Name
 	}
 	cfg.Name = strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(cfg.Name), "_", "-"), " ", "-"))
+	return cfg
+}
+
+func resolveTerminalConfig(cfg TerminalConfig) TerminalConfig {
+	if value := firstSetEnv("DVV_TERMINAL_LAUNCHER", "DEVT_TERMINAL_LAUNCHER"); value != "" {
+		cfg.Launcher = value
+	}
+	cfg.Launcher = strings.ToLower(strings.TrimSpace(cfg.Launcher))
+	if cfg.Launcher == "" {
+		cfg.Launcher = DefaultProjectConfig().Terminal.Launcher
+	}
 	return cfg
 }
 

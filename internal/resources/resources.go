@@ -57,9 +57,16 @@ type ActionResult struct {
 	RequiresTerminal bool
 }
 
+type brewService struct {
+	Name   string
+	Status string
+	User   string
+}
+
 type Manager struct {
 	Config *config.Config
 	Runner run.Runner
+	OS     string
 }
 
 func Run(ctx context.Context, cfg *config.Config, runner run.Runner, args []string) error {
@@ -129,14 +136,18 @@ func (m Manager) Load(ctx context.Context) ([]Resource, error) {
 }
 
 func (m Manager) Resources(ctx context.Context) ([]Resource, error) {
-	serviceEntries := m.serviceStatusEntries(ctx)
-	hasSystemctl := m.systemctlUsable(ctx)
 	resources := make([]Resource, 0, len(serviceDefinitions)+8)
 
-	for _, definition := range serviceDefinitions {
-		resource, ok := m.detectService(ctx, definition.Name, definition.Label, serviceEntries, hasSystemctl)
-		if ok {
-			resources = append(resources, resource)
+	if m.goos() == "darwin" {
+		resources = append(resources, m.detectBrewServices(ctx)...)
+	} else {
+		serviceEntries := m.serviceStatusEntries(ctx)
+		hasSystemctl := m.systemctlUsable(ctx)
+		for _, definition := range serviceDefinitions {
+			resource, ok := m.detectService(ctx, definition.Name, definition.Label, serviceEntries, hasSystemctl)
+			if ok {
+				resources = append(resources, resource)
+			}
 		}
 	}
 
@@ -158,6 +169,13 @@ func (m Manager) Resources(ctx context.Context) ([]Resource, error) {
 		return resourceKindRank(resources[i].Kind) < resourceKindRank(resources[j].Kind)
 	})
 	return resources, nil
+}
+
+func (m Manager) goos() string {
+	if m.OS != "" {
+		return m.OS
+	}
+	return runtime.GOOS
 }
 
 func (m Manager) CommandList(ctx context.Context) error {
@@ -464,6 +482,32 @@ func (m Manager) detectService(ctx context.Context, serviceName string, label st
 	}, true
 }
 
+func (m Manager) detectBrewServices(ctx context.Context) []Resource {
+	if _, err := m.Runner.LookPath("brew"); err != nil {
+		return nil
+	}
+	output, err := m.outputWithTimeout(ctx, 6*time.Second, "", "brew", "services", "list")
+	if err != nil {
+		return nil
+	}
+	services := parseBrewServices(output)
+	resources := make([]Resource, 0, len(services))
+	for _, service := range services {
+		resources = append(resources, Resource{
+			ID:        "service:" + safeIDPart(service.Name),
+			Kind:      "Service",
+			Name:      service.Name,
+			State:     brewServiceState(service.Status),
+			Available: true,
+			Manager:   "brew",
+			Details:   firstNonEmpty(service.User, "brew services"),
+			Actions:   resourceActions(),
+			Target:    service.Name,
+		})
+	}
+	return resources
+}
+
 func (m Manager) detectDockerResources(ctx context.Context) []Resource {
 	if _, err := m.Runner.LookPath("docker"); err != nil {
 		return nil
@@ -590,6 +634,9 @@ func (m Manager) actionCommand(ctx context.Context, resource Resource, action st
 	}
 	switch resource.Kind {
 	case "Service":
+		if resource.Manager == "brew" {
+			return []string{"brew", "services", action, resource.Target}
+		}
 		if resource.Manager == "systemctl" {
 			return append(prefix, "systemctl", action, resource.Target+".service")
 		}
@@ -813,6 +860,37 @@ func parseComposeProjects(output []byte) []composeProject {
 		}
 	}
 	return rows
+}
+
+func parseBrewServices(output []byte) []brewService {
+	services := []brewService{}
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 || strings.EqualFold(fields[0], "name") {
+			continue
+		}
+		user := ""
+		if len(fields) >= 3 {
+			user = fields[2]
+		}
+		services = append(services, brewService{
+			Name:   fields[0],
+			Status: fields[1],
+			User:   user,
+		})
+	}
+	return services
+}
+
+func brewServiceState(status string) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "started", "running":
+		return "running"
+	case "stopped", "none":
+		return "stopped"
+	default:
+		return firstNonEmpty(status, "unknown")
+	}
 }
 
 func splitComposeFiles(value string) []string {

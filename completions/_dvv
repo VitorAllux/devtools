@@ -16,33 +16,57 @@ _dvv() {
         "config:Open the configuration hub"
         "db:Open the database hub"
         "doctor:Check local dependencies and integration"
+        "help:Show command help"
         "resources:Open the local resources hub"
         "setup:Install zsh completion and shell shortcuts"
         "ssh:Open the SSH hub"
         "tmux:Open the tmux environment hub"
         "workspace:Open the workspace hub"
       )
+      if [[ -n "${DVV_COMPLETE_COMPAT:-}" ]]; then
+        commands+=(
+          "config:list:List effective configuration values"
+          "config:set:Persist a configuration value"
+          "db:create:Create a database"
+          "db:import:Import a local or Google Drive dump"
+          "db:clean:Delete local dump files"
+          "db:truncate:Truncate selected databases"
+          "db:drop:Drop selected databases"
+          "resources:list:List detected local resources"
+          "ssh:add:Add an SSH entry"
+          "ssh:remove:Remove SSH entries"
+          "ssh:list:List SSH entries"
+          "tmux:session:Open the directory picker used by Ctrl+F"
+          "workspace:list:List worktree workspaces"
+        )
+      fi
       _describe -t commands 'dvv commands' commands
       ;;
     args)
       case "${words[2]:-}" in
         config)
           local -a config_actions
-          config_actions=(
-            "list:List effective configuration values"
-            "set:Persist a configuration value"
-          )
+          config_actions=("help:Show configuration hub help")
+          if [[ -n "${DVV_COMPLETE_COMPAT:-}" ]]; then
+            config_actions+=(
+              "list:List effective configuration values"
+              "set:Persist a configuration value"
+            )
+          fi
           _describe -t config-actions 'config actions' config_actions
           ;;
         db)
           local -a db_actions
-          db_actions=(
-            "create:Create a database"
-            "import:Import a local or Google Drive dump"
-            "clean:Delete local dump files"
-            "truncate:Truncate selected databases"
-            "drop:Drop selected databases"
-          )
+          db_actions=("help:Show database hub help")
+          if [[ -n "${DVV_COMPLETE_COMPAT:-}" ]]; then
+            db_actions+=(
+              "create:Create a database"
+              "import:Import a local or Google Drive dump"
+              "clean:Delete local dump files"
+              "truncate:Truncate selected databases"
+              "drop:Drop selected databases"
+            )
+          fi
           _describe -t db-actions 'db actions' db_actions
           ;;
         bootstrap)
@@ -55,22 +79,50 @@ _dvv() {
           ;;
         ssh)
           local -a ssh_flags
-          ssh_flags=(
-            "--name:Connect by SSH entry name"
-            "--target:Connect to a raw SSH target"
-            "--new-terminal:Open in a new terminal tab when supported"
-          )
+          ssh_flags=("help:Show SSH hub help")
+          if [[ -n "${DVV_COMPLETE_COMPAT:-}" ]]; then
+            ssh_flags+=(
+              "--name:Connect by SSH entry name"
+              "--target:Connect to a raw SSH target"
+              "--new-terminal:Open in a new terminal tab when supported"
+            )
+          fi
           _describe -t ssh-flags 'ssh flags' ssh_flags
           ;;
         tmux)
           local -a tmux_actions
-          tmux_actions=(
-            "up:Start or open the selected environment"
-            "down:Stop the selected environment"
-            "api-restart:Restart API and Horizon panes"
-            "web-restart:Restart Web pane"
-          )
+          tmux_actions=("help:Show tmux hub help")
+          if [[ -n "${DVV_COMPLETE_COMPAT:-}" ]]; then
+            tmux_actions+=(
+              "up:Start or open the selected environment"
+              "down:Stop the selected environment"
+              "api-restart:Restart API and Horizon panes"
+              "web-restart:Restart Web pane"
+            )
+          fi
           _describe -t tmux-actions 'tmux actions' tmux_actions
+          ;;
+        resources)
+          local -a resources_actions
+          resources_actions=("help:Show resources hub help")
+          if [[ -n "${DVV_COMPLETE_COMPAT:-}" ]]; then
+            resources_actions+=(
+              "list:List detected local resources"
+              "details:Show selected resource details"
+              "start:Start selected resource"
+              "restart:Restart selected resource"
+              "stop:Stop selected resource"
+            )
+          fi
+          _describe -t resources-actions 'resources actions' resources_actions
+          ;;
+        workspace)
+          local -a workspace_actions
+          workspace_actions=("help:Show workspace hub help")
+          if [[ -n "${DVV_COMPLETE_COMPAT:-}" ]]; then
+            workspace_actions+=("list:List worktree workspaces")
+          fi
+          _describe -t workspace-actions 'workspace actions' workspace_actions
           ;;
       esac
       ;;

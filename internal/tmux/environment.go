@@ -362,13 +362,20 @@ func (m *Manager) applyOptions(ctx context.Context) {
 }
 
 func (m *Manager) openTmuxSessionInTerminal(ctx context.Context, session string) error {
-	if err := (terminal.Launcher{Runner: m.Runner}).Open(ctx, "tmux", "attach", "-t", session); err != nil {
+	if err := (terminal.Launcher{Runner: m.Runner, Preferred: m.terminalLauncherPreference()}).Open(ctx, "tmux", "attach", "-t", session); err != nil {
 		if os.Getenv("TMUX") != "" {
 			return m.Runner.Run(ctx, "", "tmux", "switch-client", "-t", session)
 		}
 		return fmt.Errorf("%w; attach manually with: tmux attach -t %s", err, session)
 	}
 	return nil
+}
+
+func (m *Manager) terminalLauncherPreference() string {
+	if m.Config == nil {
+		return ""
+	}
+	return m.Config.Project.Terminal.Launcher
 }
 
 func (m *Manager) hasSession(ctx context.Context, session string) bool {

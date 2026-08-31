@@ -202,7 +202,7 @@ func configCategories() []Category {
 		{"database", "Database", "Manage MySQL, dumps, rclone, and DB safety defaults"},
 		{"tmux", "Tmux", "Manage directory picker search and shortcut settings"},
 		{"resources", "Resources", "Manage resource hub action shortcuts"},
-		{"integrations", "Integrations", "Configure rclone, Bitwarden, and local tool defaults"},
+		{"integrations", "Integrations", "Configure terminal, rclone, Bitwarden, and local tool defaults"},
 		{"safety", "Safety", "Manage database and workspace confirmation rules"},
 	}
 }
@@ -297,7 +297,7 @@ func entriesForCategory(categoryID string, entries []Entry) []Entry {
 	case "integrations":
 		return filterEntries(entries, func(entry Entry) bool {
 			switch entry.Key {
-			case "DVV_RCLONE_REMOTE", "DVV_BW_AGE_KEY_ITEM", "DVV_DB_HOST", "DVV_DB_PORT", "DVV_DB_USER":
+			case "DVV_TERMINAL_LAUNCHER", "DVV_RCLONE_REMOTE", "DVV_BW_AGE_KEY_ITEM", "DVV_DB_HOST", "DVV_DB_PORT", "DVV_DB_USER":
 				return true
 			default:
 				return false
@@ -714,6 +714,8 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.Workspace.Safety.OnlyRemoveDirectChildren = value == "1"
 	case "DVV_WORKSPACE_CONFIRM_LEFTOVER_DELETION":
 		m.Config.Project.Workspace.Safety.ConfirmLeftoverDeletion = value == "1"
+	case "DVV_TERMINAL_LAUNCHER":
+		m.Config.Project.Terminal.Launcher = strings.ToLower(strings.TrimSpace(value))
 	}
 }
 
@@ -929,6 +931,7 @@ func chooseOne(label string, values []string) (string, error) {
 func knownEntries(cfg *config.Config) []Entry {
 	return []Entry{
 		{"Theme", "DVV_THEME", "Selects the CLI color theme.", "theme", cfg.Project.Theme.Name, "", false},
+		{"Integrations", "DVV_TERMINAL_LAUNCHER", "Selects the terminal launcher for new SSH and tmux tabs.", "choice", cfg.Project.Terminal.Launcher, "", false},
 		{"Project", "API_DIR", "Sets the default API project path for legacy tmux flows.", "path", "", "", false},
 		{"Project", "WEB_DIR", "Sets the default Web project path for legacy tmux flows.", "path", "", "", false},
 		{"Tmux", "TMUX_DEFAULT_DIR", "Sets the legacy default root for directory pickers.", "path", "~/workspace", "", false},

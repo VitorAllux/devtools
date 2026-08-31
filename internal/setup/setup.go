@@ -17,6 +17,7 @@ import (
 type Manager struct {
 	Config *config.Config
 	Runner run.Runner
+	OS     string
 }
 
 func RunSetup(ctx context.Context, cfg *config.Config, runner run.Runner, args []string) error {
@@ -91,8 +92,9 @@ func (m Manager) Doctor(_ context.Context) error {
 	checkCommand(m.Runner, "age-keygen", false)
 	checkCommand(m.Runner, "bw", false)
 	checkCommand(m.Runner, "docker", false)
-	checkCommand(m.Runner, "systemctl", false)
-	checkCommand(m.Runner, "service", false)
+	for _, dependency := range platformDependencies(m.goos()) {
+		checkCommand(m.Runner, dependency.Name, dependency.Recommended)
+	}
 	checkPath("SSH list", m.Config.ServersFile, false)
 	checkPath("AGE key", m.Config.AgeKeyFile, false)
 	checkPath("AGE recipients", m.Config.AgeRecipientsFile, false)
@@ -103,6 +105,35 @@ func (m Manager) Doctor(_ context.Context) error {
 	checkPath("Zsh completion", filepath.Join(homeDir(), ".zfunc", "_dvv"), false)
 	checkZshShortcutBlock()
 	return nil
+}
+
+type dependency struct {
+	Name        string
+	Recommended bool
+}
+
+func platformDependencies(goos string) []dependency {
+	switch goos {
+	case "darwin":
+		return []dependency{
+			{Name: "brew", Recommended: true},
+			{Name: "osascript", Recommended: true},
+		}
+	case "linux":
+		return []dependency{
+			{Name: "systemctl"},
+			{Name: "service"},
+		}
+	default:
+		return nil
+	}
+}
+
+func (m Manager) goos() string {
+	if m.OS != "" {
+		return m.OS
+	}
+	return runtime.GOOS
 }
 
 func checkCommand(runner run.Runner, name string, recommended bool) {

@@ -7,5 +7,9 @@ import (
 )
 
 func main() {
-	os.Exit(app.Run(os.Args[1:]))
+	os.Exit(exitCode(os.Args[1:]))
+}
+
+func exitCode(args []string) int {
+	return app.Run(args)
 }

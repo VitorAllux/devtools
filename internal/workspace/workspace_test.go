@@ -12,6 +12,7 @@ import (
 	"github.com/VitorAllux/devtools/internal/config"
 	"github.com/VitorAllux/devtools/internal/discovery"
 	"github.com/VitorAllux/devtools/internal/metadata"
+	"github.com/VitorAllux/devtools/internal/ui"
 )
 
 func TestWorkspaceNaming(t *testing.T) {
@@ -160,6 +161,127 @@ func TestBuildCreatePlanUsesBaseTypeAndCreateAction(t *testing.T) {
 	}
 }
 
+func TestDiscoverProjectsPreservesConfiguredOrderAndSearchDepth(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	configured := filepath.Join(root, "configured-api")
+	discovered := filepath.Join(root, "discovered-web")
+	deep := filepath.Join(root, "team", "nested-api")
+	for _, path := range []string{configured, discovered, deep} {
+		mustMkdir(t, filepath.Join(path, ".git"))
+	}
+
+	cfg := testWorkspaceConfig(filepath.Join(root, "workspaces"))
+	cfg.Project.Workspace.Projects = []config.WorkspaceProject{{Name: "api", Path: configured}}
+	cfg.Project.Workspace.ProjectSearchRoots = []string{root}
+	cfg.Project.Workspace.ProjectSearchDepth = 2
+	runner := newWorkspaceRunner()
+	runner.primary[configured] = true
+	runner.primary[discovered] = true
+	runner.primary[deep] = true
+
+	projects, err := NewManager(cfg, runner).DiscoverProjects(ctx)
+	if err != nil {
+		t.Fatalf("DiscoverProjects returned error: %v", err)
+	}
+	if len(projects) != 2 {
+		t.Fatalf("projects = %#v, want configured and shallow discovered", projects)
+	}
+	if projects[0].Name != "api" || projects[0].Path != configured {
+		t.Fatalf("configured project should stay first: %#v", projects)
+	}
+	if projects[1].Name != "discovered-web" || projects[1].Path != discovered {
+		t.Fatalf("discovered project = %#v", projects[1])
+	}
+}
+
+func TestManageProjectsMarksIncludedAndKeepsUnknownWorktree(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	sourceAPI := filepath.Join(root, "repos", "api")
+	sourceWeb := filepath.Join(root, "repos", "web")
+	sourceLegacy := filepath.Join(root, "legacy", "worker")
+	workspacePath := filepath.Join(root, "workspaces", "workspace-alpha")
+	apiWorktree := filepath.Join(workspacePath, "api")
+	legacyWorktree := filepath.Join(workspacePath, "worker")
+	for _, path := range []string{sourceAPI, sourceWeb, sourceLegacy, apiWorktree, legacyWorktree} {
+		mustMkdir(t, path)
+	}
+
+	cfg := testWorkspaceConfig(filepath.Join(root, "workspaces"))
+	cfg.Project.Workspace.Projects = []config.WorkspaceProject{
+		{Name: "api", Path: sourceAPI},
+		{Name: "web", Path: sourceWeb},
+	}
+	runner := newWorkspaceRunner()
+	runner.primary[sourceAPI] = true
+	runner.primary[sourceWeb] = true
+	runner.linked[apiWorktree] = sourceAPI
+	runner.linked[legacyWorktree] = sourceLegacy
+	runner.branches[apiWorktree] = "alpha"
+	runner.branches[legacyWorktree] = "alpha"
+
+	rows, err := NewManager(cfg, runner).ManageProjects(ctx, Workspace{Name: "alpha", DirName: "workspace-alpha", Path: workspacePath})
+	if err != nil {
+		t.Fatalf("ManageProjects returned error: %v", err)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("rows = %#v, want api, web, and legacy worker", rows)
+	}
+	if !rows[0].Included || rows[0].Worktree.Path != apiWorktree {
+		t.Fatalf("api should be marked included: %#v", rows[0])
+	}
+	if rows[1].Included {
+		t.Fatalf("web should be available to add: %#v", rows[1])
+	}
+	if !rows[2].Included || rows[2].Project.Name != "worker" || rows[2].Project.Path != sourceLegacy {
+		t.Fatalf("legacy worktree row = %#v", rows[2])
+	}
+}
+
+func TestRemoveProjectRemovesLinkedWorktreeAndMetadata(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	source := filepath.Join(root, "repos", "api")
+	workspacePath := filepath.Join(root, "workspaces", "workspace-alpha")
+	projectPath := filepath.Join(workspacePath, "api")
+	otherPath := filepath.Join(workspacePath, "web")
+	for _, path := range []string{source, projectPath, otherPath} {
+		mustMkdir(t, path)
+	}
+	if err := metadata.Write(workspacePath, metadata.Workspace{
+		Version:       1,
+		WorkspaceName: "alpha",
+		WorkspaceDir:  "workspace-alpha",
+		Projects: []metadata.Project{
+			{Name: "api", Source: source, Path: projectPath},
+			{Name: "web", Source: filepath.Join(root, "repos", "web"), Path: otherPath},
+		},
+	}); err != nil {
+		t.Fatalf("metadata write failed: %v", err)
+	}
+
+	runner := newWorkspaceRunner()
+	runner.linked[projectPath] = source
+	runner.status[projectPath] = ""
+	manager := NewManager(testWorkspaceConfig(filepath.Join(root, "workspaces")), runner)
+
+	err := manager.RemoveProject(ctx, Workspace{Name: "alpha", DirName: "workspace-alpha", Path: workspacePath}, Project{Name: "api", Source: source, Path: projectPath, WorkBranch: "alpha"}, false)
+	if err != nil {
+		t.Fatalf("RemoveProject returned error: %v", err)
+	}
+	if _, err := os.Stat(projectPath); !os.IsNotExist(err) {
+		t.Fatalf("project worktree should be removed, stat err = %v", err)
+	}
+	meta, exists, err := metadata.Read(workspacePath)
+	if err != nil || !exists {
+		t.Fatalf("metadata read failed: exists=%v err=%v", exists, err)
+	}
+	if len(meta.Projects) != 1 || meta.Projects[0].Name != "web" {
+		t.Fatalf("metadata projects = %#v", meta.Projects)
+	}
+}
+
 func TestWorkspaceRowsShowsEmptyState(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 
@@ -227,6 +349,77 @@ func TestFZFHubKeepsEmptyWorkspaceHubOpen(t *testing.T) {
 	}
 	if !strings.Contains(runner.fzfInput, "__dvv_empty__") {
 		t.Fatalf("fzf input missing empty state: %q", runner.fzfInput)
+	}
+}
+
+func TestWorkspaceSelectionParsingHelpers(t *testing.T) {
+	path := "/tmp/workspace-alpha"
+	line := ui.FZFHiddenRow(path, "alpha")
+	if got := selectedWorkspacePaths([]string{line, ui.FZFHiddenRow("__dvv_empty__", "empty")}); len(got) != 1 || got[0] != path {
+		t.Fatalf("selectedWorkspacePaths = %#v", got)
+	}
+	if got := selectedRawLines(line + "\n" + ui.FZFHiddenHeader("header")); len(got) != 1 || got[0] != path {
+		t.Fatalf("selectedRawLines = %#v", got)
+	}
+	root := t.TempDir()
+	workspacePath := filepath.Join(root, "workspace-alpha")
+	mustMkdir(t, workspacePath)
+	manager := NewManager(testWorkspaceConfig(root), newWorkspaceRunner())
+	if ws, ok, err := manager.singleSelectedWorkspace([]string{workspacePath}); err != nil || !ok || ws.Path != workspacePath {
+		t.Fatalf("singleSelectedWorkspace = %#v %v err=%v", ws, ok, err)
+	}
+}
+
+func TestProjectRowsAndManageRowsKeepRawPathsHidden(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	projects := []discovery.Project{{Name: "api", Path: "/repo/api"}}
+	rows := projectRows(projects)
+	if !strings.Contains(rows, ui.FZFHiddenRow("/repo/api", "")) {
+		t.Fatalf("project rows should hide project path: %q", rows)
+	}
+	manageRows := manageProjectRows([]ManageProject{{
+		Project:  projects[0],
+		Included: true,
+		Worktree: Project{Name: "api", Path: "/workspace/api"},
+	}})
+	if !strings.Contains(manageRows, ui.FZFHiddenRow("/repo/api", "")) || !strings.Contains(manageRows, "[x]") {
+		t.Fatalf("manage rows = %q", manageRows)
+	}
+}
+
+func TestWorkspaceHubSelectionHelpers(t *testing.T) {
+	projects := []discovery.Project{
+		{Name: "api", Path: "/repo/api"},
+		{Name: "web", Path: "/repo/web"},
+	}
+	if got := findProjects(projects, []string{"/repo/web", "/missing"}); len(got) != 1 || got[0].Name != "web" {
+		t.Fatalf("findProjects = %#v", got)
+	}
+	if got, err := projectsByIndexes(projects, "1, 2"); err != nil || len(got) != 2 {
+		t.Fatalf("projectsByIndexes = %#v err=%v", got, err)
+	}
+	if _, err := projectsByIndexes(projects, "3"); err == nil {
+		t.Fatal("expected invalid project index error")
+	}
+
+	rows := []ManageProject{{Project: projects[0]}, {Project: projects[1], Included: true}}
+	if got := findManageProjects(rows, []string{"/repo/api"}); len(got) != 1 || got[0].Project.Name != "api" {
+		t.Fatalf("findManageProjects = %#v", got)
+	}
+	if got, err := manageProjectsByIndexes(rows, "2"); err != nil || len(got) != 1 || !got[0].Included {
+		t.Fatalf("manageProjectsByIndexes = %#v err=%v", got, err)
+	}
+	if matchesShortcut("d", "alt-d") != true || matchesShortcut("alt-d", "alt-d") != true || matchesShortcut("", "alt-d") {
+		t.Fatal("matchesShortcut returned unexpected values")
+	}
+	if got := stripANSI("\033[31mred\033[0m"); got != "red" {
+		t.Fatalf("stripANSI = %q", got)
+	}
+	if got := messageFromError(errors.New("broken"), "fallback"); got != "broken" {
+		t.Fatalf("messageFromError = %q", got)
+	}
+	if got := shellQuote("a'b"); got != "'a'\\''b'" {
+		t.Fatalf("shellQuote = %q", got)
 	}
 }
 

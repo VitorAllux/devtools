@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -183,5 +184,45 @@ func TestProgressPercentClamps(t *testing.T) {
 				t.Fatalf("progressPercent(%d, %d) = %d, want %d", test.current, test.total, got, test.want)
 			}
 		})
+	}
+}
+
+func TestRoyalProgressLoaderTracksProgress(t *testing.T) {
+	t.Setenv("DVV_NO_LOADER", "1")
+	loader := NewRoyalProgressLoader(ProgressOptions{Action: "importing", Subject: "dump.sql", Total: 200})
+
+	loader.Add(40)
+	if got := loader.Percent(); got != 20 {
+		t.Fatalf("Percent after Add = %d, want 20", got)
+	}
+	loader.Set(300)
+	if got := loader.Percent(); got != 100 {
+		t.Fatalf("Percent after Set = %d, want 100", got)
+	}
+	loader.Set(-1)
+	if got := loader.Percent(); got != 0 {
+		t.Fatalf("Percent after negative Set = %d, want 0", got)
+	}
+	loader.Start()
+	loader.Finish(true)
+}
+
+func TestRunWithRoyalLoaderReturnsFunctionResultWhenDisabled(t *testing.T) {
+	t.Setenv("DVV_NO_LOADER", "1")
+	called := false
+	err := RunWithRoyalLoader(LoaderOptions{Action: "testing"}, func() error {
+		called = true
+		return nil
+	})
+	if err != nil || !called {
+		t.Fatalf("RunWithRoyalLoader success err=%v called=%v", err, called)
+	}
+
+	want := errors.New("broken")
+	got := RunWithRoyalLoader(LoaderOptions{Action: "testing"}, func() error {
+		return want
+	})
+	if !errors.Is(got, want) {
+		t.Fatalf("RunWithRoyalLoader error = %v, want %v", got, want)
 	}
 }

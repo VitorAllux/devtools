@@ -104,7 +104,7 @@ func TestCategoryRowsKeepRawIDHidden(t *testing.T) {
 	if raw != "theme" {
 		t.Fatalf("first category raw id = %q, want theme", raw)
 	}
-	if !strings.Contains(rows[2], "Keys") || !strings.Contains(rows[2], "8 key(s)") {
+	if !strings.Contains(rows[2], "Keys") || !strings.Contains(rows[2], "9 key(s)") {
 		t.Fatalf("Keys row should include label and count: %q", rows[2])
 	}
 }
@@ -142,12 +142,12 @@ func TestEntriesForCategoryFiltersExpectedGroups(t *testing.T) {
 		category string
 		keys     []string
 	}{
-		{category: "keys", keys: []string{"DVV_THEME", "API_DIR", "DVV_DB_HOST", "DVV_TMUX_SESSION_SHORTCUT", "DVV_WORKSPACES_DIR", "DVV_RCLONE_REMOTE", "DVV_RESOURCES_START_SHORTCUT", "DVV_DB_SAFETY_CONFIRM"}},
+		{category: "keys", keys: []string{"DVV_THEME", "DVV_TERMINAL_LAUNCHER", "API_DIR", "DVV_DB_HOST", "DVV_TMUX_SESSION_SHORTCUT", "DVV_WORKSPACES_DIR", "DVV_RCLONE_REMOTE", "DVV_RESOURCES_START_SHORTCUT", "DVV_DB_SAFETY_CONFIRM"}},
 		{category: "paths", keys: []string{"API_DIR", "DVV_WORKSPACES_DIR"}},
 		{category: "shortcuts", keys: []string{"DVV_TMUX_SESSION_SHORTCUT", "DVV_RESOURCES_START_SHORTCUT"}},
 		{category: "database", keys: []string{"DVV_DB_HOST", "DVV_RCLONE_REMOTE"}},
 		{category: "workspace", keys: []string{"DVV_WORKSPACES_DIR"}},
-		{category: "integrations", keys: []string{"DVV_DB_HOST", "DVV_RCLONE_REMOTE"}},
+		{category: "integrations", keys: []string{"DVV_TERMINAL_LAUNCHER", "DVV_DB_HOST", "DVV_RCLONE_REMOTE"}},
 		{category: "theme", keys: []string{"DVV_THEME"}},
 		{category: "resources", keys: []string{"DVV_RESOURCES_START_SHORTCUT"}},
 		{category: "safety", keys: []string{"DVV_DB_SAFETY_CONFIRM"}},
@@ -201,6 +201,9 @@ func TestKnownEntriesIncludesRuntimeShortcutKey(t *testing.T) {
 	}
 	if _, ok := findEntry(entries, "DVV_WORKSPACE_REQUIRE_CONFIRMATION"); !ok {
 		t.Fatalf("knownEntries should include DVV_WORKSPACE_REQUIRE_CONFIRMATION")
+	}
+	if _, ok := findEntry(entries, "DVV_TERMINAL_LAUNCHER"); !ok {
+		t.Fatalf("knownEntries should include DVV_TERMINAL_LAUNCHER")
 	}
 }
 
@@ -283,11 +286,44 @@ func TestWriteValueAppliesRuntimeConfig(t *testing.T) {
 	if cfg.Project.Workspace.Safety.RequireConfirmation {
 		t.Fatalf("workspace require confirmation = true, want false")
 	}
+
+	if err := manager.writeValue("DVV_TERMINAL_LAUNCHER", "iTerm2"); err != nil {
+		t.Fatalf("writeValue terminal launcher returned error: %v", err)
+	}
+	if cfg.Project.Terminal.Launcher != "iterm2" {
+		t.Fatalf("terminal launcher = %q, want iterm2", cfg.Project.Terminal.Launcher)
+	}
+}
+
+func TestEntryFormattingHelpers(t *testing.T) {
+	secret := Entry{Key: "DVV_BW_AGE_KEY_ITEM", Kind: "secret", Value: "private", Default: "default"}
+	if maskValue(secret) != "<set>" || defaultPreviewValue(secret) != "<set>" {
+		t.Fatalf("secret values should be masked")
+	}
+	if source := entrySource(Entry{Persisted: true}); source != "config.env" {
+		t.Fatalf("persisted source = %q", source)
+	}
+	if source := entrySource(Entry{Default: "x"}); source != "default" {
+		t.Fatalf("default source = %q", source)
+	}
+	if source := entrySource(Entry{Value: "x"}); source != "environment" {
+		t.Fatalf("environment source = %q", source)
+	}
+	if got := compactField("abcdefghijklmnopqrstuvwxyz", 8); got != "abcde..." {
+		t.Fatalf("compactField = %q", got)
+	}
+	if got := cleanField("a\tb\nc"); got != "a b c" {
+		t.Fatalf("cleanField = %q", got)
+	}
+	if got := unquoteConfigValue(`'a'\''b'`); got != "a'b" {
+		t.Fatalf("unquoteConfigValue = %q", got)
+	}
 }
 
 func testEntries() []Entry {
 	return []Entry{
 		{Category: "Theme", Key: "DVV_THEME", Description: "Selects the CLI color theme.", Kind: "theme"},
+		{Category: "Integrations", Key: "DVV_TERMINAL_LAUNCHER", Description: "Selects the terminal launcher.", Kind: "choice"},
 		{Category: "Project", Key: "API_DIR", Description: "Sets the default API project path.", Kind: "path"},
 		{Category: "Database", Key: "DVV_DB_HOST", Description: "Sets the MySQL host.", Kind: "text"},
 		{Category: "Shortcuts", Key: "DVV_TMUX_SESSION_SHORTCUT", Description: "Sets the tmux picker shortcut.", Kind: "shortcut"},

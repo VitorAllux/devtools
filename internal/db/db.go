@@ -520,6 +520,7 @@ func (m *Manager) importDump(ctx context.Context, dump string, dbName string) er
 	cmd := exec.CommandContext(ctx,
 		"mysql",
 		"--defaults-extra-file="+m.defaultsFile,
+		"--binary-mode=1",
 		"--default-character-set=utf8mb4",
 		dbName,
 	)

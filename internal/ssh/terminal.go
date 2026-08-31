@@ -46,10 +46,17 @@ func (m *Manager) OpenInNewTerminal(ctx context.Context, entry Entry) error {
 	if err := m.Runner.Run(ctx, "", "tmux", "new-session", "-ds", session, "-n", "ssh", "ssh "+shellQuote(entry.Target)); err != nil {
 		return err
 	}
-	if err := (terminal.Launcher{Runner: m.Runner}).Open(ctx, "tmux", "attach", "-t", session); err != nil {
+	if err := (terminal.Launcher{Runner: m.Runner, Preferred: m.terminalLauncherPreference()}).Open(ctx, "tmux", "attach", "-t", session); err != nil {
 		return fmt.Errorf("%w; attach manually with: tmux attach -t %s", err, session)
 	}
 	return nil
+}
+
+func (m *Manager) terminalLauncherPreference() string {
+	if m.Config == nil {
+		return ""
+	}
+	return m.Config.Project.Terminal.Launcher
 }
 
 func commandExists(m *Manager, name string) bool {

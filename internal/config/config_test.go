@@ -103,6 +103,16 @@ func TestResolveThemeConfigUsesEnvOverride(t *testing.T) {
 	}
 }
 
+func TestResolveTerminalConfigUsesEnvOverride(t *testing.T) {
+	t.Setenv("DVV_TERMINAL_LAUNCHER", "iTerm2")
+
+	cfg := resolveTerminalConfig(DefaultProjectConfig().Terminal)
+
+	if cfg.Launcher != "iterm2" {
+		t.Fatalf("terminal launcher = %q, want iterm2", cfg.Launcher)
+	}
+}
+
 func TestResolveShortcutConfigsUseEnvOverrides(t *testing.T) {
 	t.Setenv("DVV_SSH_ADD_SHORTCUT", "alt-a")
 	t.Setenv("DVV_SSH_REMOVE_SHORTCUT", "alt-r")

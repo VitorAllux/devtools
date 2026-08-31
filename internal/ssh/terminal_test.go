@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/VitorAllux/devtools/internal/config"
 )
 
 func TestOpenInTmuxCreatesWindowWhenAlreadyInsideTmux(t *testing.T) {
@@ -98,6 +100,36 @@ func TestOpenInNewTerminalCreatesDetachedTmuxSessionAndLaunchesTerminal(t *testi
 	start := runner.lastStart()
 	if !strings.HasPrefix(start, "x-terminal-emulator -e tmux attach -t dvv-ssh-api-") {
 		t.Fatalf("terminal command = %q, want terminal attach", start)
+	}
+}
+
+func TestOpenInNewTerminalUsesConfiguredTerminalLauncher(t *testing.T) {
+	project := config.DefaultProjectConfig()
+	project.Terminal.Launcher = "konsole"
+	runner := &terminalFakeRunner{paths: map[string]bool{"tmux": true, "konsole": true, "x-terminal-emulator": true}}
+	manager := Manager{
+		Config:          &config.Config{Project: project},
+		Runner:          runner,
+		connectionProbe: successfulConnectionProbe,
+	}
+
+	err := manager.OpenInNewTerminal(context.Background(), Entry{Name: "api", Target: "forge@example.com"})
+	if err != nil {
+		t.Fatalf("OpenInNewTerminal returned error: %v", err)
+	}
+	if start := runner.lastStart(); !strings.HasPrefix(start, "konsole --new-tab -e tmux attach -t dvv-ssh-api-") {
+		t.Fatalf("terminal command = %q, want konsole attach", start)
+	}
+}
+
+func TestTerminalLauncherPreferenceHandlesNilConfig(t *testing.T) {
+	if got := (&Manager{}).terminalLauncherPreference(); got != "" {
+		t.Fatalf("terminalLauncherPreference = %q, want empty", got)
+	}
+	project := config.DefaultProjectConfig()
+	project.Terminal.Launcher = "iterm2"
+	if got := (&Manager{Config: &config.Config{Project: project}}).terminalLauncherPreference(); got != "iterm2" {
+		t.Fatalf("terminalLauncherPreference = %q, want iterm2", got)
 	}
 }
 

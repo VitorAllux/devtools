@@ -47,6 +47,56 @@ func TestBaseProjectDirReadsCommonGitDir(t *testing.T) {
 	}
 }
 
+func TestWorktreeDetectionComparesGitAndCommonDir(t *testing.T) {
+	runner := &gitRunner{outputs: map[string][]byte{
+		"git -C /repo rev-parse --path-format=absolute --git-dir":                 []byte("/repo/.git\n"),
+		"git -C /repo rev-parse --path-format=absolute --git-common-dir":          []byte("/repo/.git\n"),
+		"git -C /workspace/api rev-parse --path-format=absolute --git-dir":        []byte("/repo/.git/worktrees/api\n"),
+		"git -C /workspace/api rev-parse --path-format=absolute --git-common-dir": []byte("/repo/.git\n"),
+	}}
+	client := New(runner)
+
+	if !client.IsPrimaryWorktree(context.Background(), "/repo") {
+		t.Fatal("/repo should be detected as primary worktree")
+	}
+	if !client.IsLinkedWorktree(context.Background(), "/workspace/api") {
+		t.Fatal("/workspace/api should be detected as linked worktree")
+	}
+}
+
+func TestCurrentBranchAndHasChanges(t *testing.T) {
+	runner := &gitRunner{outputs: map[string][]byte{
+		"git -C /repo branch --show-current": []byte("feature\n"),
+		"git -C /repo status --porcelain":    []byte(" M file.go\n"),
+	}}
+	client := New(runner)
+
+	if got := client.CurrentBranch(context.Background(), "/repo"); got != "feature" {
+		t.Fatalf("CurrentBranch = %q", got)
+	}
+	if !client.HasChanges(context.Background(), "/repo") {
+		t.Fatal("HasChanges should be true for porcelain output")
+	}
+}
+
+func TestBranchExistsAndBaseBranchChecks(t *testing.T) {
+	runner := &gitRunner{ok: map[string]bool{
+		"git -C /repo show-ref --verify --quiet refs/heads/feature":       true,
+		"git -C /repo rev-parse --verify --quiet origin/release^{commit}": true,
+	}}
+	client := New(runner)
+
+	if !client.BranchExists(context.Background(), "/repo", "feature") {
+		t.Fatal("BranchExists should detect local branch")
+	}
+	if !client.BaseBranchExists(context.Background(), "/repo", "origin", "release") {
+		t.Fatal("BaseBranchExists should detect remote branch")
+	}
+	if client.BaseBranchExists(context.Background(), "/repo", "origin", "fork/release") {
+		t.Fatal("BaseBranchExists should not rewrite branch names that already contain a slash")
+	}
+}
+
 func TestAddWorktreeNewBranchPrunesBeforeAdding(t *testing.T) {
 	runner := &gitRunner{}
 	client := New(runner)
@@ -58,6 +108,28 @@ func TestAddWorktreeNewBranchPrunesBeforeAdding(t *testing.T) {
 	want := []string{
 		"git -C /repo worktree prune",
 		"git -C /repo worktree add -b issue-42 /workspace/api origin/master",
+	}
+	if strings.Join(runner.runs, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("runs = %#v", runner.runs)
+	}
+}
+
+func TestAddAndRemoveWorktreeCommands(t *testing.T) {
+	runner := &gitRunner{}
+	client := New(runner)
+
+	if err := client.AddWorktree(context.Background(), "/repo", "/workspace/api", "feature"); err != nil {
+		t.Fatalf("AddWorktree returned error: %v", err)
+	}
+	if err := client.RemoveWorktree(context.Background(), "/repo", "/workspace/api", true); err != nil {
+		t.Fatalf("RemoveWorktree returned error: %v", err)
+	}
+
+	want := []string{
+		"git -C /repo worktree prune",
+		"git -C /repo worktree add /workspace/api feature",
+		"git -C /repo worktree remove --force /workspace/api",
+		"git -C /repo worktree prune",
 	}
 	if strings.Join(runner.runs, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("runs = %#v", runner.runs)

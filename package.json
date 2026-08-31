@@ -1,6 +1,6 @@
 {
   "name": "@vitorallux/dvv",
-  "version": "2.0.0-alpha.1",
+  "version": "2.0.0-alpha.2",
   "description": "Personal developer CLI for local automation.",
   "license": "MIT",
   "publishConfig": {
@@ -15,7 +15,9 @@
     "internal",
     "scripts",
     "examples",
+    "docs/go-version",
     "dvv.config.json",
+    "AGENTS.md",
     "go.mod",
     "README.md",
     "VERSION",
@@ -26,7 +28,8 @@
     "setup": "node ./scripts/setup.js",
     "test": "node ./scripts/go.js test ./...",
     "vet": "node ./scripts/go.js vet ./...",
-    "check": "npm run build && npm test && npm run vet",
+    "smoke": "node ./scripts/smoke.js",
+    "check": "npm run build && npm test && npm run vet && npm run smoke",
     "prepare": "node ./scripts/build.js",
     "postinstall": "node ./scripts/postinstall.js"
   },

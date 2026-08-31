@@ -33,6 +33,7 @@ These rules document the local conventions for future agents and maintainers wor
 - Keep help, zsh completion, README command lists, and the router command surface in sync.
 - If a command name changes in help, update `completions/_dvv` in the same change.
 - Support routes used by shell shortcuts or compatibility scripts may exist without being advertised in root help.
+- zsh completion should expose public hub commands by default. Put compatibility route completions behind `DVV_COMPLETE_COMPAT=1`.
 
 ## Shortcuts
 

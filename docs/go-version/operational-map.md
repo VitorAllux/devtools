@@ -17,6 +17,7 @@ This document maps the operational details that are easy to forget while using o
 | --- | --- | --- |
 | Local rebuild | `dvv build` rebuilds from any working directory. | Use this after source changes. |
 | Repository build | `npm run build` works only from this repo root. | Do not run it from `~`; npm will search for `/root/package.json`. |
+| Validation | `npm run check` runs build, tests, vet, and non-destructive smoke. | Use it before pushing behavior changes. |
 | Versioned launcher | `bin/dvv` is committed because NPM uses it as the package executable. | Keep it small and source-controlled. |
 | Compiled binary | `dist/dvv` is a build artifact. | Do not commit it. |
 | Shell integration | `dvv setup` installs completion and managed zsh shortcuts. | Run only when setup, completion, or shortcut behavior changes. |
@@ -47,6 +48,16 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | WSL folder URI | In WSL, editor openers use `vscode-remote://wsl+<distro>/<path>`. | Avoid raw Windows paths unless a Windows-only launcher requires them. |
 | Bad encoded names | Invalid filename bytes can become `%C2...` in VS Code. | Filter invalid workspace names and inspect with `dvv doctor`. |
 
+## Terminal Launchers
+
+| Detail | Current rule | Action |
+| --- | --- | --- |
+| Launcher config | `DVV_TERMINAL_LAUNCHER` controls terminal handoff and defaults to `auto`. | Prefer config over platform-specific commands in feature packages. |
+| WSL | `auto` opens a new Windows Terminal tab with `wt.exe -w 0 new-tab wsl.exe ...` when available. | Use for SSH and tmux handoff. |
+| Linux | `auto` probes supported terminal emulators such as GNOME Terminal, Konsole, XFCE Terminal, `x-terminal-emulator`, and Alacritty. | Keep fallback errors actionable. |
+| macOS | `auto` uses Terminal.app through `osascript`; `iterm2` uses iTerm2 when configured. | Run the macOS smoke checklist before publishing as multi-platform. |
+| Unsupported launcher | Unknown configured launchers fail before opening a new process. | Surface the configured value in the error. |
+
 ## Hubs And Shortcuts
 
 | Detail | Current rule | Action |
@@ -55,6 +66,7 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | Shortcut config | Hub action keys are configurable in `dvv.config.json`. | Read from config, do not hard-code feature shortcuts in command handlers. |
 | fzf previews | Detailed shortcut decks belong in the side preview panel. | Use shared `internal/ui.FZFHub` and `FZFPreviewCommandDeck`. |
 | Global shortcuts | Only `Ctrl+F` and `Alt+S` are project-managed zsh shortcuts. | Avoid adding new global `Ctrl-*` bindings. |
+| Completion | Root completion lists public hubs by default. Compatibility routes are shown only when `DVV_COMPLETE_COMPAT=1`. | Keep root help, completion, and README aligned. |
 
 ## Config Hub
 

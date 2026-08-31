@@ -2,6 +2,9 @@
   "theme": {
     "name": "royal-noir"
   },
+  "terminal": {
+    "launcher": "auto"
+  },
   "db": {
     "host": "",
     "port": "3306",

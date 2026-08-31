@@ -15,6 +15,9 @@ The file is versioned because it defines project behavior, theme identity, and d
   "theme": {
     "name": "royal-noir"
   },
+  "terminal": {
+    "launcher": "auto"
+  },
   "db": {
     "host": "",
     "port": "3306",
@@ -107,7 +110,7 @@ First-level categories:
 | `Database` | Manage MySQL, dump directory, rclone, and database safety defaults. |
 | `Tmux` | Manage directory picker search and shortcut settings. |
 | `Resources` | Manage resource hub action shortcuts. |
-| `Integrations` | Configure rclone, Bitwarden, and local tool defaults. |
+| `Integrations` | Configure rclone, Bitwarden, terminal launcher, and local tool defaults. |
 | `Safety` | Manage database and workspace confirmation rules. |
 
 The `Keys` category keeps the current raw key editing flow available for advanced usage and script compatibility. The main config UX prefers categorized selectors so common settings are easier to find.
@@ -153,6 +156,18 @@ The `resources.hub.shortcuts` section configures the local resource hub actions:
 - `stop`: stop the selected service/container/Compose project.
 
 Defaults preserve the previous resources hub shortcuts: `alt+s`, `alt+r`, and `alt+x`.
+
+## Terminal Config
+
+The `terminal.launcher` setting controls SSH and tmux handoff into a new terminal tab or window:
+
+- `auto`: detect the best launcher for the current platform.
+- `wt` or `windows-terminal`: use Windows Terminal from WSL.
+- `terminal` or `terminal.app`: use Terminal.app on macOS.
+- `iterm` or `iterm2`: use iTerm2 on macOS.
+- `gnome-terminal`, `konsole`, `xfce4-terminal`, `x-terminal-emulator`, or `alacritty`: use a specific Linux terminal.
+
+Use `DVV_TERMINAL_LAUNCHER` for local overrides. `DEVT_TERMINAL_LAUNCHER` is accepted during migration.
 
 ## Tmux Config
 
@@ -272,6 +287,20 @@ DVV_DUMPS_DIR
 DVV_RCLONE_REMOTE
 ```
 
+Terminal overrides:
+
+```text
+DVV_TERMINAL_LAUNCHER
+```
+
+Completion overrides:
+
+```text
+DVV_COMPLETE_COMPAT
+```
+
+Default zsh completion exposes public hub commands only. Set `DVV_COMPLETE_COMPAT=1` to show script-friendly compatibility routes such as `dvv db import`, `dvv config set`, or `dvv tmux:session`.
+
 Legacy database equivalents:
 
 ```text
@@ -280,6 +309,7 @@ DEVT_DB_PORT
 DEVT_DB_USER
 DEVT_DUMPS_DIR
 DEVT_RCLONE_REMOTE
+DEVT_TERMINAL_LAUNCHER
 ```
 
 Legacy workspace equivalents:

@@ -2,7 +2,7 @@
 
 Personal developer CLI for local automation.
 
-Current version: `2.0.0-alpha.1`
+Current version: `2.0.0-alpha.2`
 
 `dvv` is the Go rewrite of the previous shell-based devtools project. The command prefix is now `dvv`; the old `devv` command is intentionally not the public command for this branch.
 
@@ -57,6 +57,26 @@ If your terminal still finds an old binary, refresh the shell cache:
 hash -r
 ```
 
+## macOS
+
+macOS support uses the same public commands. Install the expected local tools with Homebrew:
+
+```bash
+brew install go node fzf tmux mysql-client rclone age bitwarden-cli
+```
+
+Docker resources require Docker Desktop. Editor openers require their CLI command on `PATH`, such as `code`, `cursor`, `opencode`, or `codex`.
+
+Terminal handoff is configurable:
+
+```bash
+DVV_TERMINAL_LAUNCHER=auto
+DVV_TERMINAL_LAUNCHER=terminal
+DVV_TERMINAL_LAUNCHER=iterm2
+```
+
+`auto` uses Windows Terminal on WSL, Terminal.app on macOS, and a detected Linux terminal elsewhere. `dvv doctor` reports macOS dependencies with `brew` and `osascript` instead of Linux-only service managers.
+
 ## Daily Workflow
 
 After pulling or changing source code, rebuild from any directory:
@@ -81,7 +101,7 @@ Run the full validation suite before pushing behavior changes:
 npm run check
 ```
 
-`npm run check` runs build, tests, and `go vet`.
+`npm run check` runs build, tests, `go vet`, and the non-destructive smoke script.
 
 ## Command Map
 
@@ -323,6 +343,12 @@ DVV_TMUX_SESSION_NAME=space
 DVV_TMUX_SESSION_SHORTCUT=ctrl+f
 ```
 
+Terminal:
+
+```bash
+DVV_TERMINAL_LAUNCHER=auto
+```
+
 Secrets and SSH:
 
 ```bash
@@ -346,6 +372,7 @@ DVV_BW_AGE_KEY_ITEM=<bitwarden-item-name-or-id>
 | Secrets | `dvv bootstrap` restores AGE/Bitwarden-backed SSH data without committing private files. |
 | Long operations | Confirmed actions use Royal Noir loaders; imports use a percentage bar that fills to `completed`. |
 | Colors/loaders | Default theme is Royal Noir. Use `dvv config` -> `Theme` or `DVV_THEME` to switch themes. Set `NO_COLOR=1` or `DVV_NO_LOADER=1` to disable color/loader behavior. |
+| Autocomplete | Public hub commands are completed by default. Set `DVV_COMPLETE_COMPAT=1` to expose script-friendly compatibility routes in zsh completion. |
 
 More detail lives in [docs/go-version/operational-map.md](docs/go-version/operational-map.md).
 
@@ -358,6 +385,8 @@ More detail lives in [docs/go-version/operational-map.md](docs/go-version/operat
 | [Themes](docs/go-version/theme.md) | Built-in themes, fzf hub conventions, loaders, and CLI presentation rules. |
 | [Operational map](docs/go-version/operational-map.md) | Practical edge cases, local paths, install behavior, and troubleshooting details. |
 | [Maintainer harness](docs/go-version/maintainer-harness.md) | Command ownership map, shared UI contracts, workspace harness rules, and test conventions. |
+| [Smoke checklist](docs/go-version/smoke-checklist.md) | Automated and manual release smoke checks for Linux/WSL and macOS. |
+| [Release notes](docs/go-version/release.md) | NPM package shape, dry-run review, versioning, and merge criteria. |
 | [Migration roadmap](docs/go-version/migration-roadmap.md) | Porting status and remaining migration work. |
 
 ## Troubleshooting
@@ -394,6 +423,7 @@ dvv build
 npm run build
 npm test
 npm run vet
+npm run smoke
 npm run check
 ```
 
@@ -413,3 +443,14 @@ Main packages:
 | `internal/secrets` | AGE and Bitwarden bootstrap. |
 
 Before adding a new hub, use `internal/ui.FZFHub`, keep shortcuts configurable, and document the public command in this README and completion.
+
+## Release Notes
+
+`2.0.0-alpha.2`:
+
+- Added config categories, theme presets, and key descriptions.
+- Added terminal launcher preferences with WSL, Linux, Terminal.app, and iTerm2 support.
+- Added macOS resource and doctor support for `brew services` and `osascript`.
+- Added hub-first zsh completion with compatibility completions behind `DVV_COMPLETE_COMPAT=1`.
+- Added release smoke validation through `npm run smoke`.
+- Raised test coverage for critical packages and documented the release/NPM gate.

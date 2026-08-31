@@ -131,7 +131,7 @@ func (m *Manager) OpenSession(ctx context.Context, selected string) error {
 		if err := m.Runner.Run(ctx, "", "tmux", "new-session", "-ds", sessionName, "-n", windowName, "-c", path); err != nil {
 			return err
 		}
-		if err := (terminal.Launcher{Runner: m.Runner}).Open(ctx, "tmux", "attach", "-t", sessionName); err != nil {
+		if err := (terminal.Launcher{Runner: m.Runner, Preferred: m.terminalLauncherPreference()}).Open(ctx, "tmux", "attach", "-t", sessionName); err != nil {
 			if os.Getenv("TMUX") != "" {
 				return m.Runner.Run(ctx, "", "tmux", "switch-client", "-t", sessionName)
 			}

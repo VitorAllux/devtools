@@ -1,0 +1,118 @@
+#!/usr/bin/env node
+
+const childProcess = require("node:child_process");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+
+const root = path.resolve(__dirname, "..");
+const bin = path.join(root, "bin", "dvv");
+const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dvv-smoke-"));
+const home = path.join(tempRoot, "home");
+const xdgConfigHome = path.join(tempRoot, "config");
+const workspaceRoot = path.join(tempRoot, "workspace");
+const dumpsDir = path.join(tempRoot, "dumps");
+const completionDir = path.join(home, ".zfunc");
+
+fs.mkdirSync(home, { recursive: true });
+fs.mkdirSync(xdgConfigHome, { recursive: true });
+fs.mkdirSync(workspaceRoot, { recursive: true });
+fs.mkdirSync(dumpsDir, { recursive: true });
+fs.mkdirSync(path.join(home, ".config", "devv"), { recursive: true });
+fs.writeFileSync(path.join(home, ".config", "devv", "servers.list"), "local root@127.0.0.1\n", "utf8");
+
+const env = {
+  ...process.env,
+  HOME: home,
+  XDG_CONFIG_HOME: xdgConfigHome,
+  DVV_AUTO_BUILD: "0",
+  DVV_DIR: root,
+  DVV_NO_LOADER: "1",
+  DVV_ZSH_COMPLETION_DIR: completionDir,
+  DVV_WORKSPACES_DIR: workspaceRoot,
+  DVV_DUMPS_DIR: dumpsDir,
+  NO_COLOR: "1",
+};
+
+run("build script", process.execPath, [path.join(root, "scripts", "build.js")], { cwd: root });
+run("dvv build from another directory", bin, ["build"], { cwd: home });
+run("root help", bin, ["help"]);
+run("ssh help", bin, ["ssh", "help"]);
+run("workspace help", bin, ["workspace", "help"]);
+run("tmux help", bin, ["tmux", "help"]);
+run("tmux session help", bin, ["tmux:session", "help"]);
+run("db help", bin, ["db", "help"]);
+run("resources help", bin, ["resources", "help"]);
+run("config help", bin, ["config", "help"]);
+run("bootstrap help", bin, ["bootstrap", "help"]);
+run("doctor", bin, ["doctor"]);
+run("setup in temporary HOME", bin, ["setup"]);
+run("script-friendly ssh list", bin, ["ssh:list"]);
+run("script-friendly workspace list", bin, ["workspace:list"]);
+
+assertFile(path.join(completionDir, "_dvv"), "zsh completion");
+const zshrc = readFile(path.join(home, ".zshrc"));
+assertIncludes(zshrc, "dvv tmux:session\\n", "managed Ctrl+F shortcut");
+assertIncludes(zshrc, "dvv ssh\\n", "managed Alt+S shortcut");
+assertExcludes(zshrc, "devv ", "legacy devv shortcut");
+
+const completion = readFile(path.join(root, "completions", "_dvv"));
+assertIncludes(completion, "DVV_COMPLETE_COMPAT", "compatibility completion gate");
+assertIncludes(completion, "ssh:Open the SSH hub", "hub-first SSH completion");
+
+console.error("dvv smoke ok");
+
+function run(label, command, args, options = {}) {
+  const result = childProcess.spawnSync(command, args, {
+    cwd: options.cwd || root,
+    env,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: false,
+  });
+
+  if (result.error) {
+    fail(`${label} failed to start: ${result.error.message}`);
+  }
+
+  if ((result.status ?? 1) !== 0) {
+    if (result.stdout) {
+      process.stderr.write(result.stdout);
+    }
+    if (result.stderr) {
+      process.stderr.write(result.stderr);
+    }
+    fail(`${label} exited with status ${result.status ?? 1}`);
+  }
+}
+
+function assertFile(file, label) {
+  if (!fs.existsSync(file)) {
+    fail(`${label} was not created at ${file}`);
+  }
+}
+
+function readFile(file) {
+  try {
+    return fs.readFileSync(file, "utf8");
+  } catch (error) {
+    fail(`could not read ${file}: ${error.message}`);
+  }
+}
+
+function assertIncludes(value, expected, label) {
+  if (!value.includes(expected)) {
+    fail(`${label} missing ${JSON.stringify(expected)}`);
+  }
+}
+
+function assertExcludes(value, unexpected, label) {
+  if (value.includes(unexpected)) {
+    fail(`${label} contains ${JSON.stringify(unexpected)}`);
+  }
+}
+
+function fail(message) {
+  console.error(`dvv smoke failed: ${message}`);
+  process.exit(1);
+}
