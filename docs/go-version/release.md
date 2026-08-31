@@ -63,6 +63,27 @@ Review the output for:
 
 Reject the dry run if it contains dumps, secrets, `.env`, `dist/`, local config, or private SSH targets.
 
+## NPM Login And Publish
+
+Use browser-based login for publishing:
+
+```bash
+npm_config_browser=false npm login --auth-type=web
+```
+
+In WSL this prints the login URL instead of trying to open a Linux browser. Copy that URL into the Windows browser, finish authentication, then return to the terminal.
+
+After login:
+
+```bash
+npm whoami
+npm run check
+npm_config_cache=/tmp/dvv-npm-cache npm pack --dry-run
+npm publish --tag alpha --access public
+```
+
+Use `--tag alpha` for prereleases so the package does not become the default `latest` install.
+
 ## Versioning
 
 For a user-visible release change:

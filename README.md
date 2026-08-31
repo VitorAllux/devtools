@@ -103,6 +103,29 @@ npm run check
 
 `npm run check` runs build, tests, `go vet`, and the non-destructive smoke script.
 
+## Publish Alpha
+
+Use browser-based npm login. In WSL, the most reliable flow is to print the login URL and open it manually in the Windows browser:
+
+```bash
+npm_config_browser=false npm login --auth-type=web
+```
+
+Then publish the alpha package:
+
+```bash
+npm whoami
+npm run check
+npm_config_cache=/tmp/dvv-npm-cache npm pack --dry-run
+npm publish --tag alpha --access public
+```
+
+Install the published alpha:
+
+```bash
+npm install -g @vitorallux/dvv@alpha
+```
+
 ## Command Map
 
 | Command | Purpose |
