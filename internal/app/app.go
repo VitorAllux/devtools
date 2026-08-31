@@ -50,9 +50,9 @@ func Run(args []string) int {
 		}
 		return 0
 	case "config:set":
-		return runCommand(ctx, cfg, runner, "config", append([]string{"set"}, commandArgs...))
+		return runCompatibilityCommand(ctx, cfg, runner, "config", "set", commandArgs)
 	case "config:list":
-		return runCommand(ctx, cfg, runner, "config", append([]string{"list"}, commandArgs...))
+		return runCompatibilityCommand(ctx, cfg, runner, "config", "list", commandArgs)
 	case "db":
 		if err := dbcmd.Run(ctx, cfg, runner, commandArgs); err != nil {
 			ui.Error("%v", err)
@@ -60,15 +60,15 @@ func Run(args []string) int {
 		}
 		return 0
 	case "db:create":
-		return runCommand(ctx, cfg, runner, "db", append([]string{"create"}, commandArgs...))
+		return runCompatibilityCommand(ctx, cfg, runner, "db", "create", commandArgs)
 	case "db:drop":
-		return runCommand(ctx, cfg, runner, "db", append([]string{"drop"}, commandArgs...))
+		return runCompatibilityCommand(ctx, cfg, runner, "db", "drop", commandArgs)
 	case "db:truncate":
-		return runCommand(ctx, cfg, runner, "db", append([]string{"truncate"}, commandArgs...))
+		return runCompatibilityCommand(ctx, cfg, runner, "db", "truncate", commandArgs)
 	case "db:clean":
-		return runCommand(ctx, cfg, runner, "db", append([]string{"clean"}, commandArgs...))
+		return runCompatibilityCommand(ctx, cfg, runner, "db", "clean", commandArgs)
 	case "db:import":
-		return runCommand(ctx, cfg, runner, "db", append([]string{"import"}, commandArgs...))
+		return runCompatibilityCommand(ctx, cfg, runner, "db", "import", commandArgs)
 	case "bootstrap", "env:bootstrap":
 		if err := secretscmd.RunBootstrap(ctx, cfg, runner, commandArgs); err != nil {
 			ui.Error("%v", err)
@@ -108,11 +108,11 @@ func Run(args []string) int {
 		}
 		return 0
 	case "ssh:add":
-		return runCommand(ctx, cfg, runner, "ssh", append([]string{"add"}, commandArgs...))
+		return runCompatibilityCommand(ctx, cfg, runner, "ssh", "add", commandArgs)
 	case "ssh:remove":
-		return runCommand(ctx, cfg, runner, "ssh", append([]string{"remove"}, commandArgs...))
+		return runCompatibilityCommand(ctx, cfg, runner, "ssh", "remove", commandArgs)
 	case "ssh:list":
-		return runCommand(ctx, cfg, runner, "ssh", append([]string{"list"}, commandArgs...))
+		return runCompatibilityCommand(ctx, cfg, runner, "ssh", "list", commandArgs)
 	case "tmux":
 		if err := tmuxcmd.RunHub(ctx, cfg, runner, commandArgs); err != nil {
 			ui.Error("%v", err)
@@ -120,9 +120,9 @@ func Run(args []string) int {
 		}
 		return 0
 	case "tmux:up":
-		return runCommand(ctx, cfg, runner, "tmux", append([]string{"up"}, commandArgs...))
+		return runCompatibilityCommand(ctx, cfg, runner, "tmux", "up", commandArgs)
 	case "tmux:down":
-		return runCommand(ctx, cfg, runner, "tmux", append([]string{"down"}, commandArgs...))
+		return runCompatibilityCommand(ctx, cfg, runner, "tmux", "down", commandArgs)
 	case "tmux:session":
 		if err := tmuxcmd.Run(ctx, cfg, runner, commandArgs); err != nil {
 			ui.Error("%v", err)
@@ -130,9 +130,9 @@ func Run(args []string) int {
 		}
 		return 0
 	case "api:restart":
-		return runCommand(ctx, cfg, runner, "tmux", append([]string{"api-restart"}, commandArgs...))
+		return runCompatibilityCommand(ctx, cfg, runner, "tmux", "api-restart", commandArgs)
 	case "web:restart":
-		return runCommand(ctx, cfg, runner, "tmux", append([]string{"web-restart"}, commandArgs...))
+		return runCompatibilityCommand(ctx, cfg, runner, "tmux", "web-restart", commandArgs)
 	case "workspace":
 		if err := workspacecmd.Run(ctx, cfg, runner, commandArgs); err != nil {
 			ui.Error("%v", err)
@@ -140,7 +140,7 @@ func Run(args []string) int {
 		}
 		return 0
 	case "workspace:list":
-		return runCommand(ctx, cfg, runner, "workspace", append([]string{"list"}, commandArgs...))
+		return runCompatibilityCommand(ctx, cfg, runner, "workspace", "list", commandArgs)
 	}
 
 	ui.Error("Unknown command: %s", command)
@@ -155,6 +155,13 @@ func isHelpArg(value string) bool {
 	default:
 		return false
 	}
+}
+
+func runCompatibilityCommand(ctx context.Context, cfg *config.Config, runner run.Runner, command string, action string, args []string) int {
+	if len(args) > 0 && isHelpArg(args[0]) {
+		return runCommand(ctx, cfg, runner, command, []string{"help"})
+	}
+	return runCommand(ctx, cfg, runner, command, append([]string{action}, args...))
 }
 
 func runCommand(ctx context.Context, cfg *config.Config, runner run.Runner, command string, args []string) int {
