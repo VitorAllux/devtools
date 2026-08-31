@@ -1,5 +1,9 @@
 # Go Version Foundation Plan
 
+## Status
+
+Completed on 2026-08-31. This plan is historical; remaining release work moved to `docs/plans/active/2026-08-31-go-version-hardening-release.md`.
+
 ## Objective
 
 Prepare the `go-version` branch for an incremental Go rewrite exposed as `dvv`, starting with documentation, agent guides, and migration rules before application code is introduced.

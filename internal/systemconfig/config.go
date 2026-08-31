@@ -24,6 +24,12 @@ type Entry struct {
 	Persisted   bool
 }
 
+type Category struct {
+	ID          string
+	Label       string
+	Description string
+}
+
 type Manager struct {
 	Config *config.Config
 	Runner run.Runner
@@ -54,17 +60,64 @@ func (m Manager) Hub(ctx context.Context) error {
 			return err
 		}
 		if _, err := m.Runner.LookPath("fzf"); err != nil {
+			return m.basicCategoryHub(ctx, entries)
+		}
+		category, ok, err := m.selectCategory(ctx, entries)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil
+		}
+		if err := m.openCategory(ctx, category); err != nil {
+			ui.Error("%v", err)
+			continue
+		}
+	}
+}
+
+func (m Manager) openCategory(ctx context.Context, category Category) error {
+	entries, err := m.Entries()
+	if err != nil {
+		return err
+	}
+	filtered := entriesForCategory(category.ID, entries)
+	if len(filtered) == 0 {
+		return m.plannedCategory(category)
+	}
+	return m.keyHub(ctx, category, filtered)
+}
+
+func (m Manager) keyHub(ctx context.Context, category Category, initial []Entry) error {
+	entries := initial
+	for {
+		if entries == nil {
+			var err error
+			entries, err = m.Entries()
+			if err != nil {
+				return err
+			}
+			entries = entriesForCategory(category.ID, entries)
+		}
+		if len(entries) == 0 {
+			return m.plannedCategory(category)
+		}
+		if _, err := m.Runner.LookPath("fzf"); err != nil {
 			return m.basicHub(entries)
 		}
-		output, err := m.Runner.OutputWithInput(ctx, "", []byte(configRows(entries)), "fzf", configFZFArgs()...)
+		output, err := m.Runner.OutputWithInput(ctx, "", []byte(configRows(entries)), "fzf", configFZFArgs(category)...)
 		if err != nil && len(output) == 0 {
 			return nil
+		}
+		if err != nil {
+			return err
 		}
 		key, selected := ui.ParseFZFExpectOutput(string(output))
 		if key == "alt-a" {
 			if err := m.addCustom(); err != nil {
 				ui.Error("%v", err)
 			}
+			entries = nil
 			continue
 		}
 		if key == "alt-s" {
@@ -77,20 +130,237 @@ func (m Manager) Hub(ctx context.Context) error {
 		if !ok {
 			continue
 		}
-		switch key {
-		case "alt-c":
-			if err := m.Unset(entry.Key); err != nil {
-				ui.Error("%v", err)
+		if err := m.handleEntryAction(key, entry); err != nil {
+			ui.Error("%v", err)
+		}
+		entries = nil
+	}
+}
+
+func (m Manager) handleEntryAction(key string, entry Entry) error {
+	switch key {
+	case "alt-c":
+		return m.Unset(entry.Key)
+	case "alt-v":
+		m.validate(entry)
+		_, _ = ui.Prompt("Press Enter to return")
+		return nil
+	default:
+		return m.edit(entry)
+	}
+}
+
+func (m Manager) selectCategory(ctx context.Context, entries []Entry) (Category, bool, error) {
+	output, err := m.Runner.OutputWithInput(ctx, "", []byte(categoryRows(entries)), "fzf", categoryFZFArgs()...)
+	if err != nil && len(output) == 0 {
+		return Category{}, false, nil
+	}
+	if err != nil {
+		return Category{}, false, err
+	}
+	raw := ui.FZFSelectedRaw(strings.TrimSpace(string(output)))
+	category, ok := findCategory(raw)
+	return category, ok, nil
+}
+
+func (m Manager) plannedCategory(category Category) error {
+	ui.Title(category.Label)
+	ui.Info("%s", category.Description)
+	ui.Warn("This config category is planned. Use Keys for raw config values for now.")
+	_, _ = ui.Prompt("Press Enter to return")
+	return nil
+}
+
+func (m Manager) basicCategoryHub(ctx context.Context, entries []Entry) error {
+	categories := configCategories()
+	ui.Title("Configuration")
+	ui.Info("File: %s", m.Config.ConfigFile)
+	for index, category := range categories {
+		count := len(entriesForCategory(category.ID, entries))
+		status := "planned"
+		if count > 0 {
+			status = fmt.Sprintf("%d key(s)", count)
+		}
+		fmt.Printf("  %2d  %-14s %-10s %s\n", index+1, category.Label, status, category.Description)
+	}
+	value, err := ui.Prompt("Config category")
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	category, ok := findCategoryInput(categories, value)
+	if !ok {
+		return fmt.Errorf("unknown config category: %s", value)
+	}
+	return m.openCategory(ctx, category)
+}
+
+func configCategories() []Category {
+	return []Category{
+		{"theme", "Theme", "Select and preview CLI themes"},
+		{"keys", "Keys", "Edit raw runtime config keys"},
+		{"paths", "Paths", "Manage workspace, dumps, SSH, AGE, and config paths"},
+		{"shortcuts", "Shortcuts", "Manage shell shortcuts and hub action keys"},
+		{"workspace", "Workspace", "Manage workspace behavior and defaults"},
+		{"database", "Database", "Manage MySQL and dump import defaults"},
+		{"tmux", "Tmux", "Manage tmux environment and directory picker settings"},
+		{"resources", "Resources", "Manage local resources hub settings"},
+		{"integrations", "Integrations", "Inspect and configure external tool defaults"},
+		{"safety", "Safety", "Manage destructive-action confirmation rules"},
+		{"profiles", "Profiles", "Manage future machine-specific config profiles"},
+	}
+}
+
+func categoryRows(entries []Entry) string {
+	var builder strings.Builder
+	builder.WriteString(ui.FZFHiddenHeader(categoryHeader()))
+	builder.WriteByte('\n')
+	for index, category := range configCategories() {
+		builder.WriteString(ui.FZFHiddenRow(category.ID, categoryRow(index, category, entries)))
+		builder.WriteByte('\n')
+	}
+	return builder.String()
+}
+
+func categoryHeader() string {
+	return strings.Join([]string{
+		ui.Crown("NO"),
+		ui.Crown(fixedWidth("CATEGORY", 16)),
+		ui.Crown(fixedWidth("STATUS", 12)),
+		ui.Crown("DETAIL"),
+	}, "\t")
+}
+
+func categoryRow(index int, category Category, entries []Entry) string {
+	count := len(entriesForCategory(category.ID, entries))
+	status := "planned"
+	if count > 0 {
+		status = fmt.Sprintf("%d key(s)", count)
+	}
+	return strings.Join([]string{
+		ui.Muted(fmt.Sprintf("%02d", index+1)),
+		ui.Accent(fixedWidth(category.Label, 16)),
+		ui.Gold(fixedWidth(status, 12)),
+		ui.Muted(category.Description),
+	}, "\t")
+}
+
+func categoryFZFArgs() []string {
+	return ui.FZFHub{
+		Prompt:        ui.Crown("config") + ui.Muted("> "),
+		BorderLabel:   "dvv config",
+		Preview:       categoryPreviewCommand(),
+		PreviewLabel:  "category panel",
+		PreviewWindow: "right,40%,border-rounded,wrap",
+		Shortcuts: []ui.FZFShortcut{
+			{Label: "Enter", Description: "open category"},
+			{Label: "Esc", Description: "exit"},
+		},
+		ExtraArgs: []string{
+			"--delimiter=\t",
+			"--with-nth=2..",
+			"--nth=1,2,3,4,5",
+			"--header-lines=1",
+		},
+	}.Args()
+}
+
+func categoryPreviewCommand() string {
+	return `sh -c 'line=$1
+raw=$(printf "%s" "$line" | cut -f1)
+category=$(printf "%s" "$line" | cut -f3)
+status=$(printf "%s" "$line" | cut -f4)
+detail=$(printf "%s" "$line" | cut -f5-)
+printf "\033[1;38;2;212;175;55mConfig category\033[0m\n"
+printf "  \033[38;2;196;181;253m%-10s\033[0m %s\n" "Category" "$category"
+printf "  \033[38;2;196;181;253m%-10s\033[0m %s\n" "Status" "$status"
+printf "  \033[38;2;196;181;253m%-10s\033[0m %s\n" "ID" "$raw"
+printf "\n\033[38;2;139;126;163m%s\033[0m\n" "$detail"
+printf "\n\033[38;2;139;126;163mEnter open | Esc exit\033[0m\n"
+' sh {}`
+}
+
+func entriesForCategory(categoryID string, entries []Entry) []Entry {
+	switch categoryID {
+	case "keys":
+		return entries
+	case "paths":
+		return filterEntries(entries, func(entry Entry) bool {
+			return entry.Kind == "path" || entry.Kind == "path-list"
+		})
+	case "shortcuts":
+		return filterEntries(entries, func(entry Entry) bool {
+			return strings.Contains(entry.Key, "SHORTCUT")
+		})
+	case "workspace":
+		return filterEntriesByCategory(entries, "Workspace")
+	case "database":
+		return filterEntriesByCategory(entries, "Database")
+	case "tmux":
+		return filterEntriesByCategory(entries, "Tmux")
+	case "integrations":
+		return filterEntries(entries, func(entry Entry) bool {
+			switch entry.Key {
+			case "DVV_RCLONE_REMOTE", "DVV_BW_AGE_KEY_ITEM", "DVV_DB_HOST", "DVV_DB_PORT", "DVV_DB_USER":
+				return true
+			default:
+				return false
 			}
-		case "alt-v":
-			m.validate(entry)
-			_, _ = ui.Prompt("Press Enter to return")
-		default:
-			if err := m.edit(entry); err != nil {
-				ui.Error("%v", err)
-			}
+		})
+	case "theme", "resources", "safety", "profiles":
+		return filterEntriesByCategory(entries, categoryID)
+	default:
+		return nil
+	}
+}
+
+func filterEntriesByCategory(entries []Entry, category string) []Entry {
+	return filterEntries(entries, func(entry Entry) bool {
+		return strings.EqualFold(entry.Category, category)
+	})
+}
+
+func filterEntries(entries []Entry, keep func(Entry) bool) []Entry {
+	filtered := []Entry{}
+	for _, entry := range entries {
+		if keep(entry) {
+			filtered = append(filtered, entry)
 		}
 	}
+	return filtered
+}
+
+func findCategory(id string) (Category, bool) {
+	for _, category := range configCategories() {
+		if category.ID == id {
+			return category, true
+		}
+	}
+	return Category{}, false
+}
+
+func findCategoryInput(categories []Category, value string) (Category, bool) {
+	value = strings.TrimSpace(value)
+	if index, ok := parseIndex(value, len(categories)); ok {
+		return categories[index], true
+	}
+	for _, category := range categories {
+		if strings.EqualFold(category.ID, value) || strings.EqualFold(category.Label, value) {
+			return category, true
+		}
+	}
+	return Category{}, false
+}
+
+func parseIndex(value string, max int) (int, bool) {
+	var index int
+	if _, err := fmt.Sscanf(strings.TrimSpace(value), "%d", &index); err != nil {
+		return 0, false
+	}
+	index--
+	return index, index >= 0 && index < max
 }
 
 func (m Manager) basicHub(entries []Entry) error {
@@ -224,6 +494,12 @@ func (m Manager) validate(entry Entry) {
 		} else {
 			ui.Warn("Expected 0 or 1, got: %s", entry.Value)
 		}
+	case "shortcut":
+		if _, err := config.NormalizeKey(entry.Value); err != nil {
+			ui.Warn("%v", err)
+		} else {
+			ui.OK("Shortcut value is valid: %s", entry.Value)
+		}
 	default:
 		ui.Info("%s=%s", entry.Key, maskValue(entry))
 	}
@@ -252,10 +528,14 @@ func (m Manager) printSecretStatus() {
 	checkSecret("AGE recipients", m.Config.AgeRecipientsFile)
 }
 
-func configFZFArgs() []string {
+func configFZFArgs(category Category) []string {
+	borderLabel := "dvv config / " + category.Label
+	if strings.TrimSpace(category.Label) == "" {
+		borderLabel = "dvv config"
+	}
 	return ui.FZFHub{
 		Prompt:        ui.Crown("config") + ui.Muted("> "),
-		BorderLabel:   "dvv config",
+		BorderLabel:   borderLabel,
 		Preview:       configPreviewCommand(),
 		PreviewLabel:  "config panel",
 		PreviewWindow: "right,40%,border-rounded,wrap",
@@ -358,11 +638,13 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Tmux", "TMUX_DEFAULT_DIR", "Default root for tmux directory pickers", "path", "~/workspace", "", false},
 		{"Tmux", "TMUX_SESSION", "Default tmux environment session name", "text", "eloverde", "", false},
 		{"Tmux", "TMUX_WIN", "Default tmux environment window name", "text", "dev", "", false},
-		{"Tmux", "DVV_TMUX_SESSION_SEARCH_DEPTH", "Directory picker search depth", "number", "3", "", false},
-		{"Workspace", "DVV_WORKSPACES_DIR", "Root directory for workspace-* folders", "path", "~/workspace", "", false},
-		{"Workspace", "DVV_WORKSPACE_PROJECT_ROOTS", "Colon-separated roots for project discovery", "path-list", "~/workspace", "", false},
-		{"Workspace", "DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "Project discovery depth", "number", "4", "", false},
-		{"Workspace", "DVV_WORKSPACE_OPENER", "Workspace opener", "choice", "auto", "", false},
+		{"Tmux", "DVV_TMUX_SESSION_SEARCH_ROOTS", "Directory picker search roots", "path-list", strings.Join(cfg.Project.Tmux.Session.SearchRoots, string(os.PathListSeparator)), "", false},
+		{"Tmux", "DVV_TMUX_SESSION_SEARCH_DEPTH", "Directory picker search depth", "number", fmt.Sprintf("%d", cfg.Project.Tmux.Session.SearchDepth), "", false},
+		{"Shortcuts", "DVV_TMUX_SESSION_SHORTCUT", "Managed zsh shortcut for the tmux directory picker", "shortcut", cfg.Project.Tmux.Session.Shortcut, "", false},
+		{"Workspace", "DVV_WORKSPACES_DIR", "Root directory for workspace-* folders", "path", cfg.Project.Workspace.Root, "", false},
+		{"Workspace", "DVV_WORKSPACE_PROJECT_ROOTS", "Colon-separated roots for project discovery", "path-list", strings.Join(cfg.Project.Workspace.ProjectSearchRoots, string(os.PathListSeparator)), "", false},
+		{"Workspace", "DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "Project discovery depth", "number", fmt.Sprintf("%d", cfg.Project.Workspace.ProjectSearchDepth), "", false},
+		{"Workspace", "DVV_WORKSPACE_OPENER", "Workspace opener", "choice", defaultString(cfg.Project.Workspace.Interactive.Opener, "auto"), "", false},
 		{"Database", "DVV_DB_HOST", "MySQL host; empty uses local socket", "text", cfg.Project.DB.Host, "", false},
 		{"Database", "DVV_DB_PORT", "MySQL port when host is set", "number", cfg.Project.DB.Port, "", false},
 		{"Database", "DVV_DB_USER", "MySQL user for DB actions", "text", cfg.Project.DB.User, "", false},
@@ -512,13 +794,25 @@ func fixedWidth(value string, width int) string {
 	return value + strings.Repeat(" ", width-len(value))
 }
 
+func defaultString(value string, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
+}
+
 func showHelp() {
 	ui.Title("Config Hub")
 	fmt.Printf("  %s dvv config\n\n", ui.Bold("Usage:"))
 	helpSection("Hub")
-	helpEntry("dvv config", "Open the interactive configuration hub")
+	helpEntry("dvv config", "Open the category-based configuration hub")
 	helpEntry("dvv config list", "List effective configuration values")
 	helpEntry("dvv config set KEY VALUE", "Persist a configuration value")
+	fmt.Println()
+	helpSection("Categories")
+	for _, category := range configCategories() {
+		helpEntry(category.Label, category.Description)
+	}
 }
 
 func helpSection(title string) {

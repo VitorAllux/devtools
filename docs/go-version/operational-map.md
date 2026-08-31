@@ -56,6 +56,15 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | fzf previews | Detailed shortcut decks belong in the side preview panel. | Use shared `internal/ui.FZFHub` and `FZFPreviewCommandDeck`. |
 | Global shortcuts | Only `Ctrl+F` and `Alt+S` are project-managed zsh shortcuts. | Avoid adding new global `Ctrl-*` bindings. |
 
+## Config Hub
+
+| Detail | Current rule | Action |
+| --- | --- | --- |
+| First screen | `dvv config` opens a category hub. | Keep raw key lists inside `Keys` or focused sub-hubs. |
+| Current raw editor | `Keys` preserves the old key/value editor. | Keep `dvv config list` and `dvv config set` script-friendly. |
+| Planned categories | Theme, Resources, Safety, and Profiles can show planned state until their backend exists. | Do not persist values that the runtime does not read yet. |
+| Runtime keys | Category sub-hubs should expose only keys that affect current behavior. | Add runtime config support before making a setting editable. |
+
 ## Loader Coverage
 
 Use `internal/ui.RunWithRoyalLoader` for actions that can leave the terminal visually idle after confirmation and do not expose measurable progress. Use `internal/ui.NewRoyalProgressLoader` when the operation has a known total and can report bytes, items, or steps.

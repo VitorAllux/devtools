@@ -257,11 +257,13 @@ The configuration hub edits persisted runtime values in:
 ~/.config/devv/config.env
 ```
 
+`dvv config` opens a category hub first. Use `Keys` for raw key editing, or choose a focused area such as `Paths`, `Shortcuts`, `Workspace`, `Database`, `Tmux`, or `Integrations`.
+
 Shortcuts:
 
 | Shortcut | Action |
 | --- | --- |
-| `Enter` | Edit selected value. |
+| `Enter` | Open selected category or edit selected value inside a key hub. |
 | `Alt+A` | Add custom config key. |
 | `Alt+C` | Clear selected persisted value. |
 | `Alt+V` | Validate selected value. |

@@ -91,6 +91,45 @@ The file is versioned because it defines project behavior, theme identity, and d
 
 See `dvv.config.json` for the full default file, including bootstrap rules, workspace harness, hooks, and safety settings.
 
+## Config Hub UX
+
+`dvv config` opens a first-level category hub instead of opening directly on every raw key. Categories backed by current runtime keys route to filtered key hubs. Categories that are designed but not implemented yet show a planned-state message and return to the category hub.
+
+First-level categories:
+
+| Category | Purpose |
+| --- | --- |
+| `Theme` | Select and preview CLI themes. |
+| `Keys` | Edit raw runtime config keys and advanced values. |
+| `Paths` | Manage workspace, dumps, SSH, AGE, and config paths. |
+| `Shortcuts` | Manage shell shortcuts and hub action keys. |
+| `Workspace` | Manage workspace behavior, branch rules, bootstrap, hooks, and harness settings. |
+| `Database` | Manage MySQL and dump import defaults. |
+| `Tmux` | Manage tmux session picker settings. |
+| `Resources` | Manage local resources hub settings. |
+| `Integrations` | Inspect and configure editors, terminal launcher, Bitwarden, rclone, Docker, and MySQL. |
+| `Safety` | Manage destructive-action confirmation rules. |
+| `Profiles` | Future machine-specific config profiles. |
+
+The `Keys` category keeps the current raw key editing flow available for advanced usage and script compatibility. The main config UX prefers categorized selectors so common settings are easier to find.
+
+Planned built-in themes:
+
+| Theme | Notes |
+| --- | --- |
+| `royal-noir` | Default dvv identity: black, royal purple, and restrained gold. |
+| `darcula` | JetBrains-style dark gray with muted contrast. |
+| `tokyo-night` | Deep blue-black terminal palette with violet and cyan accents. |
+| `dracula` | Dark purple palette with high-contrast accent colors. |
+| `catppuccin-mocha` | Soft dark palette with pastel accents. |
+| `nord` | Cool dark palette with blue-gray tones. |
+| `gruvbox-dark` | Warm dark palette with earthy accents. |
+| `everforest-dark` | Green-tinted dark palette with softer contrast. |
+| `solarized-dark` | Classic low-contrast terminal palette. |
+| `one-dark` | Atom-style dark palette with balanced accent colors. |
+
+Theme selection should update shared UI helpers, `fzf` colors, loader colors, prompts, status labels, and previews from one theme registry.
+
 ## DB Config
 
 The `db` section contains local database defaults used by `dvv db`:
