@@ -1,3 +1,0 @@
-# Format: <name> <user@host>
-prod-api api@10.0.0.10
-worker forge@10.0.0.20

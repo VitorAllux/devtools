@@ -1,0 +1,205 @@
+{
+  "theme": {
+    "name": "royal-noir"
+  },
+  "terminal": {
+    "launcher": "auto"
+  },
+  "db": {
+    "host": "",
+    "port": "3306",
+    "user": "root",
+    "dumpsDir": "dumps",
+    "rcloneRemote": "gdrive",
+    "safetyConfirm": true
+  },
+  "resources": {
+    "hub": {
+      "shortcuts": {
+        "start": "alt+s",
+        "restart": "alt+r",
+        "stop": "alt+x"
+      }
+    }
+  },
+  "ssh": {
+    "hub": {
+      "shortcuts": {
+        "add": "shift+a",
+        "remove": "shift+r",
+        "newTerminal": "shift+t"
+      }
+    }
+  },
+  "tmux": {
+    "session": {
+      "searchRoots": [
+        "~/workspace",
+        "~/Work/Development/dev",
+        "~/Work/Development",
+        "~/Development"
+      ],
+      "searchDepth": 3,
+      "defaultSessionName": "space",
+      "shortcut": "ctrl+f"
+    },
+    "home": {
+      "directory": "~",
+      "sessionName": "home",
+      "shortcut": "ctrl+shift+f"
+    }
+  },
+  "workspace": {
+    "root": "~/workspace",
+    "projects": [],
+    "projectSearchRoots": [
+      "~/workspace",
+      "~/Development/projects",
+      "~/Work/Development/dev",
+      "~/Work/Development",
+      "~/Development"
+    ],
+    "projectSearchDepth": 4,
+    "git": {
+      "remoteName": "origin",
+      "baseBranchPriority": [
+        "master",
+        "main"
+      ],
+      "reuseExistingBranch": true,
+      "createBranchIfMissing": true,
+      "branchNameTemplate": "{{ workspace.name }}",
+      "baseByType": {
+        "bug": "prod",
+        "issue": "master"
+      }
+    },
+    "interactive": {
+      "enabled": true,
+      "selector": "fzf",
+      "opener": "",
+      "shortcuts": {
+        "create": "shift+c",
+        "manage": "shift+m",
+        "delete": "shift+d"
+      }
+    },
+    "bootstrap": {
+      "onCreate": true,
+      "onAdd": true,
+      "copyRules": [
+        {
+          "from": ".env",
+          "to": ".env",
+          "ifMissing": true
+        },
+        {
+          "from": "src/environments/environment.ts",
+          "to": "src/environments/environment.ts",
+          "ifMissing": true
+        },
+        {
+          "from": ".phpactor.json",
+          "to": ".phpactor.json",
+          "ifMissing": true
+        }
+      ],
+      "commands": [
+        {
+          "name": "npm-install",
+          "command": "npm",
+          "args": [
+            "i"
+          ],
+          "when": {
+            "files": [
+              "package.json"
+            ],
+            "missingFiles": [
+              "artisan"
+            ]
+          }
+        },
+        {
+          "name": "composer-install",
+          "command": "composer",
+          "args": [
+            "install"
+          ],
+          "when": {
+            "files": [
+              "composer.json"
+            ],
+            "missingFiles": []
+          }
+        },
+        {
+          "name": "laravel-config-cache",
+          "command": "php",
+          "args": [
+            "artisan",
+            "config:cache"
+          ],
+          "when": {
+            "files": [
+              "artisan",
+              "composer.json"
+            ],
+            "missingFiles": []
+          }
+        },
+        {
+          "name": "sync-agents-node",
+          "command": "npm",
+          "args": [
+            "run",
+            "sync-agents",
+            "--",
+            "--target=.codex"
+          ],
+          "when": {
+            "files": [
+              "package.json",
+              ".agents/manifest.json"
+            ],
+            "missingFiles": [
+              "artisan"
+            ]
+          }
+        },
+        {
+          "name": "sync-agents-php",
+          "command": "composer",
+          "args": [
+            "sync-agents",
+            "--",
+            "--target=.codex"
+          ],
+          "when": {
+            "files": [
+              "composer.json",
+              ".agents/manifest.json"
+            ],
+            "missingFiles": []
+          }
+        }
+      ]
+    },
+    "workspaceHarness": {
+      "agentsFile": {
+        "enabled": true,
+        "useCustom": true,
+        "path": "AGENTS.md",
+        "overwrite": false
+      }
+    },
+    "hooks": {},
+    "safety": {
+      "requireConfirmation": true,
+      "blockRemoveWithDirtyProjects": true,
+      "allowForceRemove": false,
+      "onlyRemoveDirectChildren": true,
+      "confirmLeftoverDeletion": true
+    }
+  }
+}

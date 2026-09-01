@@ -1,0 +1,106 @@
+package ui
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestFZFHubArgsBuildsBrandedHub(t *testing.T) {
+	hub := FZFHub{
+		Prompt:       "ssh> ",
+		Title:        "dvv ssh",
+		Subtitle:     "2 configured target(s)",
+		BorderLabel:  "dvv ssh ",
+		Preview:      "printf test",
+		PreviewLabel: "selected target",
+		Shortcuts: []FZFShortcut{
+			{Label: "Enter", Description: "connect"},
+			{Key: "A", Label: "Shift+A", Description: "add"},
+			{Key: "R", Label: "Shift+R", Description: "remove"},
+		},
+		ExtraArgs: FZFHiddenRowArgs(),
+	}
+
+	args := strings.Join(hub.Args(), "\n")
+	expected := []string{
+		"--prompt=ssh> ",
+		"--border-label=",
+		"--header=",
+		"--header-first",
+		"--expect=A,R",
+		"--preview=printf test",
+		"--preview-window=right,44%,border-rounded,wrap",
+		"--preview-label=",
+		"--with-nth=2..",
+	}
+
+	for _, value := range expected {
+		if !strings.Contains(args, value) {
+			t.Fatalf("FZFHub Args missing %q in %s", value, args)
+		}
+	}
+}
+
+func TestFZFHubKeepsShortcutsOutOfHeaderByDefault(t *testing.T) {
+	hub := FZFHub{
+		Title: "dvv ssh",
+		Shortcuts: []FZFShortcut{
+			{Key: "A", Label: "Shift+A", Description: "add"},
+		},
+	}
+
+	header := hub.Header()
+	if strings.Contains(header, "Shift+A") {
+		t.Fatalf("header should not include shortcut deck by default: %s", header)
+	}
+
+	hub.ShortcutsInHeader = true
+	header = hub.Header()
+	if !strings.Contains(header, "Shift+A") {
+		t.Fatalf("header should include shortcut deck when enabled: %s", header)
+	}
+}
+
+func TestFZFPreviewCommandDeckPrintsEveryShortcut(t *testing.T) {
+	deck := FZFPreviewCommandDeck([]FZFShortcut{
+		{Label: "Enter", Description: "open"},
+		{Key: "C", Label: "Shift+C", Description: "create workspace"},
+		{Key: "D", Label: "Shift+D", Description: "delete selected"},
+	})
+
+	for _, want := range []string{"Enter", "open", "Shift+C", "create workspace", "Shift+D", "delete selected"} {
+		if !strings.Contains(deck, want) {
+			t.Fatalf("command deck missing %q: %s", want, deck)
+		}
+	}
+	if strings.Contains(deck, "DVV_FZF_COMMANDS") {
+		t.Fatalf("command deck should be static printf calls: %s", deck)
+	}
+}
+
+func TestFZFSelectedRaw(t *testing.T) {
+	raw := FZFSelectedRaw("api root@example.com\tstyled display")
+	if raw != "api root@example.com" {
+		t.Fatalf("raw = %q, want api root@example.com", raw)
+	}
+
+	raw = FZFSelectedRaw("api root@example.com")
+	if raw != "api root@example.com" {
+		t.Fatalf("raw = %q, want api root@example.com", raw)
+	}
+}
+
+func TestParseFZFExpectOutputSupportsMultiSelect(t *testing.T) {
+	key, selected := ParseFZFExpectOutput("D\n/path/a\trow a\n/path/b\trow b\n")
+	if key != "D" {
+		t.Fatalf("key = %q", key)
+	}
+	if len(selected) != 2 || selected[0] != "/path/a\trow a" || selected[1] != "/path/b\trow b" {
+		t.Fatalf("selected = %#v", selected)
+	}
+
+	key, selected = ParseFZFExpectOutput("\n/path/a\trow a\n")
+	if key != "" || len(selected) != 1 || selected[0] != "/path/a\trow a" {
+		t.Fatalf("got key=%q selected=%#v", key, selected)
+	}
+}
