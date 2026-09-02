@@ -3,6 +3,7 @@ package systemconfig
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -79,6 +80,9 @@ func (m Manager) Hub(ctx context.Context) error {
 func (m Manager) openCategory(ctx context.Context, category Category) error {
 	if category.ID == "theme" {
 		return m.themeHub(ctx)
+	}
+	if category.ID == "profiles" {
+		return m.profileHub(ctx)
 	}
 	entries, err := m.Entries()
 	if err != nil {
@@ -195,15 +199,16 @@ func (m Manager) basicCategoryHub(ctx context.Context, entries []Entry) error {
 func configCategories() []Category {
 	return []Category{
 		{"theme", "Theme", "Select and preview CLI themes"},
-		{"keys", "Keys", "Edit raw runtime config keys"},
+		{"keys", "All Keys", "Edit every known runtime config key, including focused category keys and custom values"},
 		{"paths", "Paths", "Manage workspace, dumps, SSH, AGE, and config paths"},
-		{"shortcuts", "Shortcuts", "Manage shell shortcuts and hub action keys"},
+		{"shortcuts", "Shortcuts", "Manage shell, tmux, and hub action keys"},
 		{"workspace", "Workspace", "Manage workspace root, discovery, opener, and action keys"},
 		{"database", "Database", "Manage MySQL, dumps, rclone, and DB safety defaults"},
 		{"tmux", "Tmux", "Manage directory picker and home session settings"},
 		{"resources", "Resources", "Manage resource hub action shortcuts"},
 		{"integrations", "Integrations", "Configure terminal, rclone, Bitwarden, and local tool defaults"},
 		{"safety", "Safety", "Manage database and workspace confirmation rules"},
+		{"profiles", "Profiles", "Select a machine or context profile"},
 	}
 }
 
@@ -230,7 +235,7 @@ func categoryHeader() string {
 func categoryStatus(category Category, entries []Entry) string {
 	count := len(entriesForCategory(category.ID, entries))
 	status := fmt.Sprintf("%d key(s)", count)
-	if category.ID == "theme" {
+	if category.ID == "theme" || category.ID == "profiles" {
 		status = "selector"
 	}
 	return status
@@ -318,6 +323,8 @@ func entriesForCategory(categoryID string, entries []Entry) []Entry {
 		})
 	case "theme", "resources", "safety":
 		return filterEntriesByCategory(entries, categoryID)
+	case "profiles":
+		return filterEntriesByCategory(entries, "Profiles")
 	default:
 		return nil
 	}
@@ -429,6 +436,179 @@ func (m Manager) setTheme(name string) error {
 	ui.SetTheme(theme.Name)
 	ui.OK("Theme set to %s", theme.Name)
 	return nil
+}
+
+func (m Manager) profileHub(ctx context.Context) error {
+	for {
+		profiles := m.Config.Project.Profiles.Items
+		if len(profiles) == 0 {
+			profiles = config.DefaultProjectConfig().Profiles.Items
+		}
+		if _, err := m.Runner.LookPath("fzf"); err != nil {
+			return m.basicProfileHub(profiles)
+		}
+		output, err := m.Runner.OutputWithInput(ctx, "", []byte(profileRows(profiles, m.Config.Project.Profiles.Active)), "fzf", profileFZFArgs()...)
+		if err != nil && len(output) == 0 {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		raw := ui.FZFSelectedRaw(strings.TrimSpace(string(output)))
+		if raw == "" {
+			return nil
+		}
+		if err := m.setProfile(raw); err != nil {
+			ui.Error("%v", err)
+			continue
+		}
+		return nil
+	}
+}
+
+func (m Manager) basicProfileHub(profiles []config.ProfileConfig) error {
+	ui.Title("Profiles")
+	for index, profile := range profiles {
+		status := ""
+		if profile.Name == m.Config.Project.Profiles.Active {
+			status = "active"
+		}
+		fmt.Printf("  %2d  %-18s %-8s %s\n", index+1, profile.Name, status, profile.Description)
+	}
+	value, err := ui.Prompt("Profile")
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	if index, ok := parseIndex(value, len(profiles)); ok {
+		return m.setProfile(profiles[index].Name)
+	}
+	return m.setProfile(value)
+}
+
+func (m Manager) setProfile(name string) error {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if name == "" {
+		return fmt.Errorf("profile name is empty")
+	}
+	if _, ok := findProfile(m.Config.Project.Profiles.Items, name); !ok {
+		return fmt.Errorf("unknown profile: %s", name)
+	}
+	if err := m.writeValue("DVV_PROFILE", name); err != nil {
+		return err
+	}
+	m.Config.Project.Profiles.Active = name
+	ui.OK("Profile set to %s", name)
+	return nil
+}
+
+func profileRows(profiles []config.ProfileConfig, active string) string {
+	active = strings.ToLower(strings.TrimSpace(active))
+	var builder strings.Builder
+	builder.WriteString(profileLine("__dvv_header__", "", "", "", "", profileHeader()))
+	builder.WriteByte('\n')
+	for index, profile := range profiles {
+		status := ""
+		if strings.EqualFold(profile.Name, active) {
+			status = "active"
+		}
+		builder.WriteString(profileLine(profile.Name, profile.Name, status, profile.Description, profileValuesPreview(profile.Values), profileRow(index, profile, status)))
+		builder.WriteByte('\n')
+	}
+	return builder.String()
+}
+
+func profileHeader() string {
+	return strings.Join([]string{
+		ui.Crown("NO"),
+		ui.Crown(fixedWidth("PROFILE", 18)),
+		ui.Crown(fixedWidth("STATUS", 10)),
+	}, "\t")
+}
+
+func profileRow(index int, profile config.ProfileConfig, status string) string {
+	return strings.Join([]string{
+		ui.Muted(fmt.Sprintf("%02d", index+1)),
+		ui.Accent(fixedWidth(profile.Name, 18)),
+		ui.Gold(fixedWidth(status, 10)),
+	}, "\t")
+}
+
+func profileLine(raw string, name string, status string, description string, values string, display string) string {
+	return strings.Join([]string{
+		cleanField(raw),
+		cleanField(name),
+		cleanField(status),
+		cleanField(description),
+		cleanField(values),
+		display,
+	}, "\t")
+}
+
+func profileValuesPreview(values map[string]string) string {
+	if len(values) == 0 {
+		return "No profile overrides."
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, key+"="+maskText(values[key], "text", key))
+	}
+	return strings.Join(parts, "\n")
+}
+
+func profileFZFArgs() []string {
+	return ui.FZFHub{
+		Prompt:        ui.Crown("profile") + ui.Muted("> "),
+		BorderLabel:   "dvv config / Profiles",
+		Preview:       profilePreviewCommand(),
+		PreviewLabel:  "profile panel",
+		PreviewWindow: "right,42%,border-rounded,wrap",
+		Shortcuts: []ui.FZFShortcut{
+			{Label: "Enter", Description: "set active profile"},
+			{Label: "Esc", Description: "back"},
+		},
+		ExtraArgs: []string{
+			"--delimiter=\t",
+			"--with-nth=6..",
+			"--nth=1,2,3,4,5,6..",
+			"--header-lines=1",
+		},
+	}.Args()
+}
+
+func profilePreviewCommand() string {
+	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
+raw=$(printf "%s" "$line" | cut -f1)
+name=$(printf "%s" "$line" | cut -f2)
+status=$(printf "%s" "$line" | cut -f3)
+description=$(printf "%s" "$line" | cut -f4)
+values=$(printf "%s" "$line" | cut -f5)
+printf "%sProfile%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%-10s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$name"
+printf "  %s%-10s%s %s\n" "$dvv_label" "Status" "$dvv_reset" "$status"
+printf "  %s%-10s%s %s\n" "$dvv_label" "ID" "$dvv_reset" "$raw"
+printf "\n%sWhat it does%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%s%s\n" "$dvv_muted" "$description" "$dvv_reset"
+printf "\n%sOverrides%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%s%s\n" "$dvv_muted" "$values" "$dvv_reset"
+printf "\n%sEnter set active profile | Esc back%s\n" "$dvv_muted" "$dvv_reset"
+' sh {}`
+}
+
+func findProfile(profiles []config.ProfileConfig, name string) (config.ProfileConfig, bool) {
+	for _, profile := range profiles {
+		if strings.EqualFold(profile.Name, name) {
+			return profile, true
+		}
+	}
+	return config.ProfileConfig{}, false
 }
 
 func themeRows(themes []ui.Theme, active string) string {
@@ -678,6 +858,8 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 			m.Config.Project.Theme.Name = theme.Name
 			ui.SetTheme(theme.Name)
 		}
+	case "DVV_PROFILE":
+		m.Config.Project.Profiles.Active = strings.ToLower(strings.TrimSpace(value))
 	case "DVV_SSH_ADD_SHORTCUT":
 		m.Config.Project.SSH.Hub.Shortcuts.Add = value
 	case "DVV_SSH_REMOVE_SHORTCUT":
@@ -690,6 +872,12 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.Resources.Hub.Shortcuts.Restart = value
 	case "DVV_RESOURCES_STOP_SHORTCUT":
 		m.Config.Project.Resources.Hub.Shortcuts.Stop = value
+	case "DVV_RESOURCES_LOGS_SHORTCUT":
+		m.Config.Project.Resources.Hub.Shortcuts.Logs = value
+	case "DVV_RESOURCES_LOG_TAIL":
+		if isNumber(value) {
+			fmt.Sscanf(value, "%d", &m.Config.Project.Resources.Logs.Tail)
+		}
 	case "DVV_TMUX_SESSION_SHORTCUT":
 		m.Config.Project.Tmux.Session.Shortcut = value
 	case "DVV_TMUX_SESSION_SEARCH_ROOTS":
@@ -704,6 +892,10 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.Tmux.Home.SessionName = value
 	case "DVV_TMUX_HOME_SHORTCUT":
 		m.Config.Project.Tmux.Home.Shortcut = value
+	case "DVV_TMUX_RESET_SHORTCUT":
+		m.Config.Project.Tmux.Reset.Shortcut = value
+	case "DVV_TMUX_ENVIRONMENTS":
+		m.Config.Project.Tmux.Environments = parseRuntimeTmuxEnvironments(value)
 	case "DVV_WORKSPACES_DIR":
 		m.Config.Project.Workspace.Root = config.ExpandPath(value)
 	case "DVV_WORKSPACE_PROJECT_ROOTS":
@@ -720,6 +912,10 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.Workspace.Interactive.Shortcuts.Manage = value
 	case "DVV_WORKSPACE_DELETE_SHORTCUT":
 		m.Config.Project.Workspace.Interactive.Shortcuts.Delete = value
+	case "DVV_WORKSPACE_TEMPLATE_SHORTCUT":
+		m.Config.Project.Workspace.Interactive.Shortcuts.Template = value
+	case "DVV_WORKSPACE_TEMPLATES":
+		m.Config.Project.Workspace.Templates = parseRuntimeWorkspaceTemplates(value)
 	case "DVV_DB_HOST":
 		m.Config.Project.DB.Host = value
 	case "DVV_DB_PORT":
@@ -748,6 +944,12 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.Workspace.Safety.ConfirmLeftoverDeletion = value == "1"
 	case "DVV_TERMINAL_LAUNCHER":
 		m.Config.Project.Terminal.Launcher = strings.ToLower(strings.TrimSpace(value))
+	case "DVV_SECRETS_PREPARE_SHORTCUT":
+		m.Config.Project.Secrets.Hub.Shortcuts.Prepare = value
+	case "DVV_SECRETS_RESTORE_SHORTCUT":
+		m.Config.Project.Secrets.Hub.Shortcuts.Restore = value
+	case "DVV_SECRETS_SYNC_SHORTCUT":
+		m.Config.Project.Secrets.Hub.Shortcuts.Sync = value
 	}
 }
 
@@ -931,6 +1133,11 @@ func promptValue(entry Entry) (string, error) {
 		if err == nil && selected != "" {
 			return selected, nil
 		}
+	case "profile":
+		selected, err := chooseOne(entry.Key, profileNamesFromConfigEnv())
+		if err == nil && selected != "" {
+			return selected, nil
+		}
 	}
 	value, err := ui.Prompt(entry.Key + " [" + entry.Value + "]")
 	if err != nil {
@@ -963,6 +1170,7 @@ func chooseOne(label string, values []string) (string, error) {
 func knownEntries(cfg *config.Config) []Entry {
 	return []Entry{
 		{"Theme", "DVV_THEME", "Selects the CLI color theme.", "theme", cfg.Project.Theme.Name, "", false},
+		{"Profiles", "DVV_PROFILE", "Selects the active runtime profile from project config.", "profile", cfg.Project.Profiles.Active, "", false},
 		{"Integrations", "DVV_TERMINAL_LAUNCHER", "Selects the terminal launcher for new SSH and tmux tabs.", "choice", cfg.Project.Terminal.Launcher, "", false},
 		{"Project", "API_DIR", "Sets the default API project path for legacy tmux flows.", "path", "", "", false},
 		{"Project", "WEB_DIR", "Sets the default Web project path for legacy tmux flows.", "path", "", "", false},
@@ -973,18 +1181,22 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Tmux", "DVV_TMUX_SESSION_SEARCH_DEPTH", "Limits directory picker search depth.", "number", fmt.Sprintf("%d", cfg.Project.Tmux.Session.SearchDepth), "", false},
 		{"Tmux", "DVV_TMUX_HOME_DIR", "Sets the directory opened by the direct home tmux shortcut.", "path", cfg.Project.Tmux.Home.Directory, "", false},
 		{"Tmux", "DVV_TMUX_HOME_SESSION_NAME", "Sets the tmux session name used by the direct home shortcut.", "text", cfg.Project.Tmux.Home.SessionName, "", false},
+		{"Tmux", "DVV_TMUX_ENVIRONMENTS", "Stores custom API/Web tmux environments as JSON.", "json", tmuxEnvironmentsJSON(cfg.Project.Tmux.Environments), "", false},
 		{"Shortcuts", "DVV_TMUX_SESSION_SHORTCUT", "Sets the zsh shortcut for the tmux directory picker.", "shortcut", cfg.Project.Tmux.Session.Shortcut, "", false},
 		{"Shortcuts", "DVV_TMUX_HOME_SHORTCUT", "Sets the zsh shortcut for opening a home tmux tab.", "shortcut", cfg.Project.Tmux.Home.Shortcut, "", false},
+		{"Shortcuts", "DVV_TMUX_RESET_SHORTCUT", "Sets the tmux shortcut for resetting API and Horizon panes.", "shortcut", cfg.Project.Tmux.Reset.Shortcut, "", false},
 		{"Shortcuts", "DVV_SSH_ADD_SHORTCUT", "Sets the SSH hub shortcut for adding an entry.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Add, "", false},
 		{"Shortcuts", "DVV_SSH_REMOVE_SHORTCUT", "Sets the SSH hub shortcut for removing an entry.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Remove, "", false},
 		{"Shortcuts", "DVV_SSH_NEW_TERMINAL_SHORTCUT", "Sets the SSH hub shortcut for opening a new tab.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.NewTerminal, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_CREATE_SHORTCUT", "Sets the workspace hub shortcut for creating a workspace.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Create, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_MANAGE_SHORTCUT", "Sets the workspace hub shortcut for managing projects.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Manage, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_DELETE_SHORTCUT", "Sets the workspace hub shortcut for deleting workspaces.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Delete, "", false},
+		{"Shortcuts", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "Sets the workspace hub shortcut for saving templates.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Template, "", false},
 		{"Workspace", "DVV_WORKSPACES_DIR", "Sets where workspace-* folders are created.", "path", cfg.Project.Workspace.Root, "", false},
 		{"Workspace", "DVV_WORKSPACE_PROJECT_ROOTS", "Sets roots scanned for base git repositories.", "path-list", strings.Join(cfg.Project.Workspace.ProjectSearchRoots, string(os.PathListSeparator)), "", false},
 		{"Workspace", "DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "Limits repository discovery depth.", "number", fmt.Sprintf("%d", cfg.Project.Workspace.ProjectSearchDepth), "", false},
 		{"Workspace", "DVV_WORKSPACE_OPENER", "Sets how a selected workspace opens.", "choice", defaultString(cfg.Project.Workspace.Interactive.Opener, "auto"), "", false},
+		{"Workspace", "DVV_WORKSPACE_TEMPLATES", "Stores saved workspace templates with base branch and project list.", "json", workspaceTemplatesJSON(cfg.Project.Workspace.Templates), "", false},
 		{"Database", "DVV_DB_HOST", "Sets the MySQL host; empty uses client defaults.", "text", cfg.Project.DB.Host, "", false},
 		{"Database", "DVV_DB_PORT", "Sets the MySQL TCP port when a host is set.", "number", cfg.Project.DB.Port, "", false},
 		{"Database", "DVV_DB_USER", "Sets the MySQL user for database actions.", "text", cfg.Project.DB.User, "", false},
@@ -993,6 +1205,8 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Resources", "DVV_RESOURCES_START_SHORTCUT", "Sets the resources hub shortcut for start.", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Start, "", false},
 		{"Resources", "DVV_RESOURCES_RESTART_SHORTCUT", "Sets the resources hub shortcut for restart.", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Restart, "", false},
 		{"Resources", "DVV_RESOURCES_STOP_SHORTCUT", "Sets the resources hub shortcut for stop.", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Stop, "", false},
+		{"Resources", "DVV_RESOURCES_LOGS_SHORTCUT", "Sets the resources hub shortcut for opening logs.", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Logs, "", false},
+		{"Resources", "DVV_RESOURCES_LOG_TAIL", "Sets how many lines resource logs show initially.", "number", fmt.Sprintf("%d", cfg.Project.Resources.Logs.Tail), "", false},
 		{"Safety", "DVV_DB_SAFETY_CONFIRM", "Requires confirmation for destructive database actions.", "bool", boolValue(cfg.Project.DB.SafetyConfirm), "", false},
 		{"Safety", "DVV_WORKSPACE_REQUIRE_CONFIRMATION", "Requires confirmation before workspace changes.", "bool", boolValue(cfg.Project.Workspace.Safety.RequireConfirmation), "", false},
 		{"Safety", "DVV_WORKSPACE_BLOCK_DIRTY_PROJECTS", "Blocks workspace deletion when projects are dirty.", "bool", boolValue(cfg.Project.Workspace.Safety.BlockRemoveWithDirtyProjects), "", false},
@@ -1004,7 +1218,61 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Secrets", "DVV_AGE_RECIPIENTS_FILE", "Sets the AGE recipients file path.", "path", cfg.AgeRecipientsFile, "", false},
 		{"Secrets", "DVV_ENCRYPTED_SERVERS_FILE", "Sets the encrypted SSH backup file path.", "path", cfg.EncryptedServersFile, "", false},
 		{"Secrets", "DVV_BW_AGE_KEY_ITEM", "Sets the Bitwarden item that stores the AGE key.", "secret", cfg.BitwardenAgeKeyItem, "", false},
+		{"Secrets", "DVV_SECRETS_PREPARE_SHORTCUT", "Sets the secrets hub shortcut for preparing local key files.", "shortcut", cfg.Project.Secrets.Hub.Shortcuts.Prepare, "", false},
+		{"Secrets", "DVV_SECRETS_RESTORE_SHORTCUT", "Sets the secrets hub shortcut for restoring SSH backup.", "shortcut", cfg.Project.Secrets.Hub.Shortcuts.Restore, "", false},
+		{"Secrets", "DVV_SECRETS_SYNC_SHORTCUT", "Sets the secrets hub shortcut for syncing encrypted SSH backup.", "shortcut", cfg.Project.Secrets.Hub.Shortcuts.Sync, "", false},
 	}
+}
+
+func tmuxEnvironmentsJSON(environments []config.TmuxEnvironmentConfig) string {
+	if len(environments) == 0 {
+		return "[]"
+	}
+	content, err := json.Marshal(environments)
+	if err != nil {
+		return "[]"
+	}
+	return string(content)
+}
+
+func parseRuntimeTmuxEnvironments(value string) []config.TmuxEnvironmentConfig {
+	var environments []config.TmuxEnvironmentConfig
+	if err := json.Unmarshal([]byte(value), &environments); err != nil {
+		return nil
+	}
+	for index := range environments {
+		environments[index].APIDir = config.ExpandPath(environments[index].APIDir)
+		environments[index].WebDir = config.ExpandPath(environments[index].WebDir)
+	}
+	return environments
+}
+
+func workspaceTemplatesJSON(templates []config.WorkspaceTemplate) string {
+	if len(templates) == 0 {
+		return "[]"
+	}
+	content, err := json.Marshal(templates)
+	if err != nil {
+		return "[]"
+	}
+	return string(content)
+}
+
+func parseRuntimeWorkspaceTemplates(value string) []config.WorkspaceTemplate {
+	var templates []config.WorkspaceTemplate
+	if err := json.Unmarshal([]byte(value), &templates); err != nil {
+		return nil
+	}
+	for templateIndex := range templates {
+		for projectIndex := range templates[templateIndex].Projects {
+			templates[templateIndex].Projects[projectIndex].Path = config.ExpandPath(templates[templateIndex].Projects[projectIndex].Path)
+		}
+	}
+	return templates
+}
+
+func profileNamesFromConfigEnv() []string {
+	return []string{"default", "personal", "work", "wsl", "ci"}
 }
 
 func readConfigFile(path string) (map[string]string, error) {

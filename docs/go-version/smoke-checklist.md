@@ -15,9 +15,9 @@ The smoke script validates:
 | Area | Check |
 | --- | --- |
 | Build | `scripts/build.js` and `dvv build` from a non-repository directory. |
-| Help | Root help and hub help for `ssh`, `workspace`, `tmux`, `db`, `resources`, `config`, and `bootstrap`. |
+| Help | Root help and hub help for `ssh`, `workspace`, `tmux`, `db`, `resources`, `secrets`, `config`, and `bootstrap`. |
 | Doctor | `dvv doctor` exits cleanly in a temporary home directory. |
-| Setup | `dvv setup` writes completion and managed zsh shortcuts to temporary files only. |
+| Setup | `dvv setup` writes completion, managed zsh shortcuts, and managed tmux shortcuts to temporary files only. |
 | Compatibility | Script-friendly `ssh:list` and `workspace:list` still run without being advertised as primary UX. |
 | Completion | Static zsh completion keeps public hubs visible and gates compatibility completions behind `DVV_COMPLETE_COMPAT`. |
 
@@ -31,17 +31,20 @@ Run these checks on the machine that will use the CLI daily:
 | --- | --- | --- |
 | Source install | `ln -sf "$PWD/bin/dvv" ~/.local/bin/dvv` | Global `dvv` command points at this checkout. |
 | Build | `dvv build` | Binary rebuilds from any directory. |
-| Setup | `dvv setup` | `~/.zfunc/_dvv` and the managed `.zshrc` block are updated. |
+| Setup | `dvv setup` | `~/.zfunc/_dvv`, the managed `.zshrc` block, and the managed `.tmux.conf` block are updated. |
 | Help | `dvv help` | Only public hub-first commands are shown. |
 | Doctor | `dvv doctor` | Missing optional tools are warnings, not failures. |
-| Config | `dvv config` | Category hub opens; Theme and Keys work. |
+| Doctor fix | `dvv doctor --fix` | Safe runtime dirs/files are created, binary rebuilds, and shell/tmux integration is refreshed. |
+| Config | `dvv config` | Category hub opens; Theme and All Keys work. |
 | SSH | `dvv ssh` | Hub opens, fake or real entries render, and a selected entry opens in a new terminal tab. |
-| Workspace | `dvv workspace` | Hub opens even when empty, existing `workspace-*` dirs are adopted, create/manage/delete flows show loaders. |
-| Tmux | `dvv tmux` | Environment hub opens and selected actions route to tmux commands. |
+| Workspace | `dvv workspace` | Hub opens even when empty, existing `workspace-*` dirs are adopted, create/manage/delete/template flows show loaders. |
+| Tmux | `dvv tmux` | Environment hub opens; selected actions route to tmux commands; `Alt+N` can select API/Web projects and save a custom target. |
+| Tmux reset | `Alt+R` inside a dvv tmux environment | API pane receives Laravel cache/config reset commands, Horizon restarts when present, and Web is untouched. |
 | Directory picker | `Ctrl+F` or `dvv tmux:session` | Directory picker lists current directory, configured roots, and child directories. |
-| Home tmux tab | `Ctrl+Shift+F` or `dvv tmux:home` | New terminal tab opens in WSL/macOS/Linux terminal and attaches to a tmux session in `~`. |
+| Home tmux tab | `Alt+F` or `dvv tmux:home` | New terminal tab opens in WSL/macOS/Linux terminal and attaches to a tmux session in `~`. |
 | Database | `dvv db` | Create/import/truncate/drop/clean actions show confirmation and loader/progress states. |
-| Resources | `dvv resources` | Services, Docker, containers, and Compose projects render when available. |
+| Resources | `dvv resources` | Services, Docker, containers, and Compose projects render when available; `Shift+L` opens logs in a terminal tab. |
+| Secrets | `dvv secrets` | Secret file status renders and prepare/restore/sync actions stay inside the hub. |
 
 ## Manual macOS Smoke
 
@@ -51,14 +54,15 @@ Run after installing Homebrew dependencies listed in the README:
 | --- | --- | --- |
 | Source install | `ln -sf "$PWD/bin/dvv" ~/.local/bin/dvv` | `dvv` is on `PATH` and points at this checkout. |
 | Build | `dvv build` | Go binary builds locally. |
-| Setup | `dvv setup` | zsh completion and managed shortcuts are installed in the user's shell files. |
+| Setup | `dvv setup` | zsh completion, managed shell shortcuts, and managed tmux shortcuts are installed. |
 | Doctor | `dvv doctor` | Checks `brew` and `osascript`; does not warn about Linux-only `systemctl` or `service`. |
 | Terminal | `DVV_TERMINAL_LAUNCHER=terminal dvv ssh` | SSH handoff opens in Terminal.app. |
 | iTerm2 | `DVV_TERMINAL_LAUNCHER=iterm2 dvv ssh` | SSH handoff opens in iTerm2 when installed. |
 | Workspace | `dvv workspace` | Editor openers resolve `code`, `cursor`, `opencode`, `codex`, or shell according to local tools. |
 | Tmux | `dvv tmux`, `dvv tmux:session`, and `dvv tmux:home` | Tmux sessions open in the configured terminal launcher. |
 | Database | `dvv db` | MySQL client and rclone flows work with local credentials. |
-| Resources | `dvv resources` | `brew services` and Docker Desktop resources are detected when available. |
+| Resources | `dvv resources` | `brew services` and Docker Desktop resources are detected when available; logs open through Terminal.app or iTerm2. |
+| Secrets | `dvv secrets` | Secret status and AGE/SSH backup actions work with local files. |
 | Config | `dvv config` | Theme and terminal launcher config persist in `~/.config/devv/config.env`. |
 
 ## Disposable Integration Harnesses

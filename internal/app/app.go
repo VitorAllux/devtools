@@ -75,6 +75,12 @@ func Run(args []string) int {
 			return 1
 		}
 		return 0
+	case "secrets":
+		if err := secretscmd.RunSecrets(ctx, cfg, runner, commandArgs); err != nil {
+			ui.Error("%v", err)
+			return 1
+		}
+		return 0
 	case "build":
 		if err := setupcmd.RunBuild(ctx, cfg, runner, commandArgs); err != nil {
 			ui.Error("%v", err)
@@ -135,6 +141,12 @@ func Run(args []string) int {
 			return 1
 		}
 		return 0
+	case "tmux:reset-api":
+		if err := tmuxcmd.RunResetAPI(ctx, cfg, runner, commandArgs); err != nil {
+			ui.Error("%v", err)
+			return 1
+		}
+		return 0
 	case "api:restart":
 		return runCompatibilityCommand(ctx, cfg, runner, "tmux", "api-restart", commandArgs)
 	case "web:restart":
@@ -181,6 +193,8 @@ func runCommand(ctx context.Context, cfg *config.Config, runner run.Runner, comm
 		err = resourcescmd.Run(ctx, cfg, runner, args)
 	case "setup":
 		err = setupcmd.RunSetup(ctx, cfg, runner, args)
+	case "secrets":
+		err = secretscmd.RunSecrets(ctx, cfg, runner, args)
 	case "ssh":
 		err = sshcmd.Run(ctx, cfg, runner, args)
 	case "tmux":
@@ -189,6 +203,8 @@ func runCommand(ctx context.Context, cfg *config.Config, runner run.Runner, comm
 		err = tmuxcmd.Run(ctx, cfg, runner, args)
 	case "tmux:home":
 		err = tmuxcmd.RunHome(ctx, cfg, runner, args)
+	case "tmux:reset-api":
+		err = tmuxcmd.RunResetAPI(ctx, cfg, runner, args)
 	case "workspace":
 		err = workspacecmd.Run(ctx, cfg, runner, args)
 	default:
@@ -219,8 +235,9 @@ func showHelp() {
 	fmt.Println()
 	helpSection("System")
 	helpEntry("build", "*", "Rebuild the local dvv binary")
-	helpEntry("setup", "*", "Install zsh completion and shell shortcuts")
+	helpEntry("setup", "*", "Install zsh completion, shell shortcuts, and tmux shortcuts")
 	helpEntry("bootstrap", "*", "Restore AGE/Bitwarden secrets and SSH backup")
+	helpEntry("secrets", ">", "Open the local secrets hub")
 	helpEntry("doctor", "?", "Check local dependencies and integration")
 	helpEntry("config", ">", "Open the configuration hub")
 	fmt.Println()
@@ -229,8 +246,11 @@ func showHelp() {
 	fmt.Println()
 	helpSection("Shell Shortcuts")
 	helpEntry("Ctrl+F", ">", "Open the directory picker in tmux")
-	helpEntry("Ctrl+Shift+F", ">", "Open a home tmux tab")
+	helpEntry("Alt+F", ">", "Open a home tmux tab")
 	helpEntry("Alt+S", ">", "Open the SSH hub")
+	fmt.Println()
+	helpSection("Tmux Shortcuts")
+	helpEntry("Alt+R", ">", "Reset API and Horizon panes in the current tmux window")
 	fmt.Println()
 	fmt.Println("  Use `dvv <command> help` for hub details.")
 }

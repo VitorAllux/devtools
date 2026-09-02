@@ -148,6 +148,80 @@ func TestRunActionUsesBrewServicesCommand(t *testing.T) {
 	}
 }
 
+func TestLogsCommandUsesResourceManager(t *testing.T) {
+	cfg := testConfig()
+	cfg.Project.Resources.Logs.Tail = 50
+	manager := Manager{Config: cfg, Runner: &fakeRunner{
+		paths: map[string]bool{"docker": true, "journalctl": true},
+		outputs: map[string][]byte{
+			"docker compose version": []byte("Docker Compose version v2.20.0\n"),
+		},
+	}}
+
+	container, err := manager.logsCommand(context.Background(), Resource{
+		Kind:      "Container",
+		Name:      "web",
+		Available: true,
+		Manager:   "docker",
+		Target:    "web",
+	})
+	if err != nil {
+		t.Fatalf("container logsCommand returned error: %v", err)
+	}
+	if got := strings.Join(container, " "); got != "docker logs --tail 50 -f web" {
+		t.Fatalf("container logs command = %q", got)
+	}
+
+	compose, err := manager.logsCommand(context.Background(), Resource{
+		Kind:         "Compose",
+		Name:         "saas",
+		Available:    true,
+		Manager:      "docker compose",
+		Target:       "saas",
+		ComposeFiles: []string{"docker-compose.yml", "docker-compose.override.yml"},
+	})
+	if err != nil {
+		t.Fatalf("compose logsCommand returned error: %v", err)
+	}
+	if got := strings.Join(compose, " "); got != "docker compose -f docker-compose.yml -f docker-compose.override.yml -p saas logs --tail 50 -f" {
+		t.Fatalf("compose logs command = %q", got)
+	}
+
+	service, err := manager.logsCommand(context.Background(), Resource{
+		Kind:      "Service",
+		Name:      "mysql",
+		Available: true,
+		Manager:   "systemctl",
+		Target:    "mysql",
+	})
+	if err != nil {
+		t.Fatalf("service logsCommand returned error: %v", err)
+	}
+	if got := strings.Join(service, " "); got != "journalctl -fu mysql.service -n 50" {
+		t.Fatalf("service logs command = %q", got)
+	}
+}
+
+func TestOpenLogsLaunchesTerminal(t *testing.T) {
+	t.Setenv("DVV_NO_LOADER", "1")
+	runner := &fakeRunner{paths: map[string]bool{"x-terminal-emulator": true}}
+	manager := Manager{Config: testConfig(), Runner: runner, OS: "linux"}
+
+	err := manager.OpenLogs(context.Background(), Resource{
+		Kind:      "Container",
+		Name:      "web",
+		Available: true,
+		Manager:   "docker",
+		Target:    "web",
+	})
+	if err != nil {
+		t.Fatalf("OpenLogs returned error: %v", err)
+	}
+	if !runner.hasStart("x-terminal-emulator -e docker logs --tail 200 -f web") {
+		t.Fatalf("terminal start missing: %#v", runner.starts)
+	}
+}
+
 func TestCommandDetailsAndActionUseDetectedResource(t *testing.T) {
 	t.Setenv("DVV_NO_LOADER", "1")
 	runner := &fakeRunner{
@@ -312,6 +386,7 @@ type fakeRunner struct {
 	paths   map[string]bool
 	outputs map[string][]byte
 	runs    []string
+	starts  []string
 	lookups []string
 }
 
@@ -332,8 +407,9 @@ func (r *fakeRunner) OutputWithInput(context.Context, string, []byte, string, ..
 	return nil, errors.New("unexpected fzf command")
 }
 
-func (r *fakeRunner) Start(context.Context, string, string, ...string) error {
-	return errors.New("unexpected start command")
+func (r *fakeRunner) Start(_ context.Context, _ string, name string, args ...string) error {
+	r.starts = append(r.starts, commandKey(name, args...))
+	return nil
 }
 
 func (r *fakeRunner) LookPath(name string) (string, error) {
@@ -356,6 +432,15 @@ func (r *fakeRunner) hasRun(command string) bool {
 func (r *fakeRunner) lookedUp(command string) bool {
 	for _, lookup := range r.lookups {
 		if lookup == command {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *fakeRunner) hasStart(command string) bool {
+	for _, start := range r.starts {
+		if start == command {
 			return true
 		}
 	}

@@ -433,10 +433,100 @@ func TestWorkspacePreviewPreservesHubCommandArgs(t *testing.T) {
 	if strings.Contains(preview, "DVV_FZF_COMMANDS") {
 		t.Fatalf("preview should render shortcut commands directly: %s", preview)
 	}
-	for _, want := range []string{"Shift+C", "create workspace", "Shift+M", "manage projects", "Shift+D", "delete selected"} {
+	for _, want := range []string{"Shift+C", "create workspace", "Shift+T", "save workspace template", "Shift+M", "manage projects", "Shift+D", "delete selected"} {
 		if !strings.Contains(preview, want) {
 			t.Fatalf("preview missing %q: %s", want, preview)
 		}
+	}
+}
+
+func TestWorkspaceCreateSourcesIncludeTemplates(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	root := t.TempDir()
+	apiPath := filepath.Join(root, "api")
+	webPath := filepath.Join(root, "web")
+	cfg := testWorkspaceConfig(filepath.Join(root, "workspaces"))
+	cfg.Project.Workspace.Templates = []config.WorkspaceTemplate{{
+		Name:     "Fullstack Bug",
+		BaseKind: "bug",
+		Projects: []config.WorkspaceProject{{Name: "api", Path: apiPath}, {Name: "web", Path: webPath}},
+	}}
+	manager := NewManager(cfg, newWorkspaceRunner())
+
+	sources := manager.createSources()
+	source, ok := findCreateSource(sources, "template:0")
+	if !ok {
+		t.Fatalf("template source missing: %#v", sources)
+	}
+	if source.Label != "Fullstack Bug" || source.BaseKind != "bug" || source.BaseLabel != "prod" || len(source.Projects) != 2 {
+		t.Fatalf("template source = %#v", source)
+	}
+	rows := createSourceRows(sources)
+	if !strings.Contains(rows, "Fullstack Bug") || !strings.Contains(rows, "template") || strings.Contains(strings.Split(rows, "\n")[0], "Uses saved projects") {
+		t.Fatalf("create source rows = %q", rows)
+	}
+	templateRow := strings.Split(strings.TrimSpace(rows), "\n")[4]
+	fields := strings.Split(templateRow, "\t")
+	if len(fields) != 8 {
+		t.Fatalf("template row fields = %#v", fields)
+	}
+	if fields[5] != "api|web" {
+		t.Fatalf("template project names field = %q, want api|web", fields[5])
+	}
+	if visible := fields[7]; strings.Contains(visible, "api|web") || strings.Contains(visible, "Uses saved projects") {
+		t.Fatalf("visible template row should keep project names and description in preview only: %q", visible)
+	}
+
+	preview := createSourcePreviewCommand()
+	for _, want := range []string{"Selected projects", "source_project_names", "tr \"|\" \"\\n\""} {
+		if !strings.Contains(preview, want) {
+			t.Fatalf("create source preview missing %q: %s", want, preview)
+		}
+	}
+}
+
+func TestFZFSelectCreateSourceReturnsTemplate(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	root := t.TempDir()
+	cfg := testWorkspaceConfig(filepath.Join(root, "workspaces"))
+	cfg.Project.Workspace.Templates = []config.WorkspaceTemplate{{
+		Name:     "Fullstack Issue",
+		BaseKind: "issue",
+		Projects: []config.WorkspaceProject{{Name: "api", Path: filepath.Join(root, "api")}},
+	}}
+	runner := newWorkspaceRunner()
+	runner.paths["fzf"] = true
+	manager := NewManager(cfg, runner)
+	sources := manager.createSources()
+	templateSource, ok := findCreateSource(sources, "template:0")
+	if !ok {
+		t.Fatalf("template source missing: %#v", sources)
+	}
+	runner.fzfOutput = []byte(createSourceLine(templateSource.ID, templateSource.Label, templateSource.Kind, templateSource.BaseLabel, templateSource.ProjectsLabel, projectNamePreviewList(templateSource.Projects), templateSource.Description, createSourceRow(3, templateSource)) + "\n")
+
+	selected, ok, err := manager.fzfSelectCreateSource(context.Background(), sources)
+	if err != nil {
+		t.Fatalf("fzfSelectCreateSource returned error: %v", err)
+	}
+	if !ok || selected.ID != "template:0" || len(selected.Projects) != 1 {
+		t.Fatalf("selected source ok=%v value=%#v", ok, selected)
+	}
+	if !strings.Contains(runner.fzfInput, "Fullstack Issue") {
+		t.Fatalf("fzf input should include template rows: %q", runner.fzfInput)
+	}
+}
+
+func TestWorkspaceTemplateHelpers(t *testing.T) {
+	api := discovery.Project{Name: "api", Path: "/repo/api"}
+	web := discovery.Project{Name: "", Path: "/repo/web"}
+	projects := workspaceProjectsFromDiscovery([]discovery.Project{api, web})
+	if len(projects) != 2 || projects[1].Name != "web" {
+		t.Fatalf("workspaceProjectsFromDiscovery = %#v", projects)
+	}
+	template := config.WorkspaceTemplate{Name: "A", Projects: projects}
+	replaced := appendOrReplaceWorkspaceTemplate([]config.WorkspaceTemplate{template}, config.WorkspaceTemplate{Name: "a", BaseKind: "bug", Projects: projects[:1]})
+	if len(replaced) != 1 || replaced[0].BaseKind != "bug" {
+		t.Fatalf("appendOrReplaceWorkspaceTemplate = %#v", replaced)
 	}
 }
 

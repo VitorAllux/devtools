@@ -155,6 +155,11 @@ func (m *Manager) fzfHub(ctx context.Context, details []Details, hubError string
 			return true, err.Error(), nil
 		}
 		return false, "", nil
+	case keys.Template.FZFKey:
+		if err := m.createTemplateInteractive(ctx); err != nil {
+			return true, err.Error(), nil
+		}
+		return true, "", nil
 	case keys.Manage.FZFKey:
 		ws, ok, err := m.singleSelectedWorkspace(selectedPaths)
 		if err != nil || !ok {
@@ -194,7 +199,7 @@ func (m *Manager) basicHub(ctx context.Context, details []Details, hubError stri
 	}
 	printWorkspaceList(details)
 	fmt.Println()
-	fmt.Printf("Commands: number opens | %s creates | %s number manages | %s number deletes | q exits\n", keys.Create.Label, keys.Manage.Label, keys.Delete.Label)
+	fmt.Printf("Commands: number opens | %s creates | %s saves template | %s number manages | %s number deletes | q exits\n", keys.Create.Label, keys.Template.Label, keys.Manage.Label, keys.Delete.Label)
 	value, err := ui.Prompt("Workspace")
 	if err != nil {
 		return false, "", err
@@ -212,6 +217,12 @@ func (m *Manager) basicHub(ctx context.Context, details []Details, hubError stri
 			return true, err.Error(), nil
 		}
 		return false, "", nil
+	}
+	if matchesShortcut(value, keys.Template.FZFKey) {
+		if err := m.createTemplateInteractive(ctx); err != nil {
+			return true, err.Error(), nil
+		}
+		return true, "", nil
 	}
 
 	fields := strings.Fields(value)
@@ -253,32 +264,37 @@ func (m *Manager) createInteractive(ctx context.Context) (Workspace, error) {
 	if strings.TrimSpace(name) == "" {
 		return Workspace{}, fmt.Errorf("workspace name cannot be empty")
 	}
-	baseKind, err := m.selectBaseKind(ctx)
+	source, ok, err := m.selectCreateSource(ctx)
 	if err != nil {
 		return Workspace{}, err
 	}
-	baseOverride := ""
-	if baseKind == "other" {
-		baseOverride, err = ui.Prompt("Source branch")
+	if !ok {
+		return Workspace{}, fmt.Errorf("workspace creation cancelled")
+	}
+	if source.BaseKind == "other" && source.BaseOverride == "" {
+		source.BaseOverride, err = ui.Prompt("Source branch")
 		if err != nil {
 			return Workspace{}, err
 		}
-		if strings.TrimSpace(baseOverride) == "" {
+		if strings.TrimSpace(source.BaseOverride) == "" {
 			return Workspace{}, fmt.Errorf("source branch cannot be empty")
 		}
 	}
-	projects, err := m.selectProjects(ctx, "Select Projects")
-	if err != nil {
-		return Workspace{}, err
-	}
+	projects := source.Projects
 	if len(projects) == 0 {
-		return Workspace{}, fmt.Errorf("no projects selected")
+		projects, err = m.selectProjects(ctx, "Select Projects")
+		if err != nil {
+			return Workspace{}, err
+		}
+		if len(projects) == 0 {
+			return Workspace{}, fmt.Errorf("no projects selected")
+		}
 	}
 
 	var plan CreatePlan
 	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "planning", Subject: Slug(name)}, func() error {
 		var buildErr error
-		plan, buildErr = m.BuildCreatePlan(ctx, name, projects, baseKind, baseOverride)
+		plan, buildErr = m.BuildCreatePlan(ctx, name, projects, source.BaseKind, source.BaseOverride)
 		return buildErr
 	}); err != nil {
 		return Workspace{}, err
@@ -288,7 +304,7 @@ func (m *Manager) createInteractive(ctx context.Context) (Workspace, error) {
 		return Workspace{}, fmt.Errorf("workspace creation cancelled")
 	}
 	var result CreateResult
-	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "creating", Subject: plan.WorkspaceDir, ShowResult: true, SuccessAction: "created"}, func() error {
+	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "creating", Subject: plan.WorkspaceDir}, func() error {
 		result = m.ExecuteCreatePlan(ctx, plan)
 		return nil
 	}); err != nil {
@@ -330,7 +346,7 @@ func (m *Manager) manageInteractive(ctx context.Context, ws Workspace) error {
 		return nil
 	}
 	for _, project := range toRemove {
-		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "removing", Subject: project.Name, ShowResult: true, SuccessAction: "removed"}, func() error {
+		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "removing", Subject: project.Name}, func() error {
 			return m.RemoveProject(ctx, ws, project, false)
 		}); err != nil {
 			return err
@@ -355,7 +371,7 @@ func (m *Manager) manageInteractive(ctx context.Context, ws Workspace) error {
 	}
 	printAddPlan(plan)
 	var result AddResult
-	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "adding", Subject: ws.DirName, ShowResult: true, SuccessAction: "added"}, func() error {
+	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "adding", Subject: ws.DirName}, func() error {
 		result = m.ExecuteAddPlan(ctx, plan)
 		return nil
 	}); err != nil {
@@ -388,7 +404,7 @@ func (m *Manager) deleteWorkspaceInteractive(ctx context.Context, ws Workspace) 
 	options := RemoveWorkspaceOptions{}
 	for {
 		var result RemoveWorkspaceResult
-		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "deleting", Subject: ws.DirName, ShowResult: true, SuccessAction: "deleted"}, func() error {
+		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "deleting", Subject: ws.DirName}, func() error {
 			result = m.RemoveWorkspace(ctx, ws, options)
 			return nil
 		}); err != nil {
@@ -793,6 +809,7 @@ func workspaceHubShortcuts(keys config.WorkspaceHubKeyBindings) []ui.FZFShortcut
 		{Label: "Enter", Description: "open"},
 		{Label: "Tab", Description: "mark delete"},
 		{Key: keys.Create.FZFKey, Label: keys.Create.Label, Description: "create workspace"},
+		{Key: keys.Template.FZFKey, Label: keys.Template.Label, Description: "save workspace template"},
 		{Key: keys.Manage.FZFKey, Label: keys.Manage.Label, Description: "manage projects"},
 		{Key: keys.Delete.FZFKey, Label: keys.Delete.Label, Description: "delete selected"},
 		{Label: "Esc", Description: "exit hub"},

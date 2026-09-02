@@ -20,6 +20,7 @@ func (l Launcher) Open(ctx context.Context, command string, args ...string) erro
 	if strings.TrimSpace(command) == "" {
 		return fmt.Errorf("terminal command is required")
 	}
+	command, args = commandWithTerminalEnvironment(command, args...)
 	preferred := normalizeLauncher(l.Preferred)
 	if preferred == "" || preferred == "auto" {
 		if l.exists("wt.exe") {
@@ -78,6 +79,13 @@ func (l Launcher) openLinux(ctx context.Context, preferred string, command strin
 	}
 
 	return fmt.Errorf("no compatible terminal launcher found")
+}
+
+func commandWithTerminalEnvironment(command string, args ...string) (string, []string) {
+	if command != "tmux" {
+		return command, args
+	}
+	return "env", append([]string{"COLORTERM=truecolor", command}, args...)
 }
 
 func (l Launcher) openDarwin(ctx context.Context, preferred string, command string, args ...string) error {

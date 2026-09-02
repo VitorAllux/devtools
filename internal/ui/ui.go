@@ -143,14 +143,27 @@ type LoaderOptions struct {
 	FailureAction string
 }
 
+type loaderRunResult struct {
+	err       error
+	panicData any
+}
+
 func RunWithRoyalLoader(options LoaderOptions, fn func() error) error {
 	if !LoaderEnabled() {
 		return fn()
 	}
 
-	done := make(chan error, 1)
+	done := make(chan loaderRunResult, 1)
 	go func() {
-		done <- fn()
+		result := loaderRunResult{}
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				result.panicData = recovered
+				result.err = fmt.Errorf("loader task panicked: %v", recovered)
+			}
+			done <- result
+		}()
+		result.err = fn()
 	}()
 
 	start := time.Now()
@@ -171,38 +184,46 @@ func RunWithRoyalLoader(options LoaderOptions, fn func() error) error {
 	}
 	finish := func(err error) {
 		clear()
-		if options.ShowResult {
+		if options.ShowResult || err != nil {
 			fmt.Fprintln(os.Stderr, renderRoyalLoaderResult(options, err == nil))
 		}
 	}
 
-	var result error
+	result := loaderRunResult{}
 	completed := false
-	doneCh := (<-chan error)(done)
+	doneCh := (<-chan loaderRunResult)(done)
 	render()
 
 	for {
 		select {
-		case err := <-doneCh:
-			result = err
+		case runResult := <-doneCh:
+			result = runResult
 			completed = true
 			doneCh = nil
 			if options.Minimum <= 0 || time.Since(start) >= options.Minimum {
-				finish(result)
-				return result
+				finish(result.err)
+				if result.panicData != nil {
+					panic(result.panicData)
+				}
+				return result.err
 			}
 		case <-ticker.C:
 			render()
 			if completed && time.Since(start) >= options.Minimum {
-				finish(result)
-				return result
+				finish(result.err)
+				if result.panicData != nil {
+					panic(result.panicData)
+				}
+				return result.err
 			}
 		}
 	}
 }
 
+var terminalCheck = isTerminal
+
 func LoaderEnabled() bool {
-	return os.Getenv("DVV_NO_LOADER") != "1" && isTerminal(os.Stderr)
+	return os.Getenv("DVV_NO_LOADER") != "1" && terminalCheck(os.Stderr)
 }
 
 func renderRoyalLoaderFrame(options LoaderOptions, index int, _ time.Duration) string {

@@ -98,7 +98,7 @@ func TestOpenInNewTerminalCreatesDetachedTmuxSessionAndLaunchesTerminal(t *testi
 		t.Fatalf("tmux session command = %q, want ssh command", run)
 	}
 	start := runner.lastStart()
-	if !strings.HasPrefix(start, "x-terminal-emulator -e tmux attach -t dvv-ssh-api-") {
+	if !strings.HasPrefix(start, "x-terminal-emulator -e env COLORTERM=truecolor tmux attach -t dvv-ssh-api-") {
 		t.Fatalf("terminal command = %q, want terminal attach", start)
 	}
 }
@@ -117,7 +117,7 @@ func TestOpenInNewTerminalUsesConfiguredTerminalLauncher(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenInNewTerminal returned error: %v", err)
 	}
-	if start := runner.lastStart(); !strings.HasPrefix(start, "konsole --new-tab -e tmux attach -t dvv-ssh-api-") {
+	if start := runner.lastStart(); !strings.HasPrefix(start, "konsole --new-tab -e env COLORTERM=truecolor tmux attach -t dvv-ssh-api-") {
 		t.Fatalf("terminal command = %q, want konsole attach", start)
 	}
 }

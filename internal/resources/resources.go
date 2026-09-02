@@ -13,6 +13,7 @@ import (
 
 	"github.com/VitorAllux/devtools/internal/config"
 	"github.com/VitorAllux/devtools/internal/run"
+	"github.com/VitorAllux/devtools/internal/terminal"
 	"github.com/VitorAllux/devtools/internal/ui"
 )
 
@@ -34,6 +35,7 @@ var actionNames = map[string]bool{
 	"start":   true,
 	"stop":    true,
 	"restart": true,
+	"logs":    true,
 }
 
 type Resource struct {
@@ -83,6 +85,8 @@ func Run(ctx context.Context, cfg *config.Config, runner run.Runner, args []stri
 		return manager.CommandDetails(ctx, args[1:])
 	case "start", "stop", "restart":
 		return manager.CommandAction(ctx, args[0], args[1:])
+	case "logs":
+		return manager.CommandLogs(ctx, args[1:])
 	default:
 		return fmt.Errorf("unknown resources action: %s", args[0])
 	}
@@ -251,6 +255,20 @@ func (m Manager) CommandAction(ctx context.Context, action string, args []string
 	return nil
 }
 
+func (m Manager) CommandLogs(ctx context.Context, args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("usage: dvv resources logs <resource-id>")
+	}
+	resource, ok, err := m.Find(ctx, args[0])
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("resource not found: %s", args[0])
+	}
+	return m.OpenLogs(ctx, resource)
+}
+
 func (m Manager) Find(ctx context.Context, resourceID string) (Resource, bool, error) {
 	resources, err := m.Resources(ctx)
 	if err != nil {
@@ -265,6 +283,12 @@ func (m Manager) Find(ctx context.Context, resourceID string) (Resource, bool, e
 }
 
 func (m Manager) RunAction(ctx context.Context, resource Resource, action string, useSudo bool) (ActionResult, error) {
+	if action == "logs" {
+		if err := m.OpenLogs(ctx, resource); err != nil {
+			return ActionResult{}, err
+		}
+		return ActionResult{Success: true, Message: "Opened logs for " + resource.Name}, nil
+	}
 	if !actionNames[action] {
 		return ActionResult{}, fmt.Errorf("unknown resource action: %s", action)
 	}
@@ -294,6 +318,64 @@ func (m Manager) RunAction(ctx context.Context, resource Resource, action string
 		Message: fmt.Sprintf("%s %s", actionDoneTitle(action), resource.Name),
 		Command: command,
 	}, nil
+}
+
+func (m Manager) OpenLogs(ctx context.Context, resource Resource) error {
+	command, err := m.logsCommand(ctx, resource)
+	if err != nil {
+		return err
+	}
+	return ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "opening", Subject: resource.Name, Detail: "logs", ShowResult: true, SuccessAction: "opened"}, func() error {
+		if err := (terminal.Launcher{Runner: m.Runner, Preferred: m.terminalLauncherPreference(), OS: m.OS}).Open(ctx, command[0], command[1:]...); err != nil {
+			return fmt.Errorf("%w; run manually with: %s", err, formatCommand(command))
+		}
+		return nil
+	})
+}
+
+func (m Manager) logsCommand(ctx context.Context, resource Resource) ([]string, error) {
+	if !resource.Available {
+		return nil, fmt.Errorf("%s is unavailable: %s", resource.Name, resource.Details)
+	}
+	tail := m.Config.Project.Resources.Logs.Tail
+	if tail <= 0 {
+		tail = 200
+	}
+	switch resource.Kind {
+	case "Service":
+		if resource.Manager == "brew" {
+			return []string{"brew", "services", "info", resource.Target}, nil
+		}
+		if resource.Manager == "systemctl" {
+			return []string{"journalctl", "-fu", resource.Target + ".service", "-n", fmt.Sprintf("%d", tail)}, nil
+		}
+		if _, err := m.Runner.LookPath("journalctl"); err == nil {
+			return []string{"journalctl", "-fu", resource.Target, "-n", fmt.Sprintf("%d", tail)}, nil
+		}
+		return []string{"service", resource.Target, "status"}, nil
+	case "Container":
+		return []string{"docker", "logs", "--tail", fmt.Sprintf("%d", tail), "-f", resource.Target}, nil
+	case "Compose":
+		base := m.composeCommandBase(ctx)
+		if len(base) == 0 {
+			return nil, fmt.Errorf("docker compose is required for %s logs", resource.Name)
+		}
+		command := append([]string{}, base...)
+		for _, file := range resource.ComposeFiles {
+			command = append(command, "-f", file)
+		}
+		command = append(command, "-p", resource.Target, "logs", "--tail", fmt.Sprintf("%d", tail), "-f")
+		return command, nil
+	default:
+		return nil, fmt.Errorf("%s does not support logs", resource.Name)
+	}
+}
+
+func (m Manager) terminalLauncherPreference() string {
+	if m.Config == nil {
+		return ""
+	}
+	return m.Config.Project.Terminal.Launcher
 }
 
 func (m Manager) fzfHub(ctx context.Context, resources []Resource, hubError string) (bool, string, error) {
@@ -334,6 +416,8 @@ func (m Manager) fzfHub(ctx context.Context, resources []Resource, hubError stri
 		return true, m.runHubAction(ctx, resource, "restart"), nil
 	case keys.Stop.FZFKey:
 		return true, m.runHubAction(ctx, resource, "stop"), nil
+	case keys.Logs.FZFKey:
+		return true, m.runHubLogs(ctx, resource), nil
 	default:
 		fmt.Println(describe(resource))
 		_, _ = ui.Prompt("Press Enter to return")
@@ -341,7 +425,17 @@ func (m Manager) fzfHub(ctx context.Context, resources []Resource, hubError stri
 	}
 }
 
+func (m Manager) runHubLogs(ctx context.Context, resource Resource) string {
+	if err := m.OpenLogs(ctx, resource); err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
 func (m Manager) runHubAction(ctx context.Context, resource Resource, action string) string {
+	if action == "logs" {
+		return m.runHubLogs(ctx, resource)
+	}
 	var result ActionResult
 	err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: actionGerund(action), Subject: resource.Name, ShowResult: true, SuccessAction: actionDone(action)}, func() error {
 		var runErr error
@@ -366,7 +460,7 @@ func (m Manager) basicHub(ctx context.Context, resources []Resource, hubError st
 	ui.Title("Resources Hub")
 	fmt.Println(formatTable(resources))
 	fmt.Println()
-	fmt.Printf("Commands: number details | %s number start | %s number restart | %s number stop | q exits\n", keys.Start.Label, keys.Restart.Label, keys.Stop.Label)
+	fmt.Printf("Commands: number details | %s number start | %s number restart | %s number stop | %s number logs | q exits\n", keys.Start.Label, keys.Restart.Label, keys.Stop.Label, keys.Logs.Label)
 	value, err := ui.Prompt("Resources")
 	if err != nil {
 		return false, "", err
@@ -385,6 +479,8 @@ func (m Manager) basicHub(ctx context.Context, resources []Resource, hubError st
 			action = "restart"
 		case matchesShortcut(fields[0], keys.Stop.FZFKey):
 			action = "stop"
+		case matchesShortcut(fields[0], keys.Logs.FZFKey):
+			action = "logs"
 		}
 		if action != "" {
 			index, ok := parseIndex(fields[1], len(resources))
@@ -778,6 +874,7 @@ func resourceHubShortcuts(keys config.ResourcesHubKeyBindings) []ui.FZFShortcut 
 		{Key: keys.Start.FZFKey, Label: keys.Start.Label, Description: "start"},
 		{Key: keys.Restart.FZFKey, Label: keys.Restart.Label, Description: "restart"},
 		{Key: keys.Stop.FZFKey, Label: keys.Stop.Label, Description: "stop"},
+		{Key: keys.Logs.FZFKey, Label: keys.Logs.Label, Description: "logs"},
 		{Label: "Esc", Description: "exit hub"},
 	}
 }
@@ -1121,6 +1218,7 @@ func showHelp(cfg *config.Config) {
 	helpEntry(keys.Start.Label, "Start selected resource")
 	helpEntry(keys.Restart.Label, "Restart selected resource")
 	helpEntry(keys.Stop.Label, "Stop selected resource")
+	helpEntry(keys.Logs.Label, "Open selected resource logs in a new terminal tab")
 	helpEntry("Esc", "Exit")
 }
 

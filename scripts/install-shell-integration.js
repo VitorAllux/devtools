@@ -27,7 +27,7 @@ const tmuxHomeShortcut = shortcutToZshSequences(
   process.env.DVV_TMUX_HOME_SHORTCUT ||
     process.env.DEVT_TMUX_HOME_SHORTCUT ||
     config?.tmux?.home?.shortcut ||
-    "ctrl+shift+f",
+    "alt+f",
 );
 
 const bindings = [];

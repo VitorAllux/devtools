@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, "..");
 
 run("completion", "install-completion.js");
 run("shell integration", "install-shell-integration.js");
+run("tmux integration", "install-tmux-integration.js");
 
 console.error("dvv setup complete.");
 

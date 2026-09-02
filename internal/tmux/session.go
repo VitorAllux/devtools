@@ -156,6 +156,7 @@ func (m *Manager) openSession(ctx context.Context, selected string, baseSessionN
 	windowName := windowName(path)
 
 	return ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "opening", Subject: sessionName, ShowResult: true, SuccessAction: "opened"}, func() error {
+		m.applyOptions(ctx)
 		if err := m.Runner.Run(ctx, "", "tmux", "new-session", "-ds", sessionName, "-n", windowName, "-c", path); err != nil {
 			return err
 		}
@@ -538,7 +539,7 @@ func showHelp(cfg *config.Config) {
 func showHomeHelp(cfg *config.Config) {
 	shortcut := cfg.Project.Tmux.Home.Shortcut
 	if strings.TrimSpace(shortcut) == "" {
-		shortcut = "ctrl+shift+f"
+		shortcut = "alt+f"
 	}
 	directory := cfg.Project.Tmux.Home.Directory
 	if strings.TrimSpace(directory) == "" {
@@ -550,7 +551,7 @@ func showHomeHelp(cfg *config.Config) {
 	helpEntry("dvv tmux:home", "Open a new terminal tab attached to a tmux session in "+directory)
 	fmt.Println()
 	helpSection("Shell Shortcut")
-	helpEntry(shortcutLabel(shortcut, "ctrl+shift+f"), "Runs dvv tmux:home when shell integration is installed")
+	helpEntry(shortcutLabel(shortcut, "alt+f"), "Runs dvv tmux:home when shell integration is installed")
 }
 
 func shortcutLabel(value string, fallback string) string {

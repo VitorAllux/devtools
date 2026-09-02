@@ -2,6 +2,36 @@
   "theme": {
     "name": "royal-noir"
   },
+  "profiles": {
+    "active": "default",
+    "items": [
+      {
+        "name": "default",
+        "description": "Use project defaults and explicit runtime config values.",
+        "values": {}
+      },
+      {
+        "name": "personal",
+        "description": "Preset for personal machine overrides.",
+        "values": {}
+      },
+      {
+        "name": "work",
+        "description": "Preset for work machine overrides.",
+        "values": {}
+      },
+      {
+        "name": "wsl",
+        "description": "Preset for WSL-specific overrides.",
+        "values": {}
+      },
+      {
+        "name": "ci",
+        "description": "Preset for non-interactive validation environments.",
+        "values": {}
+      }
+    ]
+  },
   "terminal": {
     "launcher": "auto"
   },
@@ -18,8 +48,12 @@
       "shortcuts": {
         "start": "alt+s",
         "restart": "alt+r",
-        "stop": "alt+x"
+        "stop": "alt+x",
+        "logs": "shift+l"
       }
+    },
+    "logs": {
+      "tail": 200
     }
   },
   "ssh": {
@@ -28,6 +62,15 @@
         "add": "shift+a",
         "remove": "shift+r",
         "newTerminal": "shift+t"
+      }
+    }
+  },
+  "secrets": {
+    "hub": {
+      "shortcuts": {
+        "prepare": "shift+k",
+        "restore": "shift+r",
+        "sync": "shift+s"
       }
     }
   },
@@ -46,12 +89,17 @@
     "home": {
       "directory": "~",
       "sessionName": "home",
-      "shortcut": "ctrl+shift+f"
-    }
+      "shortcut": "alt+f"
+    },
+    "reset": {
+      "shortcut": "alt+r"
+    },
+    "environments": []
   },
   "workspace": {
     "root": "~/workspace",
     "projects": [],
+    "templates": [],
     "projectSearchRoots": [
       "~/workspace",
       "~/Development/projects",
@@ -81,7 +129,8 @@
       "shortcuts": {
         "create": "shift+c",
         "manage": "shift+m",
-        "delete": "shift+d"
+        "delete": "shift+d",
+        "template": "shift+t"
       }
     },
     "bootstrap": {

@@ -22,6 +22,8 @@ This document maps the operational details that are easy to forget while using o
 | Versioned launcher | `bin/dvv` is committed as the source-checkout launcher and rebuild helper. | Keep it small and source-controlled. |
 | Compiled binary | `dist/dvv` is a build artifact. | Do not commit it. |
 | Shell integration | `dvv setup` installs completion and managed zsh shortcuts. | Run only when setup, completion, or shortcut behavior changes. |
+| Tmux integration | `dvv setup` installs the managed tmux reset shortcut in `~/.tmux.conf` and tries to reload it in running tmux servers. | Use `tmux.reset.shortcut` or `DVV_TMUX_RESET_SHORTCUT` to change it. |
+| Doctor fix | `dvv doctor --fix` creates safe runtime files, rebuilds, and reinstalls managed shell/tmux integration. | Use after a checkout move or broken local setup. |
 | Legacy shortcut cleanup | `dvv setup` removes old one-line `devv`/`dvv` shortcut bindings before writing the managed block. | Use the managed block instead of scattered shell lines. |
 
 ## Workspace Paths
@@ -55,29 +57,43 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | --- | --- | --- |
 | Launcher config | `DVV_TERMINAL_LAUNCHER` controls terminal handoff and defaults to `auto`. | Prefer config over platform-specific commands in feature packages. |
 | WSL | `auto` opens a new Windows Terminal tab with `wt.exe -w 0 new-tab wsl.exe ...` when available. | Use for SSH and tmux handoff. |
+| Tmux color handoff | Terminal launchers run tmux through `env COLORTERM=truecolor` so `fzf` themes keep truecolor in new tabs. | Preserve this wrapper for tmux attaches. |
 | Linux | `auto` probes supported terminal emulators such as GNOME Terminal, Konsole, XFCE Terminal, `x-terminal-emulator`, and Alacritty. | Keep fallback errors actionable. |
 | macOS | `auto` uses Terminal.app through `osascript`; `iterm2` uses iTerm2 when configured. | Run the macOS smoke checklist before claiming full macOS support. |
 | Unsupported launcher | Unknown configured launchers fail before opening a new process. | Surface the configured value in the error. |
+
+## Tmux Environments
+
+| Detail | Current rule | Action |
+| --- | --- | --- |
+| Default target | `dvv tmux` still reads legacy `API_DIR`, `WEB_DIR`, `TMUX_SESSION`, and `TMUX_WIN`. | Keep this for compatibility with existing local env files. |
+| Workspace targets | Workspace metadata adds one tmux target per `workspace-*` directory. | Use workspace paths when a task is worktree-based. |
+| Custom targets | `tmux.environments` or `DVV_TMUX_ENVIRONMENTS` adds named API/Web targets. | Use `Alt+N` in `dvv tmux` to pick API/Web projects from workspace discovery and save a reusable target. |
+| Workspace templates | `workspace.templates` or `DVV_WORKSPACE_TEMPLATES` adds reusable creation presets. | Use `Shift+T` in `dvv workspace` to save project/base selections and `Shift+C` to reuse them. |
+| Target validation | API dir must contain `artisan`; Web dir must contain `package.json`. | Keep invalid targets visible as missing/invalid, but block start actions. |
+| Tmux truecolor | Sessions created by `dvv` set `default-terminal=tmux-256color`, `COLORTERM=truecolor`, `terminal-features=*:RGB`, and `terminal-overrides=*:Tc`. | Keep color options runtime-applied; `.tmux.conf` is only managed for the explicit shortcut block. |
+| API reset shortcut | `Alt+R` inside tmux runs `dvv tmux:reset-api` against the current session/window. | Reset API/Horizon only; do not send commands to Web panes. |
 
 ## Hubs And Shortcuts
 
 | Detail | Current rule | Action |
 | --- | --- | --- |
-| Hub-first UX | Public commands should open hubs: `dvv ssh`, `dvv workspace`, `dvv tmux`, `dvv db`, `dvv resources`, `dvv config`. | Keep mutation flows inside hubs where possible. |
+| Hub-first UX | Public commands should open hubs: `dvv ssh`, `dvv workspace`, `dvv tmux`, `dvv db`, `dvv resources`, `dvv secrets`, `dvv config`. | Keep mutation flows inside hubs where possible. |
 | Shortcut config | Hub action keys are configurable in `dvv.config.json`. | Read from config, do not hard-code feature shortcuts in command handlers. |
 | fzf previews | Detailed shortcut decks belong in the side preview panel. | Use shared `internal/ui.FZFHub` and `FZFPreviewCommandDeck`. |
-| Global shortcuts | Project-managed zsh shortcuts are `Ctrl+F`, `Ctrl+Shift+F`, and `Alt+S`. | Avoid adding more global `Ctrl-*` bindings without explicit need. |
-| Home tmux tab | `Ctrl+Shift+F` runs `dvv tmux:home`, opening `tmux.home.directory` without fzf. | If the terminal captures the chord for search, run `dvv tmux:home` directly or remap the terminal. |
+| Global shortcuts | Project-managed zsh shortcuts are `Ctrl+F`, `Alt+F`, and `Alt+S`; project-managed tmux shortcut is `Alt+R`. | Avoid adding more global `Ctrl-*` bindings without explicit need. |
+| Home tmux tab | `Alt+F` runs `dvv tmux:home`, opening `tmux.home.directory` without fzf. | `Ctrl+Shift+F` is avoided because Windows Terminal captures it for Find. |
 | Completion | Root completion lists public hubs by default. Compatibility routes are shown only when `DVV_COMPLETE_COMPAT=1`. | Keep root help, completion, and README aligned. |
 
 ## Config Hub
 
 | Detail | Current rule | Action |
 | --- | --- | --- |
-| First screen | `dvv config` opens a category hub. | Keep raw key lists inside `Keys` or focused sub-hubs. |
-| Current raw editor | `Keys` preserves the old key/value editor. | Keep `dvv config list` and `dvv config set` script-friendly. |
+| First screen | `dvv config` opens a category hub. | Keep the complete raw key list inside `All Keys` and common settings inside focused sub-hubs. |
+| Current raw editor | `All Keys` preserves the old key/value editor. | Keep `dvv config list` and `dvv config set` script-friendly. |
 | Visible categories | Every first-level category must open a working selector or key hub. | Keep future categories hidden until their backend exists. |
 | Runtime keys | Category sub-hubs expose only keys that affect current behavior. | Add runtime config support before making a setting editable. |
+| Profiles | `Profiles` selects `DVV_PROFILE`; project profile values apply before normal config resolution. | Use for machine/context presets without overriding explicit shell exports. |
 
 ## Loader Coverage
 
@@ -93,8 +109,8 @@ Final indeterminate loader labels should be action-specific, such as `ready`, `c
 | Workspace | Initial hub load, project discovery, create planning, create execution, project add/remove, workspace deletion. |
 | Tmux | Target scanning, environment open/start/stop/restart, directory picker session open. |
 | Database | Database fetch, create, drop, truncate, Google Drive download, import progress, dump cleaning. |
-| Resources | Resource scan and start/stop/restart actions. |
-| Secrets | AGE key preparation, SSH backup decrypt/encrypt. |
+| Resources | Resource scan, start/stop/restart actions, and log terminal handoff. |
+| Secrets | Secrets hub status, AGE key preparation, SSH backup decrypt/encrypt. |
 
 ## Database Dumps
 
@@ -114,6 +130,15 @@ Final indeterminate loader labels should be action-specific, such as `ready`, `c
 | AGE key | Stored in `~/.config/devv/keys/age.key`. | Never commit private keys. |
 | Encrypted SSH backup | Uses repo `secrets/servers.list.age` when `secrets/` exists, otherwise `~/.config/devv/servers.list.age`. | Keep `secrets/` out of git history. |
 | Bitwarden | `dvv bootstrap` can restore the AGE key from Bitwarden. | Configure `DVV_BW_AGE_KEY_ITEM` when needed. |
+| Secrets hub | `dvv secrets` shows AGE, recipient, SSH list, encrypted backup, and Bitwarden item state. | Use it before manually editing secret files. |
+
+## Resource Logs
+
+| Detail | Current rule | Action |
+| --- | --- | --- |
+| Services | `systemctl` services open `journalctl -fu <service>.service`; basic services use `journalctl` when available or `service status`. | Use `Shift+L` from `dvv resources`. |
+| Containers | Docker containers open `docker logs --tail <n> -f <container>`. | Configure `DVV_RESOURCES_LOG_TAIL` for the initial line count. |
+| Compose | Compose projects open `docker compose ... logs --tail <n> -f`. | Compose config files detected by Docker are preserved in the command. |
 
 ## Doctor Checklist
 
@@ -121,6 +146,12 @@ Run:
 
 ```bash
 dvv doctor
+```
+
+Use this to apply safe local repairs:
+
+```bash
+dvv doctor --fix
 ```
 
 It checks:

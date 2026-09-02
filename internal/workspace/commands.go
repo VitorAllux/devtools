@@ -36,6 +36,7 @@ func showHelp(cfg *config.Config) {
 	helpEntry("Enter", "Open selected workspace")
 	helpEntry("Tab", "Mark workspaces for delete")
 	helpEntry(keys.Create.Label, "Create workspace")
+	helpEntry(keys.Template.Label, "Save workspace template")
 	helpEntry(keys.Manage.Label, "Manage selected workspace projects")
 	helpEntry(keys.Delete.Label, "Delete selected workspace(s)")
 	helpEntry("Esc", "Exit")

@@ -18,15 +18,23 @@ type SSHHubKeyBindings struct {
 }
 
 type WorkspaceHubKeyBindings struct {
-	Create KeyBinding
-	Manage KeyBinding
-	Delete KeyBinding
+	Create   KeyBinding
+	Manage   KeyBinding
+	Delete   KeyBinding
+	Template KeyBinding
 }
 
 type ResourcesHubKeyBindings struct {
 	Start   KeyBinding
 	Restart KeyBinding
 	Stop    KeyBinding
+	Logs    KeyBinding
+}
+
+type SecretsHubKeyBindings struct {
+	Prepare KeyBinding
+	Restore KeyBinding
+	Sync    KeyBinding
 }
 
 func (c *Config) SSHHubKeys() SSHHubKeyBindings {
@@ -41,9 +49,10 @@ func (c *Config) SSHHubKeys() SSHHubKeyBindings {
 func (c *Config) WorkspaceHubKeys() WorkspaceHubKeyBindings {
 	defaults := DefaultProjectConfig().Workspace.Interactive.Shortcuts
 	return WorkspaceHubKeyBindings{
-		Create: normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Create, defaults.Create),
-		Manage: normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Manage, defaults.Manage),
-		Delete: normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Delete, defaults.Delete),
+		Create:   normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Create, defaults.Create),
+		Manage:   normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Manage, defaults.Manage),
+		Delete:   normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Delete, defaults.Delete),
+		Template: normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Template, defaults.Template),
 	}
 }
 
@@ -53,6 +62,16 @@ func (c *Config) ResourcesHubKeys() ResourcesHubKeyBindings {
 		Start:   normalizeKeyOrDefault(c.Project.Resources.Hub.Shortcuts.Start, defaults.Start),
 		Restart: normalizeKeyOrDefault(c.Project.Resources.Hub.Shortcuts.Restart, defaults.Restart),
 		Stop:    normalizeKeyOrDefault(c.Project.Resources.Hub.Shortcuts.Stop, defaults.Stop),
+		Logs:    normalizeKeyOrDefault(c.Project.Resources.Hub.Shortcuts.Logs, defaults.Logs),
+	}
+}
+
+func (c *Config) SecretsHubKeys() SecretsHubKeyBindings {
+	defaults := DefaultProjectConfig().Secrets.Hub.Shortcuts
+	return SecretsHubKeyBindings{
+		Prepare: normalizeKeyOrDefault(c.Project.Secrets.Hub.Shortcuts.Prepare, defaults.Prepare),
+		Restore: normalizeKeyOrDefault(c.Project.Secrets.Hub.Shortcuts.Restore, defaults.Restore),
+		Sync:    normalizeKeyOrDefault(c.Project.Secrets.Hub.Shortcuts.Sync, defaults.Sync),
 	}
 }
 

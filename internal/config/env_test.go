@@ -62,3 +62,39 @@ func TestLoadEnvFileKeepsExistingEnvWhenOverrideIsFalse(t *testing.T) {
 		t.Fatalf("DVV_SERVERS_FILE = %q, want /from/env", got)
 	}
 }
+
+func TestSetAndUnsetEnvFileValue(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.env")
+
+	if err := SetEnvFileValue(path, "DVV_THEME", "royal noir"); err != nil {
+		t.Fatalf("SetEnvFileValue theme failed: %v", err)
+	}
+	if err := SetEnvFileValue(path, "DVV_BW_AGE_KEY_ITEM", "a'b"); err != nil {
+		t.Fatalf("SetEnvFileValue secret failed: %v", err)
+	}
+
+	values, err := ReadEnvFile(path)
+	if err != nil {
+		t.Fatalf("ReadEnvFile failed: %v", err)
+	}
+	if values["DVV_THEME"] != "royal noir" {
+		t.Fatalf("theme = %q", values["DVV_THEME"])
+	}
+	if values["DVV_BW_AGE_KEY_ITEM"] != "a'b" {
+		t.Fatalf("bitwarden item = %q", values["DVV_BW_AGE_KEY_ITEM"])
+	}
+
+	if err := UnsetEnvFileValue(path, "DVV_THEME"); err != nil {
+		t.Fatalf("UnsetEnvFileValue failed: %v", err)
+	}
+	values, err = ReadEnvFile(path)
+	if err != nil {
+		t.Fatalf("ReadEnvFile after unset failed: %v", err)
+	}
+	if _, ok := values["DVV_THEME"]; ok {
+		t.Fatalf("DVV_THEME should have been removed: %#v", values)
+	}
+	if values["DVV_BW_AGE_KEY_ITEM"] != "a'b" {
+		t.Fatalf("bitwarden item after unset = %q", values["DVV_BW_AGE_KEY_ITEM"])
+	}
+}
