@@ -61,6 +61,7 @@ dvv workspace
 - [x] Reuse workspace metadata and config where possible.
 - [x] Keep the previous tmux session and window behavior compatible under the new nested command surface.
 - [x] Add configurable custom API/Web environments for projects outside workspace metadata.
+- [x] Add the managed `Alt+R` tmux reset shortcut for current API/Horizon panes.
 
 Current Go command surface:
 
@@ -68,6 +69,7 @@ Current Go command surface:
 dvv tmux
 dvv tmux:session
 dvv tmux:home
+dvv tmux:reset-api
 ```
 
 ## Phase 4: DB

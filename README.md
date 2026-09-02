@@ -14,7 +14,7 @@ This branch is `go-version`. The current Go implementation includes:
 | --- | --- | --- |
 | SSH | Ready | `dvv ssh` |
 | Workspace | Ready | `dvv workspace` |
-| Tmux | Ready | `dvv tmux` and `Ctrl+F` |
+| Tmux | Ready | `dvv tmux`, `Ctrl+F`, and `Alt+R` |
 | Database | Ready | `dvv db` |
 | System config | Ready | `dvv config` |
 | Resources | Ready | `dvv resources` |
@@ -40,7 +40,7 @@ Make sure `~/.local/bin` is on `PATH`. The launcher exposes:
 dvv
 ```
 
-After installing, enable completion and managed zsh shortcuts:
+After installing, enable completion, managed zsh shortcuts, and managed tmux shortcuts:
 
 ```bash
 dvv setup
@@ -113,15 +113,16 @@ npm run check
 | `dvv tmux` | Open the tmux environment hub. |
 | `dvv tmux:session` | Open the directory picker used by `Ctrl+F`. |
 | `dvv tmux:home` | Open the configured home tmux tab used by `Alt+F`. |
+| `dvv tmux:reset-api` | Reset API and Horizon panes in the current tmux window. |
 | `dvv db` | Open the database hub. |
 | `dvv resources` | Open the local resources hub. |
 | `dvv secrets` | Open the local secrets hub. |
 | `dvv config` | Open the configuration hub. |
-| `dvv setup` | Install zsh completion and managed shell shortcuts. |
+| `dvv setup` | Install zsh completion, managed shell shortcuts, and managed tmux shortcuts. |
 | `dvv bootstrap` | Restore AGE/Bitwarden secrets and SSH backup. |
 | `dvv build` | Rebuild the local Go binary. |
 | `dvv doctor` | Check dependencies, paths, shortcuts, and known local edge cases. |
-| `dvv doctor --fix` | Create safe local files, rebuild, and reinstall shell integration. |
+| `dvv doctor --fix` | Create safe local files, rebuild, and reinstall shell/tmux integration. |
 
 Compatibility routes such as `dvv ssh:list`, `dvv workspace:list`, `dvv db import`, and `dvv config set` exist for scripts and migration support, but they are not the primary user surface.
 
@@ -136,6 +137,18 @@ Compatibility routes such as `dvv ssh:list`, `dvv workspace:list`, `dvv db impor
 | `Alt+S` | `dvv ssh` |
 
 The managed block is written to `~/.zshrc`. Set `DVV_SKIP_SHELL_INTEGRATION=1` before setup to skip shortcut installation. Windows Terminal reserves `Ctrl+Shift+F` for Find, so the default direct home shortcut is `Alt+F`.
+
+## Tmux Shortcuts
+
+`dvv setup` also manages this tmux shortcut in `~/.tmux.conf`:
+
+| Shortcut | Command |
+| --- | --- |
+| `Alt+R` | `dist/dvv tmux:reset-api --session "#{session_name}" --window "#{window_name}"` |
+
+`Alt+R` resets the current tmux window's API/Horizon panes. It sends `Ctrl+C` to pane `0`, runs Laravel cache/config reset commands, starts `php artisan serve`, and restarts Horizon only when pane `1` points at the same API project. It does not touch the Web pane.
+
+Set `tmux.reset.shortcut` or `DVV_TMUX_RESET_SHORTCUT` to change it. Use `none` to disable the managed tmux shortcut. `dvv setup` writes the config, prefers the absolute built binary when available, and attempts to reload it in any running tmux server. Set `DVV_SKIP_TMUX_INTEGRATION=1` before setup to skip `.tmux.conf` changes.
 
 ## SSH Hub
 
@@ -168,6 +181,7 @@ Shortcuts:
 | `Enter` | Open the selected workspace with the configured or selected opener. |
 | `Tab` | Mark workspaces for deletion. |
 | `Shift+C` | Create a workspace. |
+| `Shift+T` | Save a workspace template. |
 | `Shift+M` | Manage projects in the selected workspace. |
 | `Shift+D` | Delete selected workspace(s). |
 | `Esc` | Exit. |
@@ -194,6 +208,8 @@ Creation rules:
 | `Issue` | `master` |
 | `Other` | Ask for source branch |
 
+Workspace templates can be saved from the hub with `Shift+T`. A template stores a name, base selection, optional source branch, and selected projects in `DVV_WORKSPACE_TEMPLATES`. When creating a workspace with `Shift+C`, the base selector lists `Bug`, `Issue`, `Other`, and saved templates in one screen. Choosing a template reuses its projects and base branch rules.
+
 Existing `workspace-*` directories are adopted automatically when the hub opens. Adoption only writes missing `.workspace/config.json` metadata; it does not move, rename, clean, or delete files.
 
 Invalid workspace directory names are ignored by the hub. This matters when a directory looks correct in the terminal but contains hidden invalid bytes, such as a broken `workspace-task_600_7656` duplicate. Use `dvv doctor` to detect this.
@@ -213,7 +229,7 @@ Shortcuts:
 | `Alt+D` | Stop selected environment. |
 | `Alt+A` | Restart API and Horizon panes. |
 | `Alt+W` | Restart Web pane. |
-| `Alt+N` | Add a custom API/Web tmux environment. |
+| `Alt+N` | Save a custom API/Web tmux target. |
 | `Esc` | Exit. |
 
 The directory picker is available through:
@@ -232,7 +248,15 @@ dvv tmux:home
 
 Default search root priority follows the previous Bash implementation: `TMUX_DEFAULT_DIR`, `~/workspace`, `~/Work/Development/dev`, `~/Work/Development`, `~/Development`, common parent of `API_DIR` and `WEB_DIR`, then `$HOME`.
 
-Custom API/Web environments can be created from `dvv tmux` with `Alt+N`. They are stored in `DVV_TMUX_ENVIRONMENTS` as JSON, so a project outside a workspace can still appear as a named tmux target.
+Custom API/Web environments can be created from `dvv tmux` with `Alt+N`. The flow asks for a target name, then opens project pickers for API and Web using the same `workspace.projectSearchRoots` discovery. Saved targets are stored in `DVV_TMUX_ENVIRONMENTS` as JSON, so a project outside a workspace can still appear as a named tmux target.
+
+The current tmux window can be reset with:
+
+```bash
+dvv tmux:reset-api
+```
+
+This command is mainly the backend for the managed `Alt+R` tmux shortcut. It targets the current tmux session/window, validates pane `0` as a Laravel API project, restarts API cache/config state, and restarts Horizon when the Horizon pane exists. Web is intentionally skipped.
 
 ## Database
 
@@ -312,9 +336,9 @@ The configuration hub edits persisted runtime values in:
 ~/.config/devv/config.env
 ```
 
-`dvv config` opens a category hub first. Use `Theme` to switch the CLI theme, `Profiles` to select the active runtime profile, `Keys` for raw key editing, or choose a focused area such as `Paths`, `Shortcuts`, `Workspace`, `Database`, `Tmux`, `Resources`, `Integrations`, or `Safety`.
+`dvv config` opens a category hub first. Use `Theme` to switch the CLI theme, `Profiles` to select the active runtime profile, `All Keys` for the complete raw key editor, or choose a focused area such as `Paths`, `Shortcuts`, `Workspace`, `Database`, `Tmux`, `Resources`, `Integrations`, or `Safety`.
 
-Every known config key shows a short explanation in the preview panel. `dvv config list` also prints a `DESCRIPTION` column for non-interactive review. Custom keys saved through the hub are kept visible in `Keys` under the `Custom` group.
+Every known config key shows a short explanation in the preview panel. `dvv config list` also prints a `DESCRIPTION` column for non-interactive review. Custom keys saved through the hub are kept visible in `All Keys` under the `Custom` group.
 
 Shortcuts:
 
@@ -388,6 +412,13 @@ DVV_TMUX_HOME_SHORTCUT=alt+f
 DVV_TMUX_ENVIRONMENTS='[{"name":"on-premise","apiDir":"~/workspace/on-premise/api","webDir":"~/workspace/on-premise/web"}]'
 ```
 
+Workspace templates:
+
+```bash
+DVV_WORKSPACE_TEMPLATES='[{"name":"fullstack-bug","baseKind":"bug","projects":[{"name":"api","path":"~/workspace/projects/api"},{"name":"web","path":"~/workspace/projects/web"}]}]'
+DVV_WORKSPACE_TEMPLATE_SHORTCUT=shift+t
+```
+
 Terminal:
 
 ```bash
@@ -425,7 +456,7 @@ DVV_RESOURCES_LOG_TAIL=200
 | Tmux custom environments | `dvv tmux` can store named API/Web targets for projects outside workspace metadata. |
 | Resource logs | `dvv resources` opens service, Docker, or Compose logs in a new terminal tab. |
 | Secrets | `dvv secrets` manages local AGE/SSH backup state; `dvv bootstrap` restores AGE/Bitwarden-backed SSH data without committing private files. |
-| Doctor fix | `dvv doctor --fix` creates safe local runtime files, rebuilds, and reinstalls managed shell integration. |
+| Doctor fix | `dvv doctor --fix` creates safe local runtime files, rebuilds, and reinstalls managed shell/tmux integration. |
 | Long operations | Confirmed actions use Royal Noir loaders; imports use a percentage bar that fills to `completed`. |
 | Colors/loaders | Default theme is Royal Noir. Use `dvv config` -> `Theme` or `DVV_THEME` to switch themes. Set `NO_COLOR=1` or `DVV_NO_LOADER=1` to disable color/loader behavior. |
 | Autocomplete | Public hub commands are completed by default. Set `DVV_COMPLETE_COMPAT=1` to expose script-friendly compatibility routes in zsh completion. |
@@ -460,6 +491,7 @@ Common cases:
 | `zsh: command not found: devv` | Use `dvv`. Run `dvv setup` if an old shortcut still calls `devv`. |
 | `npm ERR! path /root/package.json` | You ran `npm run build` outside the repo. Use `dvv build`. |
 | `Ctrl+Shift+F` opens terminal Find | This is a Windows Terminal shortcut. Use `Alt+F` after `dvv setup`, or run `dvv tmux:home`. |
+| `Alt+R` does nothing in tmux | Run `dvv build`, then `dvv setup`. If a tmux server was already open, run `tmux source-file ~/.tmux.conf` or open the environment again with `dvv tmux`. |
 | Autocomplete did not update | Run `dvv setup`, then open a new terminal or run `exec zsh`. |
 | Theme colors look different inside tmux | Rebuild with `dvv build` and open a new tmux tab. `dvv` configures tmux truecolor for sessions it creates; old sessions may need to be recreated. |
 | Workspace opens as missing in VS Code | Run `dvv doctor` and check for invalid workspace names or stale VS Code recent entries. |
@@ -510,6 +542,7 @@ Before adding a new hub, use `internal/ui.FZFHub`, keep shortcuts configurable, 
 - Added the secrets hub for AGE and SSH backup state/actions.
 - Added resource log handoff for services, containers, and Compose projects.
 - Added custom API/Web tmux environments from the tmux hub.
+- Added workspace templates from the workspace hub.
 - Added `dvv doctor --fix` for safe local setup repair.
 - Added focused tests and docs for the new hardening features.
 

@@ -58,7 +58,7 @@ Coverage percentage is a signal, not the only goal. The readiness target is stro
 ## Track 1: Config Hub Categories And Theme Selection
 
 - [x] Redesign `dvv config` as a category hub instead of opening directly on every raw key.
-- [x] Keep raw key editing available inside a `Keys` or `Advanced keys` sub-hub.
+- [x] Keep raw key editing available inside an `All Keys` sub-hub.
 - [x] Add a `Theme` sub-hub with theme selection, preview, persistence, and validation.
 - [x] Keep `royal-noir` as the default theme.
 - [x] Add built-in theme presets: `royal-noir`, `darcula`, `tokyo-night`, `dracula`, `catppuccin-mocha`, `nord`, `gruvbox-dark`, `everforest-dark`, `solarized-dark`, and `one-dark`.
@@ -75,7 +75,7 @@ Coverage percentage is a signal, not the only goal. The readiness target is stro
 - [x] Add a `Profiles` sub-hub backed by `DVV_PROFILE` and project profile definitions.
 - [x] Route each visible config category to a selector or nested key hub backed by runtime values.
 - [x] Show a concise explanation for every known config key in fzf previews and `config list`.
-- [x] Keep custom persisted config keys visible in the raw `Keys` hub.
+- [x] Keep custom persisted config keys visible in the raw `All Keys` hub.
 - [x] Keep `dvv config list` and `dvv config set` as script-friendly compatibility routes, but do not make them the primary user surface.
 - [x] Add tests for category rows, selected category routing, theme registry values, persisted theme changes, shortcut editing, and raw key fallback.
 - [x] Update README and configuration docs after the config hub redesign.
@@ -85,7 +85,7 @@ Implemented first-level `dvv config` categories:
 | Category | Purpose |
 | --- | --- |
 | `Theme` | Select and preview CLI themes. |
-| `Keys` | Edit raw runtime config keys and advanced values. |
+| `All Keys` | Edit every known runtime config key, including focused category keys and custom values. |
 | `Paths` | Manage workspace, dumps, SSH, AGE, and config paths. |
 | `Shortcuts` | Manage shell shortcuts and hub action keys. |
 | `Workspace` | Manage workspace root, discovery, opener, action keys, and safety defaults. |
@@ -123,6 +123,7 @@ Implemented first-level `dvv config` categories:
 - [x] Cover `RemoveProject`, metadata updates, dirty worktree blocking, symlink protection, and leftover deletion safety.
 - [x] Cover opener selection and WSL editor URI behavior.
 - [x] Cover hub action parsing for create/manage/delete/open without relying on real `fzf`.
+- [x] Cover workspace template selection rows, template shortcut display, and template project/base conversion.
 
 - [x] Raise confidence in `internal/systemconfig`.
 - [x] Cover config hub rows, previews, edit/clear/validate helpers, invalid key handling, and theme/category routing.
@@ -223,7 +224,7 @@ When smoke tests are added, run the documented smoke command or complete the man
 - [x] Smoke validation exists for real or realistic CLI flows.
 - [x] Autocomplete matches the final hub-first command surface.
 - [x] `dvv config` opens a category hub with theme selection and nested config areas.
-- [x] `dvv secrets`, resource logs, custom tmux environments, runtime profiles, and `doctor --fix` are implemented and documented.
+- [x] `dvv secrets`, resource logs, custom tmux environments, workspace templates, runtime profiles, and `doctor --fix` are implemented and documented.
 - [x] Maintainer/agent harness documentation exists and is linked from the main docs.
 - [x] macOS support is implemented with platform unit tests, and docs clearly require real macOS smoke before claiming full macOS support.
 - [x] `npm run check` passes.

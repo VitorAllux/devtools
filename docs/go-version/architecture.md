@@ -55,11 +55,11 @@ internal/wsl
 - `internal/run`: external process runner and fake runner support for tests.
 - `internal/safety`: workspace name, relative path, direct-child, and deletion safety checks.
 - `internal/secrets`: secrets hub, AGE key preparation, encrypted SSH backup, legacy server list migration, and Bitwarden restore bootstrap.
-- `internal/setup`: explicit shell integration installer, environment diagnostics, and safe doctor fixes.
+- `internal/setup`: explicit shell/tmux integration installer, environment diagnostics, and safe doctor fixes.
 - `internal/ssh`: SSH server list, add, remove, list, hub, and terminal launch helpers.
 - `internal/systemconfig`: interactive configuration hub and persisted runtime config editing.
 - `internal/terminal`: OS-aware terminal launcher for tmux-backed flows.
-- `internal/tmux`: tmux environment hub, custom API/Web targets, directory session picker, browse feed, and session launch helpers.
+- `internal/tmux`: tmux environment hub, custom API/Web targets, current API/Horizon reset, directory session picker, browse feed, and session launch helpers.
 - `internal/ui`: Royal Noir theme, reusable `FZFHub` component, prompts, status lines, and loaders.
 - `internal/workspace`: workspace hub, listing, creation, project management, openers, and deletion orchestration.
 
@@ -81,7 +81,7 @@ dvv resources
 dvv config
 ```
 
-`dvv tmux:session` exists as the command behind the managed `Ctrl+F` shell shortcut. `dvv tmux:home` exists as the command behind the managed `Alt+F` shortcut and opens the configured home tmux tab without a picker. `dvv env:bootstrap` is kept as a compatibility route for the previous bootstrap command.
+`dvv tmux:session` exists as the command behind the managed `Ctrl+F` shell shortcut. `dvv tmux:home` exists as the command behind the managed `Alt+F` shortcut and opens the configured home tmux tab without a picker. `dvv tmux:reset-api` exists as the command behind the managed `Alt+R` tmux shortcut. `dvv env:bootstrap` is kept as a compatibility route for the previous bootstrap command.
 
 Compatibility routes used by tests or scripts may exist during migration, but root help and autocomplete should stay hub-first unless a script command is intentionally promoted.
 

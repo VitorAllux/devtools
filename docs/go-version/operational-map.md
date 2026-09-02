@@ -22,7 +22,8 @@ This document maps the operational details that are easy to forget while using o
 | Versioned launcher | `bin/dvv` is committed as the source-checkout launcher and rebuild helper. | Keep it small and source-controlled. |
 | Compiled binary | `dist/dvv` is a build artifact. | Do not commit it. |
 | Shell integration | `dvv setup` installs completion and managed zsh shortcuts. | Run only when setup, completion, or shortcut behavior changes. |
-| Doctor fix | `dvv doctor --fix` creates safe runtime files, rebuilds, and reinstalls managed shell integration. | Use after a checkout move or broken local setup. |
+| Tmux integration | `dvv setup` installs the managed tmux reset shortcut in `~/.tmux.conf` and tries to reload it in running tmux servers. | Use `tmux.reset.shortcut` or `DVV_TMUX_RESET_SHORTCUT` to change it. |
+| Doctor fix | `dvv doctor --fix` creates safe runtime files, rebuilds, and reinstalls managed shell/tmux integration. | Use after a checkout move or broken local setup. |
 | Legacy shortcut cleanup | `dvv setup` removes old one-line `devv`/`dvv` shortcut bindings before writing the managed block. | Use the managed block instead of scattered shell lines. |
 
 ## Workspace Paths
@@ -67,9 +68,11 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | --- | --- | --- |
 | Default target | `dvv tmux` still reads legacy `API_DIR`, `WEB_DIR`, `TMUX_SESSION`, and `TMUX_WIN`. | Keep this for compatibility with existing local env files. |
 | Workspace targets | Workspace metadata adds one tmux target per `workspace-*` directory. | Use workspace paths when a task is worktree-based. |
-| Custom targets | `tmux.environments` or `DVV_TMUX_ENVIRONMENTS` adds named API/Web targets. | Use `Alt+N` in `dvv tmux` for projects that are not workspaces. |
+| Custom targets | `tmux.environments` or `DVV_TMUX_ENVIRONMENTS` adds named API/Web targets. | Use `Alt+N` in `dvv tmux` to pick API/Web projects from workspace discovery and save a reusable target. |
+| Workspace templates | `workspace.templates` or `DVV_WORKSPACE_TEMPLATES` adds reusable creation presets. | Use `Shift+T` in `dvv workspace` to save project/base selections and `Shift+C` to reuse them. |
 | Target validation | API dir must contain `artisan`; Web dir must contain `package.json`. | Keep invalid targets visible as missing/invalid, but block start actions. |
-| Tmux truecolor | Sessions created by `dvv` set `default-terminal=tmux-256color`, `COLORTERM=truecolor`, `terminal-features=*:RGB`, and `terminal-overrides=*:Tc`. | Avoid editing user `.tmux.conf`; apply runtime options before session creation/attach. |
+| Tmux truecolor | Sessions created by `dvv` set `default-terminal=tmux-256color`, `COLORTERM=truecolor`, `terminal-features=*:RGB`, and `terminal-overrides=*:Tc`. | Keep color options runtime-applied; `.tmux.conf` is only managed for the explicit shortcut block. |
+| API reset shortcut | `Alt+R` inside tmux runs `dvv tmux:reset-api` against the current session/window. | Reset API/Horizon only; do not send commands to Web panes. |
 
 ## Hubs And Shortcuts
 
@@ -78,7 +81,7 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | Hub-first UX | Public commands should open hubs: `dvv ssh`, `dvv workspace`, `dvv tmux`, `dvv db`, `dvv resources`, `dvv secrets`, `dvv config`. | Keep mutation flows inside hubs where possible. |
 | Shortcut config | Hub action keys are configurable in `dvv.config.json`. | Read from config, do not hard-code feature shortcuts in command handlers. |
 | fzf previews | Detailed shortcut decks belong in the side preview panel. | Use shared `internal/ui.FZFHub` and `FZFPreviewCommandDeck`. |
-| Global shortcuts | Project-managed zsh shortcuts are `Ctrl+F`, `Alt+F`, and `Alt+S`. | Avoid adding more global `Ctrl-*` bindings without explicit need. |
+| Global shortcuts | Project-managed zsh shortcuts are `Ctrl+F`, `Alt+F`, and `Alt+S`; project-managed tmux shortcut is `Alt+R`. | Avoid adding more global `Ctrl-*` bindings without explicit need. |
 | Home tmux tab | `Alt+F` runs `dvv tmux:home`, opening `tmux.home.directory` without fzf. | `Ctrl+Shift+F` is avoided because Windows Terminal captures it for Find. |
 | Completion | Root completion lists public hubs by default. Compatibility routes are shown only when `DVV_COMPLETE_COMPAT=1`. | Keep root help, completion, and README aligned. |
 
@@ -86,8 +89,8 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 
 | Detail | Current rule | Action |
 | --- | --- | --- |
-| First screen | `dvv config` opens a category hub. | Keep raw key lists inside `Keys` or focused sub-hubs. |
-| Current raw editor | `Keys` preserves the old key/value editor. | Keep `dvv config list` and `dvv config set` script-friendly. |
+| First screen | `dvv config` opens a category hub. | Keep the complete raw key list inside `All Keys` and common settings inside focused sub-hubs. |
+| Current raw editor | `All Keys` preserves the old key/value editor. | Keep `dvv config list` and `dvv config set` script-friendly. |
 | Visible categories | Every first-level category must open a working selector or key hub. | Keep future categories hidden until their backend exists. |
 | Runtime keys | Category sub-hubs expose only keys that affect current behavior. | Add runtime config support before making a setting editable. |
 | Profiles | `Profiles` selects `DVV_PROFILE`; project profile values apply before normal config resolution. | Use for machine/context presets without overriding explicit shell exports. |
