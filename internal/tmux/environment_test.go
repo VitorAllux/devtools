@@ -329,7 +329,7 @@ func TestResetCurrentAPIShowsSpecificTmuxFailure(t *testing.T) {
 	}
 	found := false
 	for _, run := range runner.runs {
-		if strings.Contains(run, "tmux display-message -t home:root dvv reset failed: cannot find a Laravel API pane") {
+		if strings.Contains(run, "tmux display-message -t home:root dvv reset failed: current tmux window home:root has no Laravel API pane") {
 			found = true
 			break
 		}

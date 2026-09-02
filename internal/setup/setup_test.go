@@ -269,7 +269,7 @@ func TestZshCompletionKeepsHubFirstSurface(t *testing.T) {
 	if !strings.Contains(text, "tmux:home:Open the configured home tmux tab used by Alt+F") {
 		t.Fatal("completion should keep the Alt+F shortcut command documented")
 	}
-	if !strings.Contains(text, "tmux:reset-api:Reset API and Horizon panes in the current tmux window") {
+	if !strings.Contains(text, "tmux:reset-api:Reset API and Horizon panes in the current tmux window only") {
 		t.Fatal("completion should keep the tmux reset shortcut command documented")
 	}
 	if !strings.Contains(text, "--fix:Create safe runtime files, rebuild, and reinstall shell/tmux integration") {

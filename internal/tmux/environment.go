@@ -605,7 +605,7 @@ func (m *Manager) apiPaneForCurrentWindow(ctx context.Context, session string, w
 	if err != nil {
 		return "", "", err
 	}
-	return "", "", fmt.Errorf("cannot find a Laravel API pane in %s; one pane must be inside a directory with artisan", tmuxWindowTarget(session, window))
+	return "", "", fmt.Errorf("current tmux window %s has no Laravel API pane; move to a dvv tmux target window with an API pane, or open one with dvv tmux", tmuxWindowTarget(session, window))
 }
 
 func (m *Manager) configuredAPIDirFor(ctx context.Context, session string, window string) string {
@@ -1206,14 +1206,14 @@ func showTmuxHelp(cfg *config.Config) {
 	helpEntry(shortcutLabel(cfg.Project.Tmux.Home.Shortcut, "alt+f"), "Run dvv tmux:home without picker")
 	fmt.Println()
 	helpSection("Tmux Shortcut")
-	helpEntry(shortcutLabel(cfg.Project.Tmux.Reset.Shortcut, "alt+r"), "Reset API and Horizon panes in the current tmux window")
+	helpEntry(shortcutLabel(cfg.Project.Tmux.Reset.Shortcut, "alt+r"), "Reset API and Horizon panes in the current tmux window only")
 }
 
 func showResetAPIHelp(cfg *config.Config) {
 	ui.Title("Tmux Reset")
 	fmt.Printf("  %s dvv tmux:reset-api [--session name --window name]\n\n", ui.Bold("Usage:"))
 	helpSection("Command")
-	helpEntry("dvv tmux:reset-api", "Reset API and Horizon panes in the current tmux window")
+	helpEntry("dvv tmux:reset-api", "Reset API and Horizon panes in the current tmux window only")
 	helpEntry("dvv tmux:reset-api --session <name> --window <name>", "Reset an explicit tmux window")
 	fmt.Println()
 	helpSection("Tmux Shortcut")

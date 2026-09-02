@@ -73,7 +73,7 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | Workspace templates | `workspace.templates` or `DVV_WORKSPACE_TEMPLATES` adds reusable creation presets. | Use `Shift+T` in `dvv workspace` to save project/base selections and `Shift+C` to reuse them. |
 | Target validation | API dir must contain `artisan`; Web dir must contain `package.json`. | Keep invalid targets visible as missing/invalid, but block start actions. |
 | Tmux truecolor | Sessions created by `dvv` set `default-terminal=tmux-256color`, `COLORTERM=truecolor`, `terminal-features=*:RGB`, and `terminal-overrides=*:Tc`. | Keep color options runtime-applied; `.tmux.conf` is only managed for the explicit shortcut block. |
-| API reset shortcut | `Alt+R` inside tmux runs `dvv tmux:reset-api` against the current session/window. | Reset API/Horizon only; do not send commands to Web panes. |
+| API reset shortcut | `Alt+R` inside tmux runs `dvv tmux:reset-api` against the current session/window only. | Reset API/Horizon only; do not send commands to Web panes or other tmux windows. |
 
 ## Hubs And Shortcuts
 

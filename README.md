@@ -113,7 +113,7 @@ dvv check
 | `dvv tmux` | Open the tmux environment hub. |
 | `dvv tmux:session` | Open the directory picker used by `Ctrl+F`. |
 | `dvv tmux:home` | Open the configured home tmux tab used by `Alt+F`. |
-| `dvv tmux:reset-api` | Reset API and Horizon panes in the current tmux window. |
+| `dvv tmux:reset-api` | Reset API and Horizon panes in the current tmux window only. |
 | `dvv db` | Open the database hub. |
 | `dvv resources` | Open the local resources hub. |
 | `dvv secrets` | Open the local secrets hub. |
@@ -149,6 +149,8 @@ The managed block is written to `~/.zshrc`. The `Alt+R` zsh binding is a fallbac
 | `Alt+R` | `dist/dvv tmux:reset-api --session "#{session_name}" --window "#{window_name}"` |
 
 `Alt+R` resets the current tmux window's API/Horizon panes. It looks for a pane inside a Laravel project, sends `Ctrl+C` to that API pane, runs Laravel cache/config reset commands, starts `php artisan serve`, and restarts Horizon only when another pane points at the same API project. It does not touch the Web pane. If the current tmux window has no Laravel API pane, it fails with a short status message.
+
+Running `dvv tmux:reset-api` from `~` while still attached to a tmux window such as `space_15:devtools` will target that window. It will not reset a different project in another tmux tab.
 
 Set `tmux.reset.shortcut` or `DVV_TMUX_RESET_SHORTCUT` to change it. Use `none` to disable the managed tmux shortcut and the zsh fallback. `dvv setup` writes the config, prefers the absolute built binary when available, and attempts to reload it in any running tmux server. Reset shortcut output is written to `~/.cache/devv/tmux-reset.log` so failures do not print command text into the active pane. Set `DVV_SKIP_TMUX_INTEGRATION=1` before setup to skip `.tmux.conf` changes.
 
