@@ -272,7 +272,7 @@ The `tmux.reset` section contains the tmux-level reset shortcut used inside runn
 
 - `shortcut`: tmux keybinding installed in `~/.tmux.conf`. Defaults to `alt+r`. Set to `none` to skip the managed tmux binding.
 
-`dvv tmux:reset-api` is the command behind this binding. Setup prefers the absolute built binary from `dist/dvv` so the shortcut does not depend on the tmux server's `PATH`. It finds a pane inside a Laravel API project, runs cache/config reset commands, restarts `php artisan serve`, and restarts Horizon only when another pane points at the same API project. The Web pane is intentionally skipped.
+`dvv tmux:reset-api` is the command behind this binding. Setup prefers the absolute built binary from `dist/dvv` so the shortcut does not depend on the tmux server's `PATH`. It finds a pane inside the current Laravel API window first, then falls back to the last target opened by `dvv tmux`, then to a single detected Laravel API window when the shortcut is used elsewhere. It runs cache/config reset commands, restarts `php artisan serve`, and restarts Horizon only when another pane points at the same API project. The Web pane is intentionally skipped.
 
 Shortcut changes are applied by running `dvv setup`; `dvv build` and `npm run build` do not edit shell or tmux files.
 

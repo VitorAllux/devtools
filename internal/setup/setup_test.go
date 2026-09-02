@@ -149,6 +149,9 @@ func TestTmuxResetShortcutPrefersBuiltBinary(t *testing.T) {
 	if !strings.Contains(line, "display-message -d 5000") {
 		t.Fatalf("tmux shortcut line = %q, want visible message duration", line)
 	}
+	if !strings.Contains(line, "--fallback-global") {
+		t.Fatalf("tmux shortcut line = %q, want global fallback flag", line)
+	}
 	if strings.Contains(line, `exit "$status"`) {
 		t.Fatalf("tmux shortcut line should not bubble failures to the key binding: %q", line)
 	}
@@ -269,7 +272,7 @@ func TestZshCompletionKeepsHubFirstSurface(t *testing.T) {
 	if !strings.Contains(text, "tmux:home:Open the configured home tmux tab used by Alt+F") {
 		t.Fatal("completion should keep the Alt+F shortcut command documented")
 	}
-	if !strings.Contains(text, "tmux:reset-api:Reset API and Horizon panes in the current tmux window only") {
+	if !strings.Contains(text, "tmux:reset-api:Reset current or uniquely detected API/Horizon tmux target") {
 		t.Fatal("completion should keep the tmux reset shortcut command documented")
 	}
 	if !strings.Contains(text, "--fix:Create safe runtime files, rebuild, and reinstall shell/tmux integration") {

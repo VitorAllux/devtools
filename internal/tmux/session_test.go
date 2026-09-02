@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -263,6 +264,29 @@ func (r *fakeRunner) Output(_ context.Context, _ string, name string, args ...st
 				active = "1"
 			}
 			lines = append(lines, strings.Join([]string{index, active, r.panePaths[args[2]+"."+index]}, "\t"))
+		}
+		return []byte(strings.Join(lines, "\n") + "\n"), nil
+	}
+	if name == "tmux" && len(args) == 4 && args[0] == "list-panes" && args[1] == "-a" && args[2] == "-F" && args[3] == "#{session_name}\t#{window_name}\t#{pane_index}\t#{pane_active}\t#{pane_current_path}" {
+		targets := make([]string, 0, len(r.paneIndexes))
+		for target := range r.paneIndexes {
+			targets = append(targets, target)
+		}
+		sort.Strings(targets)
+		var lines []string
+		for _, target := range targets {
+			parts := strings.SplitN(target, ":", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			activePane := r.activePanes[target]
+			for _, index := range r.paneIndexes[target] {
+				active := "0"
+				if index == activePane || activePane == "" && index == "0" {
+					active = "1"
+				}
+				lines = append(lines, strings.Join([]string{parts[0], parts[1], index, active, r.panePaths[target+"."+index]}, "\t"))
+			}
 		}
 		return []byte(strings.Join(lines, "\n") + "\n"), nil
 	}

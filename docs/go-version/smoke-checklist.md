@@ -40,7 +40,7 @@ Run these checks on the machine that will use the CLI daily:
 | Workspace | `dvv workspace` | Hub opens even when empty, existing `workspace-*` dirs are adopted, create/manage/delete/template flows show loaders. |
 | Tmux | `dvv tmux` | Environment hub opens; selected actions route to tmux commands; `Alt+N` can select API/Web projects and save a custom target. |
 | Tmux reset | `Alt+R` inside a dvv tmux environment | API pane receives Laravel cache/config reset commands, Horizon restarts when present, and Web is untouched. |
-| Tmux reset fallback | `Alt+R` outside tmux | A normal `dvv tmux:reset-api` error is printed instead of a terminal bell. |
+| Tmux reset fallback | `Alt+R` from another tmux tab | A single detected Laravel API window is reset, while multiple candidates are refused. |
 | Directory picker | `Ctrl+F` or `dvv tmux:session` | Directory picker lists current directory, configured roots, and child directories. |
 | Home tmux tab | `Alt+F` or `dvv tmux:home` | New terminal tab opens in WSL/macOS/Linux terminal and attaches to a tmux session in `~`. |
 | Database | `dvv db` | Create/import/truncate/drop/clean actions show confirmation and loader/progress states. |

@@ -16,7 +16,7 @@ These rules document the local conventions for future agents and maintainers wor
 - Avoid global shell keybindings unless the project explicitly defines one. They can conflict with terminals, shells, editors, and IDEs.
 - Prefer explicit `dvv ...` commands. Personal shell shortcuts belong in the user's own shell config.
 - Project-managed zsh shortcuts are `Ctrl+F` for `dvv tmux:session`, `Alt+F` for `dvv tmux:home`, `Alt+R` as a `dvv tmux:reset-api` fallback, and `Alt+S` for `dvv ssh`.
-- Project-managed tmux shortcut is `Alt+R` for `dvv tmux:reset-api` in the current tmux window.
+- Project-managed tmux shortcut is `Alt+R` for `dvv tmux:reset-api` with safe global fallback.
 
 ## Help And Command Lists
 
@@ -45,7 +45,7 @@ These rules document the local conventions for future agents and maintainers wor
 - `Ctrl+F` is approved for the tmux directory session picker, preserved from the previous Bash implementation.
 - `Alt+F` is approved for opening a configured home tmux tab without the directory picker.
 - Root help should present the tmux hub as `dvv tmux`, the directory picker as the `Ctrl+F` shortcut, and the home tmux tab as the `Alt+F` shortcut.
-- Root help may present `Alt+R` as a tmux shortcut; the zsh binding is only a fallback to show an actionable error outside tmux.
+- Root help may present `Alt+R` as a tmux shortcut with safe global fallback.
 - Do not use `Ctrl+Shift+F` as a managed default because Windows Terminal captures it for Find before zsh receives it.
 - Do not use `Ctrl+S`; many terminals treat it as XOFF flow control and appear frozen.
 - Interactive hubs should use local `Shift+letter` shortcuts for hub actions by default.
@@ -131,8 +131,8 @@ dvv secrets
 
 - `dvv tmux:session` is kept for the managed `Ctrl+F` shortcut.
 - `dvv tmux:home` is kept for the managed `Alt+F` shortcut and should open the configured home directory without fzf selection.
-- `dvv tmux:reset-api` is kept for the managed `Alt+R` tmux shortcut and should reset only API/Horizon panes in the current tmux window.
-- The zsh `Alt+R` fallback must only call `dvv tmux:reset-api`; do not infer or reset arbitrary tmux windows outside an explicit tmux context.
+- `dvv tmux:reset-api` is kept for the managed `Alt+R` tmux shortcut. It should reset the current tmux window first, fall back to a single detected Laravel API window, and refuse ambiguous multiple-window matches.
+- The zsh `Alt+R` fallback must only call `dvv tmux:reset-api`; do not reset arbitrary tmux windows when multiple API candidates are running.
 - API reset must find a Laravel API pane by walking from pane paths to an `artisan` file; another pane is restarted as Horizon only when it points to the same API directory. Do not touch Web panes.
 - Script-friendly compatibility routes may exist, but should not make root help noisy:
 

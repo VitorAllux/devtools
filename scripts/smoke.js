@@ -68,6 +68,7 @@ const tmuxConf = readFile(path.join(home, ".tmux.conf"));
 assertIncludes(tmuxConf, "dvv tmux:reset-api", "managed tmux reset shortcut");
 assertIncludes(tmuxConf, "unbind-key -n M-r", "managed Alt+R stale unbind");
 assertIncludes(tmuxConf, "bind-key -n M-r", "managed Alt+R tmux sequence");
+assertIncludes(tmuxConf, "--fallback-global", "managed Alt+R global fallback");
 assertIncludes(tmuxConf, "tmux display-message", "managed Alt+R failure feedback");
 assertIncludes(tmuxConf, "tmux-reset.log", "managed Alt+R silent log");
 

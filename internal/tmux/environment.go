@@ -3,6 +3,7 @@ package tmux
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,7 +35,33 @@ type tmuxPaneInfo struct {
 	CurrentPath string
 }
 
-const resetAPIShortcutArgs = `tmux:reset-api --session "#{session_name}" --window "#{window_name}"`
+type ResetAPIOptions struct {
+	Session        string
+	Window         string
+	FallbackGlobal bool
+}
+
+type resetAPICandidate struct {
+	Session string
+	Window  string
+	Pane    string
+	APIDir  string
+}
+
+type resetTargetState struct {
+	Session string `json:"session"`
+	Window  string `json:"window"`
+}
+
+type noLaravelAPIPaneError struct {
+	Target string
+}
+
+func (e noLaravelAPIPaneError) Error() string {
+	return fmt.Sprintf("current tmux window %s has no Laravel API pane; move to a dvv tmux target window with an API pane, or open one with dvv tmux", e.Target)
+}
+
+const resetAPIShortcutArgs = `tmux:reset-api --session "#{session_name}" --window "#{window_name}" --fallback-global`
 
 func RunHub(ctx context.Context, cfg *config.Config, runner run.Runner, args []string) error {
 	manager := NewManager(cfg, runner)
@@ -63,11 +90,11 @@ func RunResetAPI(ctx context.Context, cfg *config.Config, runner run.Runner, arg
 		showResetAPIHelp(cfg)
 		return nil
 	}
-	session, window, err := parseResetAPIArgs(args)
+	options, err := parseResetAPIArgs(args)
 	if err != nil {
 		return err
 	}
-	subject := firstNonEmpty(session, "current tmux window")
+	subject := firstNonEmpty(options.Session, "tmux API")
 	return ui.RunWithRoyalLoader(ui.LoaderOptions{
 		Action:        "resetting",
 		Subject:       subject,
@@ -75,7 +102,7 @@ func RunResetAPI(ctx context.Context, cfg *config.Config, runner run.Runner, arg
 		ShowResult:    true,
 		SuccessAction: "reset",
 	}, func() error {
-		return manager.ResetCurrentAPI(ctx, session, window)
+		return manager.ResetAPI(ctx, options)
 	})
 }
 
@@ -419,6 +446,7 @@ func (m *Manager) StartEnvironment(ctx context.Context, target Target) error {
 		return err
 	}
 	if m.hasSession(ctx, target.Session) {
+		m.rememberResetTarget(target)
 		return m.openTmuxSessionInTerminal(ctx, target.Session)
 	}
 	m.applyOptions(ctx)
@@ -450,6 +478,7 @@ func (m *Manager) StartEnvironment(ctx context.Context, target Target) error {
 			return err
 		}
 	}
+	m.rememberResetTarget(target)
 	return m.openTmuxSessionInTerminal(ctx, target.Session)
 }
 
@@ -465,6 +494,7 @@ func (m *Manager) RestartAPI(ctx context.Context, target Target) error {
 	if err := m.validateTarget(target); err != nil {
 		return err
 	}
+	m.rememberResetTarget(target)
 	if !m.hasSession(ctx, target.Session) {
 		return m.StartEnvironment(ctx, target)
 	}
@@ -472,36 +502,158 @@ func (m *Manager) RestartAPI(ctx context.Context, target Target) error {
 }
 
 func (m *Manager) ResetCurrentAPI(ctx context.Context, session string, window string) error {
+	return m.ResetAPI(ctx, ResetAPIOptions{Session: session, Window: window})
+}
+
+func (m *Manager) ResetAPI(ctx context.Context, options ResetAPIOptions) error {
 	if _, err := m.Runner.LookPath("tmux"); err != nil {
 		return fmt.Errorf("tmux is required")
 	}
+	session := strings.TrimSpace(options.Session)
+	window := strings.TrimSpace(options.Window)
+	explicitTarget := session != "" || window != ""
 	if strings.TrimSpace(session) == "" || strings.TrimSpace(window) == "" {
 		currentSession, currentWindow, err := m.currentTmuxWindow(ctx)
 		if err != nil {
+			if explicitTarget {
+				return err
+			}
+		} else {
+			session = firstNonEmpty(session, currentSession)
+			window = firstNonEmpty(window, currentWindow)
+		}
+	}
+
+	if session != "" && window != "" {
+		err := m.resetAPIWindow(ctx, session, window)
+		if err == nil {
+			return nil
+		}
+		if explicitTarget && !options.FallbackGlobal {
 			return err
 		}
-		session = firstNonEmpty(session, currentSession)
-		window = firstNonEmpty(window, currentWindow)
+		var noPane noLaravelAPIPaneError
+		if !errors.As(err, &noPane) {
+			return err
+		}
 	}
-	session = strings.TrimSpace(session)
-	window = strings.TrimSpace(window)
-	if session == "" || window == "" {
+
+	if explicitTarget && !options.FallbackGlobal {
 		return fmt.Errorf("tmux reset requires a session and window")
 	}
+	return m.resetGlobalAPI(ctx, session, window)
+}
+
+func (m *Manager) resetAPIWindow(ctx context.Context, session string, window string) error {
 	if !m.hasSession(ctx, session) {
 		return fmt.Errorf("tmux session is not running: %s", session)
 	}
 	apiPane, apiDir, err := m.apiPaneForCurrentWindow(ctx, session, window)
 	if err != nil {
-		m.displayTmuxMessage(ctx, session, window, "dvv reset failed: "+shortTmuxMessage(err.Error()))
 		return err
 	}
-	m.displayTmuxMessage(ctx, session, window, "dvv resetting API/Horizon")
-	if err := m.resetAPIPanes(ctx, session, window, apiPane, apiDir); err != nil {
-		m.displayTmuxMessage(ctx, session, window, "dvv reset failed: "+shortTmuxMessage(err.Error()))
+	return m.resetAPICandidate(ctx, resetAPICandidate{
+		Session: session,
+		Window:  window,
+		Pane:    apiPane,
+		APIDir:  apiDir,
+	})
+}
+
+func (m *Manager) resetGlobalAPI(ctx context.Context, preferredSession string, preferredWindow string) error {
+	if candidate, ok := m.cachedResetCandidate(ctx, preferredSession, preferredWindow); ok {
+		if preferredSession != "" && preferredWindow != "" && tmuxWindowTarget(preferredSession, preferredWindow) != tmuxWindowTarget(candidate.Session, candidate.Window) {
+			m.displayTmuxMessage(ctx, preferredSession, preferredWindow, "dvv resetting "+tmuxWindowTarget(candidate.Session, candidate.Window)+" API/Horizon")
+		}
+		err := m.resetAPICandidate(ctx, candidate)
+		if preferredSession != "" && preferredWindow != "" && tmuxWindowTarget(preferredSession, preferredWindow) != tmuxWindowTarget(candidate.Session, candidate.Window) {
+			if err != nil {
+				m.displayTmuxMessage(ctx, preferredSession, preferredWindow, "dvv reset failed: "+shortTmuxMessage(err.Error()))
+			} else {
+				m.displayTmuxMessage(ctx, preferredSession, preferredWindow, "dvv reset "+tmuxWindowTarget(candidate.Session, candidate.Window)+" API/Horizon")
+			}
+		}
 		return err
 	}
-	m.displayTmuxMessage(ctx, session, window, "dvv API/Horizon reset")
+	candidates, err := m.runningAPICandidates(ctx)
+	if err != nil {
+		if preferredSession != "" && preferredWindow != "" {
+			m.displayTmuxMessage(ctx, preferredSession, preferredWindow, "dvv reset failed: "+shortTmuxMessage(err.Error()))
+		}
+		return err
+	}
+	candidate, err := selectGlobalResetCandidate(candidates, preferredSession, preferredWindow)
+	if err != nil {
+		if preferredSession != "" && preferredWindow != "" {
+			m.displayTmuxMessage(ctx, preferredSession, preferredWindow, "dvv reset failed: "+shortTmuxMessage(err.Error()))
+		}
+		return err
+	}
+	if preferredSession != "" && preferredWindow != "" && tmuxWindowTarget(preferredSession, preferredWindow) != tmuxWindowTarget(candidate.Session, candidate.Window) {
+		m.displayTmuxMessage(ctx, preferredSession, preferredWindow, "dvv resetting "+tmuxWindowTarget(candidate.Session, candidate.Window)+" API/Horizon")
+	}
+	err = m.resetAPICandidate(ctx, candidate)
+	if preferredSession != "" && preferredWindow != "" && tmuxWindowTarget(preferredSession, preferredWindow) != tmuxWindowTarget(candidate.Session, candidate.Window) {
+		if err != nil {
+			m.displayTmuxMessage(ctx, preferredSession, preferredWindow, "dvv reset failed: "+shortTmuxMessage(err.Error()))
+		} else {
+			m.displayTmuxMessage(ctx, preferredSession, preferredWindow, "dvv reset "+tmuxWindowTarget(candidate.Session, candidate.Window)+" API/Horizon")
+		}
+	}
+	return err
+}
+
+func (m *Manager) rememberResetTarget(target Target) {
+	session := strings.TrimSpace(target.Session)
+	window := strings.TrimSpace(target.Window)
+	if session == "" || window == "" || !fileExists(filepath.Join(target.APIDir, "artisan")) {
+		return
+	}
+	data, err := json.Marshal(resetTargetState{Session: session, Window: window})
+	if err != nil {
+		return
+	}
+	dir := devvCacheDir()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return
+	}
+	_ = os.WriteFile(filepath.Join(dir, "tmux-reset-target.json"), data, 0o600)
+}
+
+func (m *Manager) cachedResetCandidate(ctx context.Context, preferredSession string, preferredWindow string) (resetAPICandidate, bool) {
+	data, err := os.ReadFile(filepath.Join(devvCacheDir(), "tmux-reset-target.json"))
+	if err != nil {
+		return resetAPICandidate{}, false
+	}
+	var state resetTargetState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return resetAPICandidate{}, false
+	}
+	state.Session = strings.TrimSpace(state.Session)
+	state.Window = strings.TrimSpace(state.Window)
+	if state.Session == "" || state.Window == "" {
+		return resetAPICandidate{}, false
+	}
+	if preferredSession == state.Session && preferredWindow == state.Window {
+		return resetAPICandidate{}, false
+	}
+	if !m.hasSession(ctx, state.Session) {
+		return resetAPICandidate{}, false
+	}
+	pane, apiDir, err := m.apiPaneForCurrentWindow(ctx, state.Session, state.Window)
+	if err != nil {
+		return resetAPICandidate{}, false
+	}
+	return resetAPICandidate{Session: state.Session, Window: state.Window, Pane: pane, APIDir: apiDir}, true
+}
+
+func (m *Manager) resetAPICandidate(ctx context.Context, candidate resetAPICandidate) error {
+	m.displayTmuxMessage(ctx, candidate.Session, candidate.Window, "dvv resetting API/Horizon")
+	if err := m.resetAPIPanes(ctx, candidate.Session, candidate.Window, candidate.Pane, candidate.APIDir); err != nil {
+		m.displayTmuxMessage(ctx, candidate.Session, candidate.Window, "dvv reset failed: "+shortTmuxMessage(err.Error()))
+		return err
+	}
+	m.displayTmuxMessage(ctx, candidate.Session, candidate.Window, "dvv API/Horizon reset")
 	return nil
 }
 
@@ -605,7 +757,7 @@ func (m *Manager) apiPaneForCurrentWindow(ctx context.Context, session string, w
 	if err != nil {
 		return "", "", err
 	}
-	return "", "", fmt.Errorf("current tmux window %s has no Laravel API pane; move to a dvv tmux target window with an API pane, or open one with dvv tmux", tmuxWindowTarget(session, window))
+	return "", "", noLaravelAPIPaneError{Target: tmuxWindowTarget(session, window)}
 }
 
 func (m *Manager) configuredAPIDirFor(ctx context.Context, session string, window string) string {
@@ -657,6 +809,98 @@ func (m *Manager) windowPaneInfos(ctx context.Context, session string, window st
 		return nil, fmt.Errorf("no panes found in %s", tmuxWindowTarget(session, window))
 	}
 	return panes, nil
+}
+
+func (m *Manager) runningAPICandidates(ctx context.Context) ([]resetAPICandidate, error) {
+	output, err := m.Runner.Output(ctx, "", "tmux", "list-panes", "-a", "-F", "#{session_name}\t#{window_name}\t#{pane_index}\t#{pane_active}\t#{pane_current_path}")
+	if err != nil {
+		return nil, fmt.Errorf("cannot list tmux windows: %w", err)
+	}
+	seen := map[string]bool{}
+	candidates := []resetAPICandidate{}
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.SplitN(line, "\t", 5)
+		if len(fields) < 5 {
+			continue
+		}
+		session := strings.TrimSpace(fields[0])
+		window := strings.TrimSpace(fields[1])
+		pane := strings.TrimSpace(fields[2])
+		currentPath := strings.TrimSpace(fields[4])
+		if session == "" || window == "" || pane == "" {
+			continue
+		}
+		apiDir, ok := laravelProjectRoot(currentPath)
+		if !ok {
+			continue
+		}
+		key := session + "\x00" + window + "\x00" + apiDir
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		candidates = append(candidates, resetAPICandidate{
+			Session: session,
+			Window:  window,
+			Pane:    pane,
+			APIDir:  apiDir,
+		})
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		left := tmuxWindowTarget(candidates[i].Session, candidates[i].Window)
+		right := tmuxWindowTarget(candidates[j].Session, candidates[j].Window)
+		if left == right {
+			return candidates[i].Pane < candidates[j].Pane
+		}
+		return left < right
+	})
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("no running tmux window has a Laravel API pane; open a target with dvv tmux")
+	}
+	return candidates, nil
+}
+
+func selectGlobalResetCandidate(candidates []resetAPICandidate, preferredSession string, preferredWindow string) (resetAPICandidate, error) {
+	preferredSession = strings.TrimSpace(preferredSession)
+	preferredWindow = strings.TrimSpace(preferredWindow)
+	if preferredSession != "" {
+		sameSession := []resetAPICandidate{}
+		for _, candidate := range candidates {
+			if candidate.Session != preferredSession {
+				continue
+			}
+			if preferredWindow != "" && candidate.Window == preferredWindow {
+				continue
+			}
+			sameSession = append(sameSession, candidate)
+		}
+		if len(sameSession) == 1 {
+			return sameSession[0], nil
+		}
+		if len(sameSession) > 1 {
+			return resetAPICandidate{}, fmt.Errorf("multiple Laravel API windows found in session %s: %s; move to the target window or run dvv tmux:reset-api --session <name> --window <name>", preferredSession, resetCandidateSummary(sameSession))
+		}
+	}
+	if len(candidates) == 1 {
+		return candidates[0], nil
+	}
+	return resetAPICandidate{}, fmt.Errorf("multiple Laravel API windows found: %s; move to the target window or run dvv tmux:reset-api --session <name> --window <name>", resetCandidateSummary(candidates))
+}
+
+func resetCandidateSummary(candidates []resetAPICandidate) string {
+	values := []string{}
+	for index, candidate := range candidates {
+		if index == 4 {
+			values = append(values, fmt.Sprintf("+%d more", len(candidates)-index))
+			break
+		}
+		values = append(values, tmuxWindowTarget(candidate.Session, candidate.Window))
+	}
+	return strings.Join(values, ", ")
 }
 
 func (m *Manager) displayTmuxMessage(ctx context.Context, session string, window string, message string) {
@@ -721,6 +965,13 @@ func shortTmuxMessage(message string) string {
 		return message
 	}
 	return message[:97] + "..."
+}
+
+func devvCacheDir() string {
+	if value := strings.TrimSpace(os.Getenv("XDG_CACHE_HOME")); value != "" {
+		return filepath.Join(config.ExpandPath(value), "devv")
+	}
+	return filepath.Join(homeDir(), ".cache", "devv")
 }
 
 func tmuxWindowTarget(session string, window string) string {
@@ -1153,33 +1404,36 @@ func valueOr(value string, fallback string) string {
 	return value
 }
 
-func parseResetAPIArgs(args []string) (string, string, error) {
-	session := ""
-	window := ""
+func parseResetAPIArgs(args []string) (ResetAPIOptions, error) {
+	options := ResetAPIOptions{}
 	for index := 0; index < len(args); index++ {
 		arg := args[index]
 		switch {
 		case arg == "--session":
 			if index+1 >= len(args) {
-				return "", "", fmt.Errorf("--session requires a value")
+				return ResetAPIOptions{}, fmt.Errorf("--session requires a value")
 			}
 			index++
-			session = args[index]
+			options.Session = args[index]
 		case strings.HasPrefix(arg, "--session="):
-			session = strings.TrimPrefix(arg, "--session=")
+			options.Session = strings.TrimPrefix(arg, "--session=")
 		case arg == "--window":
 			if index+1 >= len(args) {
-				return "", "", fmt.Errorf("--window requires a value")
+				return ResetAPIOptions{}, fmt.Errorf("--window requires a value")
 			}
 			index++
-			window = args[index]
+			options.Window = args[index]
 		case strings.HasPrefix(arg, "--window="):
-			window = strings.TrimPrefix(arg, "--window=")
+			options.Window = strings.TrimPrefix(arg, "--window=")
+		case arg == "--fallback-global":
+			options.FallbackGlobal = true
 		default:
-			return "", "", fmt.Errorf("unknown tmux reset option: %s", arg)
+			return ResetAPIOptions{}, fmt.Errorf("unknown tmux reset option: %s", arg)
 		}
 	}
-	return strings.TrimSpace(session), strings.TrimSpace(window), nil
+	options.Session = strings.TrimSpace(options.Session)
+	options.Window = strings.TrimSpace(options.Window)
+	return options, nil
 }
 
 func showTmuxHelp(cfg *config.Config) {
@@ -1206,15 +1460,16 @@ func showTmuxHelp(cfg *config.Config) {
 	helpEntry(shortcutLabel(cfg.Project.Tmux.Home.Shortcut, "alt+f"), "Run dvv tmux:home without picker")
 	fmt.Println()
 	helpSection("Tmux Shortcut")
-	helpEntry(shortcutLabel(cfg.Project.Tmux.Reset.Shortcut, "alt+r"), "Reset API and Horizon panes in the current tmux window only")
+	helpEntry(shortcutLabel(cfg.Project.Tmux.Reset.Shortcut, "alt+r"), "Reset current or uniquely detected API/Horizon tmux target")
 }
 
 func showResetAPIHelp(cfg *config.Config) {
 	ui.Title("Tmux Reset")
 	fmt.Printf("  %s dvv tmux:reset-api [--session name --window name]\n\n", ui.Bold("Usage:"))
 	helpSection("Command")
-	helpEntry("dvv tmux:reset-api", "Reset API and Horizon panes in the current tmux window only")
+	helpEntry("dvv tmux:reset-api", "Reset the current tmux window, or the only detected Laravel API window")
 	helpEntry("dvv tmux:reset-api --session <name> --window <name>", "Reset an explicit tmux window")
+	helpEntry("global fallback", "Uses the last dvv tmux target before falling back to a single detected API window")
 	fmt.Println()
 	helpSection("Tmux Shortcut")
 	helpEntry(shortcutLabel(cfg.Project.Tmux.Reset.Shortcut, "alt+r"), "Installed by dvv setup in ~/.tmux.conf")
