@@ -14,6 +14,7 @@ dvv workspace
 dvv tmux
 dvv db
 dvv resources
+dvv secrets
 dvv config
 dvv bootstrap
 dvv setup
@@ -25,15 +26,16 @@ The hardening pass moved the merge-readiness baseline from low exploratory cover
 
 | Package | Current coverage |
 | --- | ---: |
-| Total | 50.9% |
-| `internal/db` | 45.1% |
+| Total | 50.6% |
+| `internal/db` | 45.6% |
 | `internal/workspace` | 43.2% |
-| `internal/systemconfig` | 37.5% |
-| `internal/setup` | 59.9% |
+| `internal/systemconfig` | 35.4% |
+| `internal/setup` | 64.8% |
 | `internal/terminal` | 86.4% |
-| `internal/tmux` | 48.9% |
+| `internal/tmux` | 50.7% |
 | `internal/ssh` | 38.7% |
-| `internal/resources` | 54.2% |
+| `internal/resources` | 53.1% |
+| `internal/secrets` | 36.7% |
 
 Coverage percentage is a signal, not the only goal. The readiness target is stronger confidence around command contracts, filesystem safety, terminal handoff behavior, and interactive hub flows.
 
@@ -70,7 +72,7 @@ Coverage percentage is a signal, not the only goal. The readiness target is stro
 - [x] Add a `Resources` sub-hub for resource action shortcuts.
 - [x] Add an `Integrations` sub-hub for current rclone, Bitwarden, MySQL, and external tool defaults.
 - [x] Add a `Safety` sub-hub for current database and workspace confirmation rules.
-- [x] Keep future `Profiles` work out of the first-level hub until a runtime profile backend exists.
+- [x] Add a `Profiles` sub-hub backed by `DVV_PROFILE` and project profile definitions.
 - [x] Route each visible config category to a selector or nested key hub backed by runtime values.
 - [x] Show a concise explanation for every known config key in fzf previews and `config list`.
 - [x] Keep custom persisted config keys visible in the raw `Keys` hub.
@@ -89,9 +91,10 @@ Implemented first-level `dvv config` categories:
 | `Workspace` | Manage workspace root, discovery, opener, action keys, and safety defaults. |
 | `Database` | Manage MySQL, dump directory, rclone, and DB safety defaults. |
 | `Tmux` | Manage session picker search roots, search depth, default session name, and shortcut binding. |
-| `Resources` | Manage resource hub action shortcuts. |
+| `Resources` | Manage resource hub action shortcuts and log tail settings. |
 | `Integrations` | Configure rclone, Bitwarden, MySQL, and external tool defaults. |
 | `Safety` | Manage database and workspace confirmation rules. |
+| `Profiles` | Select the active runtime profile. |
 
 ## Track 2: Maintainer And Agent Readability Harness
 
@@ -131,11 +134,13 @@ Implemented first-level `dvv config` categories:
 - [x] Cover setup writes managed zsh blocks in the isolated smoke harness.
 - [x] Cover old `devv` shortcut cleanup and current `dvv` shortcut preservation through script tests and smoke checks.
 - [x] Cover doctor findings for platform dependencies, invalid workspace names, dumps directory, and shell integration state.
+- [x] Cover `doctor --fix` safe runtime state creation and local script execution.
 
 - [x] Raise confidence in `internal/terminal` and `internal/tmux`.
 - [x] Cover Windows Terminal tab launch from WSL, Linux terminal tab launch, macOS terminal launch, iTerm2 launch, and fallback errors.
 - [x] Cover tmux environment hub action routing for up/down/API restart/Web restart.
 - [x] Cover `tmux:session` search root priority, reload command generation, current directory selection, and session naming.
+- [x] Cover configured custom API/Web tmux targets.
 
 - [x] Add shared testing utilities only where they reduce real duplication.
 - [x] Track coverage after each package pass with `go test ./... -coverprofile`.
@@ -152,6 +157,8 @@ Implemented first-level `dvv config` categories:
 - [x] Document real-hub `dvv tmux` and `dvv tmux:session` checks for fake or disposable tmux state.
 - [x] Document `dvv db` checks against a disposable MySQL database or a fake mysql/rclone harness when MySQL is unavailable.
 - [x] Validate resources behavior through unit fake runners and document optional real Docker checks.
+- [x] Validate resources log command construction and terminal handoff through fake runners.
+- [x] Validate secrets hub help and secrets status/prepare behavior through isolated tests.
 - [x] Capture known unsupported cases and expected warnings instead of letting smoke tests depend on one personal machine.
 - [x] Document when a smoke item is manual-only, fake-runner compatible, or requires a real local dependency.
 
@@ -163,6 +170,7 @@ Implemented first-level `dvv config` categories:
 - [x] Remove noisy mutation action suggestions where the hub owns add/edit/delete flows.
 - [x] Keep `dvv tmux:session` available as a compatibility command because it backs the managed `Ctrl+F` shortcut.
 - [x] Keep autocomplete descriptions in English and aligned with root help.
+- [x] Add `dvv secrets` and `dvv doctor --fix` autocomplete without exposing invalid colon-style secrets/resources routes.
 - [x] Add tests or snapshots for generated/static completion content.
 - [x] Update README, `AGENTS.md`, and `docs/go-version/operational-map.md` when command surface decisions change.
 - [x] Run isolated setup smoke after completion changes and verify zsh reload instructions still work.
@@ -215,6 +223,7 @@ When smoke tests are added, run the documented smoke command or complete the man
 - [x] Smoke validation exists for real or realistic CLI flows.
 - [x] Autocomplete matches the final hub-first command surface.
 - [x] `dvv config` opens a category hub with theme selection and nested config areas.
+- [x] `dvv secrets`, resource logs, custom tmux environments, runtime profiles, and `doctor --fix` are implemented and documented.
 - [x] Maintainer/agent harness documentation exists and is linked from the main docs.
 - [x] macOS support is implemented with platform unit tests, and docs clearly require real macOS smoke before claiming full macOS support.
 - [x] `npm run check` passes.
@@ -231,7 +240,7 @@ node ./scripts/go.js tool cover -func=/tmp/dvv-cover.out
 Result:
 
 - `npm run check` passed.
-- Total coverage: `50.9%`.
+- Total coverage: `50.6%`.
 - All critical public-flow packages are above `35%`.
 - Runtime/private files are ignored: `dist/`, dumps, secrets, `.env`, private SSH data, and local config.
 

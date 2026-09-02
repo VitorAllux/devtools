@@ -51,15 +51,15 @@ internal/wsl
 - `internal/git`: branch/ref checks, worktree detection, add/remove/prune, and dirty status.
 - `internal/hooks`: workspace/project lifecycle hook rendering and execution.
 - `internal/metadata`: `.workspace/config.json` read/write.
-- `internal/resources`: local service, Docker, container, and Compose detection plus resource hub actions.
+- `internal/resources`: local service, Docker, container, and Compose detection plus resource hub actions and log handoff.
 - `internal/run`: external process runner and fake runner support for tests.
 - `internal/safety`: workspace name, relative path, direct-child, and deletion safety checks.
-- `internal/secrets`: AGE key, encrypted SSH backup, legacy server list migration, and Bitwarden restore bootstrap.
-- `internal/setup`: explicit shell integration installer and environment diagnostics.
+- `internal/secrets`: secrets hub, AGE key preparation, encrypted SSH backup, legacy server list migration, and Bitwarden restore bootstrap.
+- `internal/setup`: explicit shell integration installer, environment diagnostics, and safe doctor fixes.
 - `internal/ssh`: SSH server list, add, remove, list, hub, and terminal launch helpers.
 - `internal/systemconfig`: interactive configuration hub and persisted runtime config editing.
 - `internal/terminal`: OS-aware terminal launcher for tmux-backed flows.
-- `internal/tmux`: tmux environment hub, directory session picker, browse feed, and session launch helpers.
+- `internal/tmux`: tmux environment hub, custom API/Web targets, directory session picker, browse feed, and session launch helpers.
 - `internal/ui`: Royal Noir theme, reusable `FZFHub` component, prompts, status lines, and loaders.
 - `internal/workspace`: workspace hub, listing, creation, project management, openers, and deletion orchestration.
 
@@ -72,6 +72,7 @@ dvv setup
 dvv bootstrap
 dvv build
 dvv doctor
+dvv secrets
 dvv ssh
 dvv workspace
 dvv tmux
@@ -80,7 +81,7 @@ dvv resources
 dvv config
 ```
 
-`dvv tmux:session` exists as the command behind the managed `Ctrl+F` shell shortcut. `dvv tmux:home` exists as the command behind the managed `Ctrl+Shift+F` shortcut and opens the configured home tmux tab without a picker. `dvv env:bootstrap` is kept as a compatibility route for the previous bootstrap command.
+`dvv tmux:session` exists as the command behind the managed `Ctrl+F` shell shortcut. `dvv tmux:home` exists as the command behind the managed `Alt+F` shortcut and opens the configured home tmux tab without a picker. `dvv env:bootstrap` is kept as a compatibility route for the previous bootstrap command.
 
 Compatibility routes used by tests or scripts may exist during migration, but root help and autocomplete should stay hub-first unless a script command is intentionally promoted.
 

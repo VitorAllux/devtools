@@ -38,6 +38,7 @@ Danger              #f87171
 ## FZF Rules
 
 - Background stays near black.
+- Tmux-launched sessions need truecolor enabled; otherwise hex colors from `fzf` are approximated and themes can look different from the direct terminal.
 - Pointer, spinner, and highlight use royal gold.
 - Marker uses royal purple.
 - Prompt and headers use soft purple.

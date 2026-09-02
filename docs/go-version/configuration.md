@@ -15,6 +15,36 @@ The file is versioned because it defines project behavior, theme identity, and d
   "theme": {
     "name": "royal-noir"
   },
+  "profiles": {
+    "active": "default",
+    "items": [
+      {
+        "name": "default",
+        "description": "Use project defaults and explicit runtime config values.",
+        "values": {}
+      },
+      {
+        "name": "personal",
+        "description": "Preset for personal machine overrides.",
+        "values": {}
+      },
+      {
+        "name": "work",
+        "description": "Preset for work machine overrides.",
+        "values": {}
+      },
+      {
+        "name": "wsl",
+        "description": "Preset for WSL-specific overrides.",
+        "values": {}
+      },
+      {
+        "name": "ci",
+        "description": "Preset for non-interactive validation environments.",
+        "values": {}
+      }
+    ]
+  },
   "terminal": {
     "launcher": "auto"
   },
@@ -31,7 +61,20 @@ The file is versioned because it defines project behavior, theme identity, and d
       "shortcuts": {
         "start": "alt+s",
         "restart": "alt+r",
-        "stop": "alt+x"
+        "stop": "alt+x",
+        "logs": "shift+l"
+      }
+    },
+    "logs": {
+      "tail": 200
+    }
+  },
+  "secrets": {
+    "hub": {
+      "shortcuts": {
+        "prepare": "shift+k",
+        "restore": "shift+r",
+        "sync": "shift+s"
       }
     }
   },
@@ -59,8 +102,9 @@ The file is versioned because it defines project behavior, theme identity, and d
     "home": {
       "directory": "~",
       "sessionName": "home",
-      "shortcut": "ctrl+shift+f"
-    }
+      "shortcut": "alt+f"
+    },
+    "environments": []
   },
   "workspace": {
     "root": "~/workspace",
@@ -113,10 +157,11 @@ First-level categories:
 | `Shortcuts` | Manage shell shortcuts and hub action keys. |
 | `Workspace` | Manage workspace root, project discovery, opener, and action keys. |
 | `Database` | Manage MySQL, dump directory, rclone, and database safety defaults. |
-| `Tmux` | Manage directory picker and home session settings. |
-| `Resources` | Manage resource hub action shortcuts. |
+| `Tmux` | Manage directory picker, home session, and custom API/Web environments. |
+| `Resources` | Manage resource hub action shortcuts and log tail settings. |
 | `Integrations` | Configure rclone, Bitwarden, terminal launcher, and local tool defaults. |
 | `Safety` | Manage database and workspace confirmation rules. |
+| `Profiles` | Select the active runtime profile from project config. |
 
 The `Keys` category keeps the current raw key editing flow available for advanced usage and script compatibility. The main config UX prefers categorized selectors so common settings are easier to find.
 
@@ -139,7 +184,17 @@ Built-in themes:
 
 Theme selection persists `DVV_THEME` in `~/.config/devv/config.env` and updates shared UI helpers, `fzf` colors, loader colors, prompts, status labels, and config previews from one theme registry.
 
-Profiles are intentionally not visible yet. Machine-specific profiles such as `personal`, `work`, `wsl`, and `ci` need a separate merge strategy before they become an editable config category.
+## Profiles Config
+
+Profiles let the project define named runtime presets without scattering local shell exports. `profiles.active` selects the default profile, and `DVV_PROFILE` can override it per machine or shell.
+
+Each profile item contains:
+
+- `name`: stable profile id, such as `default`, `personal`, `work`, `wsl`, or `ci`.
+- `description`: short text shown in the config profile selector.
+- `values`: environment-style key/value overrides applied before the rest of config resolution.
+
+Profile values do not override variables already set in the shell. This keeps explicit local exports stronger than project presets.
 
 ## DB Config
 
@@ -159,8 +214,19 @@ The `resources.hub.shortcuts` section configures the local resource hub actions:
 - `start`: start the selected service/container/Compose project.
 - `restart`: restart the selected service/container/Compose project.
 - `stop`: stop the selected service/container/Compose project.
+- `logs`: open logs for the selected service/container/Compose project in a new terminal tab.
 
-Defaults preserve the previous resources hub shortcuts: `alt+s`, `alt+r`, and `alt+x`.
+`resources.logs.tail` controls how many lines are shown initially when logs are opened. Defaults preserve the previous resource action shortcuts and add `shift+l` for logs.
+
+## Secrets Config
+
+The `secrets.hub.shortcuts` section configures the local secrets hub actions:
+
+- `prepare`: create local AGE and SSH files when they are missing.
+- `restore`: restore the SSH list from the encrypted backup.
+- `sync`: refresh the encrypted backup from the current SSH list.
+
+The secret file paths still come from runtime config or environment variables because they are machine-local paths, not repository behavior.
 
 ## Terminal Config
 
@@ -185,13 +251,23 @@ The `tmux.session` section contains the standalone directory session picker used
 
 Default search root priority mirrors the previous Bash implementation: `TMUX_DEFAULT_DIR`, then the configured `searchRoots` defaults `~/workspace`, `~/Work/Development/dev`, `~/Work/Development`, and `~/Development`, then the common parent of `API_DIR` and `WEB_DIR`, then `$HOME`.
 
-The `tmux.home` section contains the no-picker session used by `dvv tmux:home` and the zsh `Ctrl+Shift+F` shortcut:
+The `tmux.home` section contains the no-picker session used by `dvv tmux:home` and the zsh `Alt+F` shortcut:
 
 - `directory`: directory opened in the new tmux tab. Defaults to `~`.
 - `sessionName`: base tmux session name. Existing sessions append `_1`, `_2`, and so on.
 - `shortcut`: zsh keybinding installed by shell integration. Set to `none` to skip the direct home binding.
 
 Shortcut changes are applied by running `dvv setup`; `dvv build` and `npm run build` do not edit shell files.
+
+The `tmux.environments` list adds named API/Web targets to `dvv tmux`, useful when a project should have a managed tmux environment but is not part of a workspace. Each entry supports:
+
+- `name`: label shown in the tmux hub.
+- `session`: optional tmux session name. Empty uses `name`.
+- `window`: optional tmux window name. Empty uses `dev`.
+- `apiDir`: API project directory.
+- `webDir`: Web project directory.
+
+The tmux hub can create these entries with `Alt+N`, persisting them to `DVV_TMUX_ENVIRONMENTS` in runtime config.
 
 ## Workspace Config
 
@@ -234,7 +310,7 @@ esc
 
 For letter keys, `shift+a` maps to the uppercase key `A` in fzf. That is how most terminals expose Shift+letter.
 
-The shell integration writes `ctrl+shift+letter` as a CSI-u zsh binding, such as `\e[70;6u` for `Ctrl+Shift+F`. Terminal applications may reserve that chord for their own UI; when that happens, use the command directly or remap the terminal shortcut.
+The shell integration writes `alt+letter` as an escaped zsh binding, such as `\ef` for `Alt+F`. It can also write `ctrl+shift+letter` as a CSI-u binding, but terminal applications may reserve those chords for their own UI. Windows Terminal reserves `Ctrl+Shift+F` for Find, so `Alt+F` is the default direct home shortcut.
 
 ## Local Runtime Data
 
@@ -261,6 +337,9 @@ DVV_AGE_KEY_FILE
 DVV_AGE_RECIPIENTS_FILE
 DVV_ENCRYPTED_SERVERS_FILE
 DVV_BW_AGE_KEY_ITEM
+DVV_SECRETS_PREPARE_SHORTCUT
+DVV_SECRETS_RESTORE_SHORTCUT
+DVV_SECRETS_SYNC_SHORTCUT
 ```
 
 Legacy equivalents:
@@ -271,6 +350,12 @@ DEVT_AGE_KEY_FILE
 DEVT_AGE_RECIPIENTS_FILE
 DEVT_ENCRYPTED_SERVERS_FILE
 DEVT_BW_AGE_KEY_ITEM
+```
+
+Profile overrides:
+
+```text
+DVV_PROFILE
 ```
 
 Workspace overrides:
@@ -292,6 +377,17 @@ DVV_TMUX_SESSION_SHORTCUT
 DVV_TMUX_HOME_DIR
 DVV_TMUX_HOME_SESSION_NAME
 DVV_TMUX_HOME_SHORTCUT
+DVV_TMUX_ENVIRONMENTS
+```
+
+Resource overrides:
+
+```text
+DVV_RESOURCES_START_SHORTCUT
+DVV_RESOURCES_RESTART_SHORTCUT
+DVV_RESOURCES_STOP_SHORTCUT
+DVV_RESOURCES_LOGS_SHORTCUT
+DVV_RESOURCES_LOG_TAIL
 ```
 
 Database overrides:

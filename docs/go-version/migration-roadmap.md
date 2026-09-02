@@ -60,12 +60,14 @@ dvv workspace
 - [x] Port the tmux hub and its start, stop, API restart, and web restart actions.
 - [x] Reuse workspace metadata and config where possible.
 - [x] Keep the previous tmux session and window behavior compatible under the new nested command surface.
+- [x] Add configurable custom API/Web environments for projects outside workspace metadata.
 
 Current Go command surface:
 
 ```text
 dvv tmux
 dvv tmux:session
+dvv tmux:home
 ```
 
 ## Phase 4: DB
@@ -80,12 +82,14 @@ dvv tmux:session
 - [x] Port the config hub and its set/list actions.
 - [x] Keep explicit setup separate from build.
 - [x] Keep runtime env file compatibility through `~/.config/devv/config.env`.
+- [x] Add category hub, theme selector, raw key editor, focused key groups, and runtime profile selector.
 
 ## Phase 6: Resources
 
 - [x] Port resource detection previously implemented in Python.
 - [x] Preserve Docker, Docker Compose, and service actions.
 - [x] Keep action shortcuts configurable in `dvv.config.json`.
+- [x] Add resource log handoff for services, containers, and Compose projects.
 - [x] Do not port the desktop control center.
 
 Current Go command surface:
@@ -95,6 +99,19 @@ dvv resources
 ```
 
 Listing and actions are owned by the interactive hub instead of separate public commands.
+
+## Phase 6.5: Secrets Hub
+
+- [x] Add `dvv secrets` as the hub for local AGE/SSH backup state.
+- [x] Keep `dvv bootstrap` for full restore/bootstrap compatibility.
+- [x] Add prepare, restore, and sync actions inside the secrets hub.
+
+Current Go command surface:
+
+```text
+dvv secrets
+dvv bootstrap
+```
 
 ## Phase 7: WSL
 
@@ -115,12 +132,13 @@ docs/plans/completed/2026-08-31-go-version-hardening-readiness.md
 - [x] Align autocomplete with the hub-first command surface.
 - [x] Redesign the config hub with categories, theme selection, and nested selectors.
 - [x] Improve maintainer and agent readability harness documentation.
+- [x] Add `dvv doctor --fix` for safe local setup repair.
 
 ## Merge Criteria For Main
 
 The Go version can replace the current `main` implementation when these are true:
 
-- `ssh`, `workspace`, `tmux`, `db`, `systemconfig`, and `resources` are implemented in Go.
+- `ssh`, `workspace`, `tmux`, `db`, `systemconfig`, `resources`, and `secrets` are implemented in Go.
 - `go test ./...` passes.
 - Help output advertises only the public Go-ready surface.
 - README and completion docs are updated.

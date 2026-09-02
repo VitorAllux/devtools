@@ -2,7 +2,7 @@
 
 Personal developer CLI for local automation.
 
-Current version: `2.0.0-alpha.2`
+Current version: `2.0.0-alpha.3`
 
 `dvv` is the Go rewrite of the previous shell-based devtools project. The command prefix is now `dvv`; the old `devv` command is intentionally not the public command for this branch.
 
@@ -18,7 +18,7 @@ This branch is `go-version`. The current Go implementation includes:
 | Database | Ready | `dvv db` |
 | System config | Ready | `dvv config` |
 | Resources | Ready | `dvv resources` |
-| Secrets bootstrap | Ready | `dvv bootstrap` |
+| Secrets | Ready | `dvv secrets` and `dvv bootstrap` |
 | WSL | Optional future port | Not exposed |
 
 The public UX is hub-first: the main commands open interactive hubs, and create/edit/delete flows live inside those hubs.
@@ -49,8 +49,7 @@ dvv setup
 Open a new terminal, or reload the current shell:
 
 ```bash
-source ~/.zshrc
-autoload -Uz compinit && compinit
+exec zsh
 ```
 
 If your terminal still finds an old binary, refresh the shell cache:
@@ -113,14 +112,16 @@ npm run check
 | `dvv workspace` | Open the workspace hub. |
 | `dvv tmux` | Open the tmux environment hub. |
 | `dvv tmux:session` | Open the directory picker used by `Ctrl+F`. |
-| `dvv tmux:home` | Open the configured home tmux tab used by `Ctrl+Shift+F`. |
+| `dvv tmux:home` | Open the configured home tmux tab used by `Alt+F`. |
 | `dvv db` | Open the database hub. |
 | `dvv resources` | Open the local resources hub. |
+| `dvv secrets` | Open the local secrets hub. |
 | `dvv config` | Open the configuration hub. |
 | `dvv setup` | Install zsh completion and managed shell shortcuts. |
 | `dvv bootstrap` | Restore AGE/Bitwarden secrets and SSH backup. |
 | `dvv build` | Rebuild the local Go binary. |
 | `dvv doctor` | Check dependencies, paths, shortcuts, and known local edge cases. |
+| `dvv doctor --fix` | Create safe local files, rebuild, and reinstall shell integration. |
 
 Compatibility routes such as `dvv ssh:list`, `dvv workspace:list`, `dvv db import`, and `dvv config set` exist for scripts and migration support, but they are not the primary user surface.
 
@@ -131,10 +132,10 @@ Compatibility routes such as `dvv ssh:list`, `dvv workspace:list`, `dvv db impor
 | Shortcut | Command |
 | --- | --- |
 | `Ctrl+F` | `dvv tmux:session` |
-| `Ctrl+Shift+F` | `dvv tmux:home` |
+| `Alt+F` | `dvv tmux:home` |
 | `Alt+S` | `dvv ssh` |
 
-The managed block is written to `~/.zshrc`. Set `DVV_SKIP_SHELL_INTEGRATION=1` before setup to skip shortcut installation. Some terminals reserve `Ctrl+Shift+F` for search; if the key does not reach zsh, run `dvv tmux:home` directly or remap the terminal shortcut.
+The managed block is written to `~/.zshrc`. Set `DVV_SKIP_SHELL_INTEGRATION=1` before setup to skip shortcut installation. Windows Terminal reserves `Ctrl+Shift+F` for Find, so the default direct home shortcut is `Alt+F`.
 
 ## SSH Hub
 
@@ -212,6 +213,7 @@ Shortcuts:
 | `Alt+D` | Stop selected environment. |
 | `Alt+A` | Restart API and Horizon panes. |
 | `Alt+W` | Restart Web pane. |
+| `Alt+N` | Add a custom API/Web tmux environment. |
 | `Esc` | Exit. |
 
 The directory picker is available through:
@@ -229,6 +231,8 @@ dvv tmux:home
 `dvv tmux:home` opens a new terminal tab attached to a tmux session in `tmux.home.directory`, defaulting to `~`. It does not show the directory picker.
 
 Default search root priority follows the previous Bash implementation: `TMUX_DEFAULT_DIR`, `~/workspace`, `~/Work/Development/dev`, `~/Work/Development`, `~/Development`, common parent of `API_DIR` and `WEB_DIR`, then `$HOME`.
+
+Custom API/Web environments can be created from `dvv tmux` with `Alt+N`. They are stored in `DVV_TMUX_ENVIRONMENTS` as JSON, so a project outside a workspace can still appear as a named tmux target.
 
 ## Database
 
@@ -275,6 +279,25 @@ Shortcuts:
 | `Alt+S` | Start selected resource. |
 | `Alt+R` | Restart selected resource. |
 | `Alt+X` | Stop selected resource. |
+| `Shift+L` | Open selected resource logs in a new terminal tab. |
+| `Esc` | Exit. |
+
+## Secrets Hub
+
+```bash
+dvv secrets
+```
+
+The secrets hub shows local AGE and SSH backup state, then lets you prepare files, restore the encrypted SSH backup, or sync the encrypted backup from the current SSH list.
+
+Shortcuts:
+
+| Shortcut | Action |
+| --- | --- |
+| `Enter` | Show selected secret item details. |
+| `Shift+K` | Prepare local AGE and SSH files. |
+| `Shift+R` | Restore SSH list from encrypted backup. |
+| `Shift+S` | Sync encrypted SSH backup from local SSH list. |
 | `Esc` | Exit. |
 
 ## Config
@@ -289,7 +312,7 @@ The configuration hub edits persisted runtime values in:
 ~/.config/devv/config.env
 ```
 
-`dvv config` opens a category hub first. Use `Theme` to switch the CLI theme, `Keys` for raw key editing, or choose a focused area such as `Paths`, `Shortcuts`, `Workspace`, `Database`, `Tmux`, `Resources`, `Integrations`, or `Safety`.
+`dvv config` opens a category hub first. Use `Theme` to switch the CLI theme, `Profiles` to select the active runtime profile, `Keys` for raw key editing, or choose a focused area such as `Paths`, `Shortcuts`, `Workspace`, `Database`, `Tmux`, `Resources`, `Integrations`, or `Safety`.
 
 Every known config key shows a short explanation in the preview panel. `dvv config list` also prints a `DESCRIPTION` column for non-interactive review. Custom keys saved through the hub are kept visible in `Keys` under the `Custom` group.
 
@@ -331,6 +354,12 @@ Do not commit private local data, dump files, `.env`, real SSH targets, AGE priv
 
 `dvv` accepts `DVV_*` variables and selected legacy `DEVT_*` variables during migration.
 
+Profiles:
+
+```bash
+DVV_PROFILE=default
+```
+
 Workspace:
 
 ```bash
@@ -355,7 +384,8 @@ DVV_TMUX_SESSION_NAME=space
 DVV_TMUX_SESSION_SHORTCUT=ctrl+f
 DVV_TMUX_HOME_DIR=~
 DVV_TMUX_HOME_SESSION_NAME=home
-DVV_TMUX_HOME_SHORTCUT=ctrl+shift+f
+DVV_TMUX_HOME_SHORTCUT=alt+f
+DVV_TMUX_ENVIRONMENTS='[{"name":"on-premise","apiDir":"~/workspace/on-premise/api","webDir":"~/workspace/on-premise/web"}]'
 ```
 
 Terminal:
@@ -370,6 +400,14 @@ Secrets and SSH:
 DVV_SERVERS_FILE=~/.config/devv/servers.list
 DVV_AGE_KEY_FILE=~/.config/devv/keys/age.key
 DVV_BW_AGE_KEY_ITEM=<bitwarden-item-name-or-id>
+DVV_SECRETS_SYNC_SHORTCUT=shift+s
+```
+
+Resources:
+
+```bash
+DVV_RESOURCES_LOGS_SHORTCUT=shift+l
+DVV_RESOURCES_LOG_TAIL=200
 ```
 
 ## Operational Details
@@ -384,7 +422,10 @@ DVV_BW_AGE_KEY_ITEM=<bitwarden-item-name-or-id>
 | Invalid workspace names | `dvv workspace` ignores `workspace-*` directories with invalid UTF-8 names. |
 | No workspace found | The workspace hub still opens and offers create inside the hub. |
 | Deletion safety | Dirty worktrees and leftover content require explicit confirmation. |
-| Secrets | `dvv bootstrap` restores AGE/Bitwarden-backed SSH data without committing private files. |
+| Tmux custom environments | `dvv tmux` can store named API/Web targets for projects outside workspace metadata. |
+| Resource logs | `dvv resources` opens service, Docker, or Compose logs in a new terminal tab. |
+| Secrets | `dvv secrets` manages local AGE/SSH backup state; `dvv bootstrap` restores AGE/Bitwarden-backed SSH data without committing private files. |
+| Doctor fix | `dvv doctor --fix` creates safe local runtime files, rebuilds, and reinstalls managed shell integration. |
 | Long operations | Confirmed actions use Royal Noir loaders; imports use a percentage bar that fills to `completed`. |
 | Colors/loaders | Default theme is Royal Noir. Use `dvv config` -> `Theme` or `DVV_THEME` to switch themes. Set `NO_COLOR=1` or `DVV_NO_LOADER=1` to disable color/loader behavior. |
 | Autocomplete | Public hub commands are completed by default. Set `DVV_COMPLETE_COMPAT=1` to expose script-friendly compatibility routes in zsh completion. |
@@ -418,7 +459,9 @@ Common cases:
 | --- | --- |
 | `zsh: command not found: devv` | Use `dvv`. Run `dvv setup` if an old shortcut still calls `devv`. |
 | `npm ERR! path /root/package.json` | You ran `npm run build` outside the repo. Use `dvv build`. |
-| Autocomplete did not update | Run `dvv setup`, then reload zsh and `compinit`. |
+| `Ctrl+Shift+F` opens terminal Find | This is a Windows Terminal shortcut. Use `Alt+F` after `dvv setup`, or run `dvv tmux:home`. |
+| Autocomplete did not update | Run `dvv setup`, then open a new terminal or run `exec zsh`. |
+| Theme colors look different inside tmux | Rebuild with `dvv build` and open a new tmux tab. `dvv` configures tmux truecolor for sessions it creates; old sessions may need to be recreated. |
 | Workspace opens as missing in VS Code | Run `dvv doctor` and check for invalid workspace names or stale VS Code recent entries. |
 | `dvv workspace` does not show a workspace | Confirm it is a direct child of `workspace.root`, starts with `workspace-`, and has a valid UTF-8 name. |
 | SSH list is empty | Run `dvv bootstrap` or check `~/.config/devv/servers.list`. |
@@ -455,11 +498,20 @@ Main packages:
 | `internal/db` | Database hub and import/create/drop/truncate/clean flows. |
 | `internal/systemconfig` | Configuration hub. |
 | `internal/resources` | Local services, Docker, and Compose resource hub. |
-| `internal/secrets` | AGE and Bitwarden bootstrap. |
+| `internal/secrets` | Secrets hub, AGE key preparation, encrypted SSH backup, and Bitwarden bootstrap. |
 
 Before adding a new hub, use `internal/ui.FZFHub`, keep shortcuts configurable, and document the public command in this README and completion.
 
 ## Version Notes
+
+`2.0.0-alpha.3`:
+
+- Added runtime profiles in the config hub.
+- Added the secrets hub for AGE and SSH backup state/actions.
+- Added resource log handoff for services, containers, and Compose projects.
+- Added custom API/Web tmux environments from the tmux hub.
+- Added `dvv doctor --fix` for safe local setup repair.
+- Added focused tests and docs for the new hardening features.
 
 `2.0.0-alpha.2`:
 

@@ -8,13 +8,14 @@ These rules document the local conventions for future agents and maintainers wor
 - Keep output direct and practical. Prefer actionable command names and short descriptions.
 - The CLI visual identity is `Royal Noir`: black foundation, royal purple interaction, and restrained gold status.
 - Use shared theme helpers and the `FZFHub` component from `internal/ui`; do not add one-off color palettes in feature packages.
+- Tmux-launched flows should preserve truecolor by using the shared tmux runtime options and `env COLORTERM=truecolor` terminal handoff.
 - Loaders should use the shared Royal Noir loader APIs from `internal/ui` and write to stderr.
 - Use `internal/ui.RunWithRoyalLoader` for indeterminate operations where no total is known.
 - Use `internal/ui.NewRoyalProgressLoader` for determinate operations where progress can be measured by bytes, items, or steps.
 - For interactive processes such as SSH, show loaders before terminal handoff and stop them before the child process owns the terminal.
 - Avoid global shell keybindings unless the project explicitly defines one. They can conflict with terminals, shells, editors, and IDEs.
 - Prefer explicit `dvv ...` commands. Personal shell shortcuts belong in the user's own shell config.
-- Project-managed zsh shortcuts are `Ctrl+F` for `dvv tmux:session`, `Ctrl+Shift+F` for `dvv tmux:home`, and `Alt+S` for `dvv ssh`.
+- Project-managed zsh shortcuts are `Ctrl+F` for `dvv tmux:session`, `Alt+F` for `dvv tmux:home`, and `Alt+S` for `dvv ssh`.
 
 ## Help And Command Lists
 
@@ -39,8 +40,9 @@ These rules document the local conventions for future agents and maintainers wor
 
 - Avoid new `Ctrl-*` shortcuts for dvv features. They commonly conflict with shells, terminal apps, VS Code, Cursor, and fzf defaults.
 - `Ctrl+F` is approved for the tmux directory session picker, preserved from the previous Bash implementation.
-- `Ctrl+Shift+F` is approved for opening a configured home tmux tab without the directory picker.
-- Root help should present the tmux hub as `dvv tmux`, the directory picker as the `Ctrl+F` shortcut, and the home tmux tab as the `Ctrl+Shift+F` shortcut.
+- `Alt+F` is approved for opening a configured home tmux tab without the directory picker.
+- Root help should present the tmux hub as `dvv tmux`, the directory picker as the `Ctrl+F` shortcut, and the home tmux tab as the `Alt+F` shortcut.
+- Do not use `Ctrl+Shift+F` as a managed default because Windows Terminal captures it for Find before zsh receives it.
 - Do not use `Ctrl+S`; many terminals treat it as XOFF flow control and appear frozen.
 - Interactive hubs should use local `Shift+letter` shortcuts for hub actions by default.
 - Hub shortcuts must be configurable in `dvv.config.json` before a hub is exposed.
@@ -118,10 +120,11 @@ dvv workspace
 dvv tmux
 dvv db
 dvv config
+dvv secrets
 ```
 
 - `dvv tmux:session` is kept for the managed `Ctrl+F` shortcut.
-- `dvv tmux:home` is kept for the managed `Ctrl+Shift+F` shortcut and should open the configured home directory without fzf selection.
+- `dvv tmux:home` is kept for the managed `Alt+F` shortcut and should open the configured home directory without fzf selection.
 - Script-friendly compatibility routes may exist, but should not make root help noisy:
 
 ```text
@@ -136,6 +139,10 @@ dvv db truncate
 dvv db drop
 dvv config list
 dvv config set
+dvv secrets status
+dvv secrets prepare
+dvv secrets restore
+dvv secrets sync
 ```
 
 ## Resources And Secrets Surface
@@ -144,10 +151,17 @@ dvv config set
 
 ```text
 dvv resources
+dvv secrets
 dvv bootstrap
 ```
 
-- `dvv resources` is the interactive local resources hub.
+- Public resources entrypoint is `dvv resources`.
+- Start, stop, restart, details, and logs should stay inside the resources hub.
+- `Shift+L` is the default resources hub shortcut for opening selected resource logs in a new terminal tab.
+- Public secrets entrypoint is `dvv secrets`.
+- `dvv bootstrap` remains the full setup/restore compatibility command.
+- Prepare, restore, and sync should stay inside the secrets hub for interactive usage.
+- Secret status must mask Bitwarden item values and never print private AGE key content.
 - `dvv bootstrap` restores AGE/Bitwarden secret state and encrypted SSH backups.
 - Keep `dvv env:bootstrap` as a compatibility route for the previous Bash command.
 - Do not advertise a separate resources list command; listing belongs inside the hub.
@@ -175,6 +189,7 @@ docs/agents.md
 - The public command for the Go rewrite is `dvv`.
 - Do not keep legacy Bash commands as fallback in this branch. Port intentionally from `main`.
 - Initial migration order is `ssh`, `workspace`, `tmux`, `db`, `systemconfig`, `resources`, then optional `wsl`.
+- Extra hardening before replacing `main` includes profiles, secrets hub, resource logs, custom tmux environments, `doctor --fix`, and macOS smoke notes.
 - The Python desktop control center is out of scope for the rewrite.
 - User-facing CLI text, generated help, autocomplete descriptions, errors, README content, and docs must remain in English.
 - Go code, package names, structs, config fields, command names, events, and tests must be in English.
