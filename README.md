@@ -99,10 +99,10 @@ Use `npm run build` only from this repository root. `dvv build` is the preferred
 Run the full validation suite before pushing behavior changes:
 
 ```bash
-npm run check
+dvv check
 ```
 
-`npm run check` is a local repository task runner. It runs build, tests, `go vet`, and the non-destructive smoke script.
+`dvv check` runs from the project root even when the current terminal is in `~`, a tmux home tab, or another project. It runs build, tests, `go vet`, and the non-destructive smoke script. `npm run check` is still available when you are already inside this repository root.
 
 ## Command Map
 
@@ -121,6 +121,7 @@ npm run check
 | `dvv setup` | Install zsh completion, managed shell shortcuts, and managed tmux shortcuts. |
 | `dvv bootstrap` | Restore AGE/Bitwarden secrets and SSH backup. |
 | `dvv build` | Rebuild the local Go binary. |
+| `dvv check` | Run build, tests, `go vet`, and smoke from the project root. |
 | `dvv doctor` | Check dependencies, paths, shortcuts, and known local edge cases. |
 | `dvv doctor --fix` | Create safe local files, rebuild, and reinstall shell/tmux integration. |
 
@@ -146,9 +147,9 @@ The managed block is written to `~/.zshrc`. Set `DVV_SKIP_SHELL_INTEGRATION=1` b
 | --- | --- |
 | `Alt+R` | `dist/dvv tmux:reset-api --session "#{session_name}" --window "#{window_name}"` |
 
-`Alt+R` resets the current tmux window's API/Horizon panes. It sends `Ctrl+C` to pane `0`, runs Laravel cache/config reset commands, starts `php artisan serve`, and restarts Horizon only when pane `1` points at the same API project. It does not touch the Web pane.
+`Alt+R` resets the current tmux window's API/Horizon panes. It looks for a pane inside a Laravel project, sends `Ctrl+C` to that API pane, runs Laravel cache/config reset commands, starts `php artisan serve`, and restarts Horizon only when another pane points at the same API project. It does not touch the Web pane. If the current tmux window has no Laravel API pane, it fails with a short status message.
 
-Set `tmux.reset.shortcut` or `DVV_TMUX_RESET_SHORTCUT` to change it. Use `none` to disable the managed tmux shortcut. `dvv setup` writes the config, prefers the absolute built binary when available, and attempts to reload it in any running tmux server. Set `DVV_SKIP_TMUX_INTEGRATION=1` before setup to skip `.tmux.conf` changes.
+Set `tmux.reset.shortcut` or `DVV_TMUX_RESET_SHORTCUT` to change it. Use `none` to disable the managed tmux shortcut. `dvv setup` writes the config, prefers the absolute built binary when available, and attempts to reload it in any running tmux server. Reset shortcut output is written to `~/.cache/devv/tmux-reset.log` so failures do not print command text into the active pane. Set `DVV_SKIP_TMUX_INTEGRATION=1` before setup to skip `.tmux.conf` changes.
 
 ## SSH Hub
 
@@ -181,7 +182,7 @@ Shortcuts:
 | `Enter` | Open the selected workspace with the configured or selected opener. |
 | `Tab` | Mark workspaces for deletion. |
 | `Shift+C` | Create a workspace. |
-| `Shift+T` | Save a workspace template. |
+| `Shift+T` | Manage workspace templates. |
 | `Shift+M` | Manage projects in the selected workspace. |
 | `Shift+D` | Delete selected workspace(s). |
 | `Esc` | Exit. |
@@ -208,7 +209,18 @@ Creation rules:
 | `Issue` | `master` |
 | `Other` | Ask for source branch |
 
-Workspace templates can be saved from the hub with `Shift+T`. A template stores a name, base selection, optional source branch, and selected projects in `DVV_WORKSPACE_TEMPLATES`. When creating a workspace with `Shift+C`, the base selector lists `Bug`, `Issue`, `Other`, and saved templates in one screen. Choosing a template reuses its projects and base branch rules.
+Workspace templates are managed from the hub with `Shift+T`. A template stores a name, optional description, base selection, optional source branch, and selected projects in `DVV_WORKSPACE_TEMPLATES`. The template hub can create, edit, and delete saved templates with its own configurable shortcuts. When creating a workspace with `Shift+C`, the base selector lists `Bug`, `Issue`, `Other`, and saved templates in one screen. Choosing a template reuses its projects and base branch rules.
+
+Template hub shortcuts:
+
+| Shortcut | Action |
+| --- | --- |
+| `Enter` | Edit the selected template. |
+| `Tab` | Mark templates for deletion. |
+| `Shift+C` | Create a template. |
+| `Shift+E` | Edit the selected template. |
+| `Shift+D` | Delete selected template(s). |
+| `Esc` | Exit templates. |
 
 Existing `workspace-*` directories are adopted automatically when the hub opens. Adoption only writes missing `.workspace/config.json` metadata; it does not move, rename, clean, or delete files.
 
@@ -417,6 +429,9 @@ Workspace templates:
 ```bash
 DVV_WORKSPACE_TEMPLATES='[{"name":"fullstack-bug","baseKind":"bug","projects":[{"name":"api","path":"~/workspace/projects/api"},{"name":"web","path":"~/workspace/projects/web"}]}]'
 DVV_WORKSPACE_TEMPLATE_SHORTCUT=shift+t
+DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT=shift+c
+DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT=shift+e
+DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT=shift+d
 ```
 
 Terminal:
@@ -447,6 +462,7 @@ DVV_RESOURCES_LOG_TAIL=200
 | --- | --- |
 | Command name | Use `dvv`. The old `devv` command is not installed by this branch. |
 | Build command | Use `dvv build` from anywhere. Use `npm run build` only from this repo root. |
+| Check command | Use `dvv check` from anywhere. Use `npm run check` only from this repo root. |
 | Launcher script | `bin/dvv` is versioned as the source-checkout launcher and rebuild helper. |
 | Compiled binary | `dist/dvv` is ignored and rebuilt locally. |
 | VS Code on WSL | Workspace openers use VS Code remote URIs for WSL paths when needed. |
@@ -489,7 +505,7 @@ Common cases:
 | Symptom | Fix |
 | --- | --- |
 | `zsh: command not found: devv` | Use `dvv`. Run `dvv setup` if an old shortcut still calls `devv`. |
-| `npm ERR! path /root/package.json` | You ran `npm run build` outside the repo. Use `dvv build`. |
+| `npm ERR! path /root/package.json` | You ran an npm script outside the repo. Use `dvv build` or `dvv check`. |
 | `Ctrl+Shift+F` opens terminal Find | This is a Windows Terminal shortcut. Use `Alt+F` after `dvv setup`, or run `dvv tmux:home`. |
 | `Alt+R` does nothing in tmux | Run `dvv build`, then `dvv setup`. If a tmux server was already open, run `tmux source-file ~/.tmux.conf` or open the environment again with `dvv tmux`. |
 | Autocomplete did not update | Run `dvv setup`, then open a new terminal or run `exec zsh`. |
@@ -510,6 +526,7 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 
 ```bash
 dvv build
+dvv check
 npm run build
 npm test
 npm run vet
@@ -542,7 +559,7 @@ Before adding a new hub, use `internal/ui.FZFHub`, keep shortcuts configurable, 
 - Added the secrets hub for AGE and SSH backup state/actions.
 - Added resource log handoff for services, containers, and Compose projects.
 - Added custom API/Web tmux environments from the tmux hub.
-- Added workspace templates from the workspace hub.
+- Added workspace templates and template management from the workspace hub.
 - Added `dvv doctor --fix` for safe local setup repair.
 - Added focused tests and docs for the new hardening features.
 

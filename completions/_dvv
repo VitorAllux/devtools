@@ -13,6 +13,7 @@ _dvv() {
       commands=(
         "bootstrap:Restore AGE/Bitwarden secrets and SSH backup"
         "build:Rebuild the local dvv binary"
+        "check:Run build, tests, vet, and smoke from the project root"
         "config:Open the configuration hub"
         "db:Open the database hub"
         "doctor:Check local dependencies and integration"
@@ -86,6 +87,11 @@ _dvv() {
             "--fix:Create safe runtime files, rebuild, and reinstall shell/tmux integration"
           )
           _describe -t doctor-flags 'doctor flags' doctor_flags
+          ;;
+        check)
+          local -a check_flags
+          check_flags=("help:Show check help")
+          _describe -t check-flags 'check flags' check_flags
           ;;
         ssh)
           local -a ssh_flags

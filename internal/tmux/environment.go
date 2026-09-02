@@ -28,6 +28,12 @@ type Target struct {
 	WebDir  string
 }
 
+type tmuxPaneInfo struct {
+	Index       string
+	Active      bool
+	CurrentPath string
+}
+
 const resetAPIShortcutArgs = `tmux:reset-api --session "#{session_name}" --window "#{window_name}"`
 
 func RunHub(ctx context.Context, cfg *config.Config, runner run.Runner, args []string) error {
@@ -462,7 +468,7 @@ func (m *Manager) RestartAPI(ctx context.Context, target Target) error {
 	if !m.hasSession(ctx, target.Session) {
 		return m.StartEnvironment(ctx, target)
 	}
-	return m.resetAPIPanes(ctx, target.Session, target.Window, target.APIDir)
+	return m.resetAPIPanes(ctx, target.Session, target.Window, "0", target.APIDir)
 }
 
 func (m *Manager) ResetCurrentAPI(ctx context.Context, session string, window string) error {
@@ -485,63 +491,72 @@ func (m *Manager) ResetCurrentAPI(ctx context.Context, session string, window st
 	if !m.hasSession(ctx, session) {
 		return fmt.Errorf("tmux session is not running: %s", session)
 	}
-	apiDir, err := m.apiDirForCurrentWindow(ctx, session, window)
+	apiPane, apiDir, err := m.apiPaneForCurrentWindow(ctx, session, window)
 	if err != nil {
+		m.displayTmuxMessage(ctx, session, window, "dvv reset failed: "+shortTmuxMessage(err.Error()))
 		return err
 	}
 	m.displayTmuxMessage(ctx, session, window, "dvv resetting API/Horizon")
-	if err := m.resetAPIPanes(ctx, session, window, apiDir); err != nil {
-		m.displayTmuxMessage(ctx, session, window, "dvv reset failed")
+	if err := m.resetAPIPanes(ctx, session, window, apiPane, apiDir); err != nil {
+		m.displayTmuxMessage(ctx, session, window, "dvv reset failed: "+shortTmuxMessage(err.Error()))
 		return err
 	}
 	m.displayTmuxMessage(ctx, session, window, "dvv API/Horizon reset")
 	return nil
 }
 
-func (m *Manager) resetAPIPanes(ctx context.Context, session string, window string, apiDir string) error {
+func (m *Manager) resetAPIPanes(ctx context.Context, session string, window string, apiPane string, apiDir string) error {
 	if !fileExists(filepath.Join(apiDir, "artisan")) {
 		return fmt.Errorf("api pane path is not a Laravel project: %s", apiDir)
 	}
-	panes, err := m.windowPanes(ctx, session, window)
+	panes, err := m.windowPaneInfos(ctx, session, window)
 	if err != nil {
 		return err
 	}
-	if !panes["0"] {
-		return fmt.Errorf("api pane 0 was not found in %s", tmuxWindowTarget(session, window))
+	if strings.TrimSpace(apiPane) == "" {
+		apiPane = "0"
 	}
-	hasHorizonPane := false
-	if panes["1"] {
-		if horizonDir, err := m.paneCurrentPath(ctx, session, window, "1"); err == nil && sameDir(horizonDir, apiDir) {
-			hasHorizonPane = true
+	if !hasPaneIndex(panes, apiPane) {
+		return fmt.Errorf("api pane %s was not found in %s", apiPane, tmuxWindowTarget(session, window))
+	}
+	horizonPane := ""
+	for _, pane := range panes {
+		if pane.Index == apiPane {
+			continue
+		}
+		if root, ok := laravelProjectRoot(pane.CurrentPath); ok && sameDir(root, apiDir) {
+			horizonPane = pane.Index
+			break
 		}
 	}
 
 	apiCD := shellQuote(apiDir)
-	commands := [][]string{
-		{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "C-c"},
+	if err := m.Runner.Run(ctx, "", "tmux", "send-keys", "-t", tmuxPaneTarget(session, window, apiPane), "C-c"); err != nil {
+		return err
 	}
-	if hasHorizonPane {
-		commands = append(commands, []string{"send-keys", "-t", tmuxPaneTarget(session, window, "1"), "C-c"})
-	}
-	commands = append(commands,
-		[]string{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "cd " + apiCD + " && php artisan optimize:clear", "Enter"},
-		[]string{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "cd " + apiCD + " && php artisan cache:clear", "Enter"},
-		[]string{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "cd " + apiCD + " && php artisan config:cache", "Enter"},
-		[]string{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "cd " + apiCD + " && php artisan horizon:forget --all || true", "Enter"},
-		[]string{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "cd " + apiCD + " && php artisan horizon:clear || true", "Enter"},
-		[]string{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "cd " + apiCD + " && php artisan queue:flush || true", "Enter"},
-		[]string{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "command -v redis-cli >/dev/null 2>&1 && redis-cli FLUSHDB || true", "Enter"},
-		[]string{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "cd " + apiCD + " && php artisan serve", "Enter"},
-	)
-	if hasHorizonPane {
-		commands = append(commands, []string{"send-keys", "-t", tmuxPaneTarget(session, window, "1"), "cd " + apiCD + " && php artisan horizon", "Enter"})
-	}
-	for index, args := range commands {
-		if err := m.Runner.Run(ctx, "", "tmux", args...); err != nil {
+	if horizonPane != "" {
+		if err := m.Runner.Run(ctx, "", "tmux", "send-keys", "-t", tmuxPaneTarget(session, window, horizonPane), "C-c"); err != nil {
 			return err
 		}
-		if index == 1 || (!hasHorizonPane && index == 0) {
-			time.Sleep(600 * time.Millisecond)
+	}
+	time.Sleep(600 * time.Millisecond)
+
+	commands := [][]string{
+		{"send-keys", "-t", tmuxPaneTarget(session, window, apiPane), "cd " + apiCD + " && php artisan optimize:clear", "Enter"},
+		{"send-keys", "-t", tmuxPaneTarget(session, window, apiPane), "cd " + apiCD + " && php artisan cache:clear", "Enter"},
+		{"send-keys", "-t", tmuxPaneTarget(session, window, apiPane), "cd " + apiCD + " && php artisan config:cache", "Enter"},
+		{"send-keys", "-t", tmuxPaneTarget(session, window, apiPane), "cd " + apiCD + " && php artisan horizon:forget --all || true", "Enter"},
+		{"send-keys", "-t", tmuxPaneTarget(session, window, apiPane), "cd " + apiCD + " && php artisan horizon:clear || true", "Enter"},
+		{"send-keys", "-t", tmuxPaneTarget(session, window, apiPane), "cd " + apiCD + " && php artisan queue:flush || true", "Enter"},
+		{"send-keys", "-t", tmuxPaneTarget(session, window, apiPane), "command -v redis-cli >/dev/null 2>&1 && redis-cli FLUSHDB || true", "Enter"},
+		{"send-keys", "-t", tmuxPaneTarget(session, window, apiPane), "cd " + apiCD + " && php artisan serve", "Enter"},
+	}
+	if horizonPane != "" {
+		commands = append(commands, []string{"send-keys", "-t", tmuxPaneTarget(session, window, horizonPane), "cd " + apiCD + " && php artisan horizon", "Enter"})
+	}
+	for _, args := range commands {
+		if err := m.Runner.Run(ctx, "", "tmux", args...); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -559,14 +574,38 @@ func (m *Manager) currentTmuxWindow(ctx context.Context) (string, string, error)
 	return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]), nil
 }
 
-func (m *Manager) apiDirForCurrentWindow(ctx context.Context, session string, window string) (string, error) {
-	if path, err := m.paneCurrentPath(ctx, session, window, "0"); err == nil && fileExists(filepath.Join(path, "artisan")) {
-		return path, nil
+func (m *Manager) apiPaneForCurrentWindow(ctx context.Context, session string, window string) (string, string, error) {
+	panes, err := m.windowPaneInfos(ctx, session, window)
+	if err == nil {
+		for _, pane := range panes {
+			if pane.Index != "0" {
+				continue
+			}
+			if root, ok := laravelProjectRoot(pane.CurrentPath); ok {
+				return pane.Index, root, nil
+			}
+		}
+		for _, pane := range panes {
+			if !pane.Active {
+				continue
+			}
+			if root, ok := laravelProjectRoot(pane.CurrentPath); ok {
+				return pane.Index, root, nil
+			}
+		}
+		for _, pane := range panes {
+			if root, ok := laravelProjectRoot(pane.CurrentPath); ok {
+				return pane.Index, root, nil
+			}
+		}
 	}
 	if configured := m.configuredAPIDirFor(ctx, session, window); configured != "" {
-		return configured, nil
+		return "0", configured, nil
 	}
-	return "", fmt.Errorf("cannot find Laravel API project for %s; pane 0 must be inside a directory with artisan", tmuxWindowTarget(session, window))
+	if err != nil {
+		return "", "", err
+	}
+	return "", "", fmt.Errorf("cannot find a Laravel API pane in %s; one pane must be inside a directory with artisan", tmuxWindowTarget(session, window))
 }
 
 func (m *Manager) configuredAPIDirFor(ctx context.Context, session string, window string) string {
@@ -593,17 +632,29 @@ func (m *Manager) paneCurrentPath(ctx context.Context, session string, window st
 	return strings.TrimSpace(string(output)), nil
 }
 
-func (m *Manager) windowPanes(ctx context.Context, session string, window string) (map[string]bool, error) {
-	output, err := m.Runner.Output(ctx, "", "tmux", "list-panes", "-t", tmuxWindowTarget(session, window), "-F", "#{pane_index}")
+func (m *Manager) windowPaneInfos(ctx context.Context, session string, window string) ([]tmuxPaneInfo, error) {
+	output, err := m.Runner.Output(ctx, "", "tmux", "list-panes", "-t", tmuxWindowTarget(session, window), "-F", "#{pane_index}\t#{pane_active}\t#{pane_current_path}")
 	if err != nil {
 		return nil, fmt.Errorf("cannot list tmux panes in %s: %w", tmuxWindowTarget(session, window), err)
 	}
-	panes := map[string]bool{}
+	panes := []tmuxPaneInfo{}
 	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
 		line = strings.TrimSpace(line)
-		if line != "" {
-			panes[line] = true
+		if line == "" {
+			continue
 		}
+		fields := strings.SplitN(line, "\t", 3)
+		if len(fields) < 3 {
+			continue
+		}
+		panes = append(panes, tmuxPaneInfo{
+			Index:       strings.TrimSpace(fields[0]),
+			Active:      strings.TrimSpace(fields[1]) == "1",
+			CurrentPath: strings.TrimSpace(fields[2]),
+		})
+	}
+	if len(panes) == 0 {
+		return nil, fmt.Errorf("no panes found in %s", tmuxWindowTarget(session, window))
 	}
 	return panes, nil
 }
@@ -624,6 +675,52 @@ func sameDir(left string, right string) bool {
 		return leftReal == rightReal
 	}
 	return filepath.Clean(left) == filepath.Clean(right)
+}
+
+func laravelProjectRoot(path string) (string, bool) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "", false
+	}
+	path = config.ExpandPath(path)
+	info, err := os.Stat(path)
+	if err != nil || !info.IsDir() {
+		return "", false
+	}
+	if realPath, err := filepath.EvalSymlinks(path); err == nil {
+		path = realPath
+	}
+	for {
+		if fileExists(filepath.Join(path, "artisan")) {
+			abs, err := filepath.Abs(path)
+			if err != nil {
+				return path, true
+			}
+			return abs, true
+		}
+		parent := filepath.Dir(path)
+		if parent == path {
+			return "", false
+		}
+		path = parent
+	}
+}
+
+func hasPaneIndex(panes []tmuxPaneInfo, index string) bool {
+	for _, pane := range panes {
+		if pane.Index == index {
+			return true
+		}
+	}
+	return false
+}
+
+func shortTmuxMessage(message string) string {
+	message = strings.TrimSpace(strings.ReplaceAll(message, "\n", " "))
+	if len(message) <= 100 {
+		return message
+	}
+	return message[:97] + "..."
 }
 
 func tmuxWindowTarget(session string, window string) string {
@@ -714,12 +811,13 @@ func (m *Manager) applyResetShortcut(ctx context.Context) {
 	if key == "" {
 		return
 	}
+	_ = m.Runner.Run(ctx, "", "tmux", "unbind-key", "-n", key)
 	_ = m.Runner.Run(ctx, "", "tmux", "bind-key", "-n", key, "run-shell", "-b", m.resetAPIShortcutCommand())
 }
 
 func (m *Manager) resetAPIShortcutCommand() string {
-	command := shellQuote(executableCommand()) + " " + resetAPIShortcutArgs
-	return command + ` || tmux display-message -t "#{session_name}:#{window_name}" "dvv reset failed"`
+	command := "NO_COLOR=1 " + shellQuote(executableCommand()) + " " + resetAPIShortcutArgs
+	return `log_dir="${XDG_CACHE_HOME:-$HOME/.cache}/devv"; log_file="$log_dir/tmux-reset.log"; mkdir -p "$log_dir"; ` + command + ` >"$log_file" 2>&1; status=$?; if [ "$status" -ne 0 ]; then message="$(tail -n 1 "$log_file" 2>/dev/null)"; [ -n "$message" ] || message="dvv reset failed; see $log_file"; tmux display-message -d 5000 -t "#{session_name}:#{window_name}" "$message"; fi`
 }
 
 func tmuxShortcutKey(value string) string {

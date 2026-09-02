@@ -433,7 +433,7 @@ func TestWorkspacePreviewPreservesHubCommandArgs(t *testing.T) {
 	if strings.Contains(preview, "DVV_FZF_COMMANDS") {
 		t.Fatalf("preview should render shortcut commands directly: %s", preview)
 	}
-	for _, want := range []string{"Shift+C", "create workspace", "Shift+T", "save workspace template", "Shift+M", "manage projects", "Shift+D", "delete selected"} {
+	for _, want := range []string{"Shift+C", "create workspace", "Shift+T", "manage templates", "Shift+M", "manage projects", "Shift+D", "delete selected"} {
 		if !strings.Contains(preview, want) {
 			t.Fatalf("preview missing %q: %s", want, preview)
 		}
@@ -527,6 +527,85 @@ func TestWorkspaceTemplateHelpers(t *testing.T) {
 	replaced := appendOrReplaceWorkspaceTemplate([]config.WorkspaceTemplate{template}, config.WorkspaceTemplate{Name: "a", BaseKind: "bug", Projects: projects[:1]})
 	if len(replaced) != 1 || replaced[0].BaseKind != "bug" {
 		t.Fatalf("appendOrReplaceWorkspaceTemplate = %#v", replaced)
+	}
+	updated, err := updateWorkspaceTemplate([]config.WorkspaceTemplate{template}, 0, config.WorkspaceTemplate{Name: "B", BaseKind: "issue", Projects: projects})
+	if err != nil || updated[0].Name != "B" {
+		t.Fatalf("updateWorkspaceTemplate = %#v err=%v", updated, err)
+	}
+	_, err = updateWorkspaceTemplate([]config.WorkspaceTemplate{template, {Name: "B", Projects: projects}}, 0, config.WorkspaceTemplate{Name: "b", Projects: projects})
+	if err == nil {
+		t.Fatal("expected duplicate template name to be rejected")
+	}
+	removed := removeWorkspaceTemplates([]config.WorkspaceTemplate{template, {Name: "B", Projects: projects}}, []int{1, 1, 9})
+	if len(removed) != 1 || removed[0].Name != "A" {
+		t.Fatalf("removeWorkspaceTemplates = %#v", removed)
+	}
+	indexes := selectedTemplateIndexes([]string{templateLine("template:1", "B", "prod", "1 project(s)", "api", "", "visible"), templateLine("__dvv_empty__", "", "", "", "", "", "empty")})
+	if len(indexes) != 1 || indexes[0] != 1 {
+		t.Fatalf("selectedTemplateIndexes = %#v", indexes)
+	}
+}
+
+func TestWorkspaceTemplateHubRowsKeepProjectsInPreview(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	cfg := config.DefaultProjectConfig().Workspace
+	templates := []config.WorkspaceTemplate{{
+		Name:        "Fullstack Bug",
+		Description: "API and Web for bug work.",
+		BaseKind:    "bug",
+		Projects:    []config.WorkspaceProject{{Name: "api", Path: "/repo/api"}, {Name: "web", Path: "/repo/web"}},
+	}}
+	rows := templateRows(cfg, templates)
+	if !strings.Contains(rows, "Fullstack Bug") || !strings.Contains(rows, "prod") {
+		t.Fatalf("template rows = %q", rows)
+	}
+	templateRow := strings.Split(strings.TrimSpace(rows), "\n")[1]
+	fields := strings.Split(templateRow, "\t")
+	if len(fields) != 7 {
+		t.Fatalf("template row fields = %#v", fields)
+	}
+	if fields[4] != "api|web" {
+		t.Fatalf("template project names field = %q, want api|web", fields[4])
+	}
+	if visible := fields[6]; strings.Contains(visible, "api|web") || strings.Contains(visible, "API and Web") {
+		t.Fatalf("visible template row should keep projects and description in preview only: %q", visible)
+	}
+
+	preview := templatePreviewCommand(workspaceTemplateHubShortcuts((&config.Config{Project: config.DefaultProjectConfig()}).WorkspaceTemplateHubKeys()))
+	for _, want := range []string{"Hub commands", "Selected projects", "create template", "edit selected", "delete selected"} {
+		if !strings.Contains(preview, want) {
+			t.Fatalf("template preview missing %q: %s", want, preview)
+		}
+	}
+}
+
+func TestFZFTemplateHubUsesReadableMinimumHeight(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	root := t.TempDir()
+	cfg := testWorkspaceConfig(filepath.Join(root, "workspaces"))
+	cfg.ConfigFile = filepath.Join(root, "config.env")
+	cfg.Project.Workspace.Templates = []config.WorkspaceTemplate{{
+		Name:     "Fullstack Bug",
+		BaseKind: "bug",
+		Projects: []config.WorkspaceProject{
+			{Name: "api", Path: filepath.Join(root, "api")},
+			{Name: "web", Path: filepath.Join(root, "web")},
+		},
+	}}
+	runner := newWorkspaceRunner()
+	runner.paths["fzf"] = true
+	runner.fzfErr = errors.New("cancel")
+	manager := NewManager(cfg, runner)
+
+	keepOpen, _, err := manager.fzfTemplatesHub(context.Background(), "")
+	if err != nil {
+		t.Fatalf("fzfTemplatesHub returned error: %v", err)
+	}
+	if keepOpen {
+		t.Fatal("empty fzf output should close template hub")
+	}
+	if !runner.hasFZFArg("--height=42%") || !runner.hasFZFArg("--min-height=22") {
+		t.Fatalf("template hub should use readable fixed height args: %#v", runner.fzfArgs)
 	}
 }
 
@@ -790,6 +869,7 @@ type workspaceRunner struct {
 	paths     map[string]bool
 	runs      []string
 	outputs   []string
+	fzfArgs   []string
 	fzfInput  string
 	fzfOutput []byte
 	fzfErr    error
@@ -926,8 +1006,9 @@ func (r *workspaceRunner) handleQuietGitMutation(args []string) (bool, error) {
 	}
 }
 
-func (r *workspaceRunner) OutputWithInput(_ context.Context, _ string, input []byte, _ string, _ ...string) ([]byte, error) {
+func (r *workspaceRunner) OutputWithInput(_ context.Context, _ string, input []byte, _ string, args ...string) ([]byte, error) {
 	r.fzfInput = string(input)
+	r.fzfArgs = append([]string{}, args...)
 	if r.fzfOutput != nil || r.fzfErr != nil {
 		return r.fzfOutput, r.fzfErr
 	}
@@ -948,6 +1029,15 @@ func (r *workspaceRunner) LookPath(name string) (string, error) {
 func (r *workspaceRunner) hasRun(command string) bool {
 	for _, run := range r.runs {
 		if run == command {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *workspaceRunner) hasFZFArg(arg string) bool {
+	for _, got := range r.fzfArgs {
+		if got == arg {
 			return true
 		}
 	}

@@ -87,6 +87,12 @@ func Run(args []string) int {
 			return 1
 		}
 		return 0
+	case "check":
+		if err := setupcmd.RunCheck(ctx, cfg, runner, commandArgs); err != nil {
+			ui.Error("%v", err)
+			return 1
+		}
+		return 0
 	case "doctor":
 		if err := setupcmd.RunDoctor(ctx, cfg, runner, commandArgs); err != nil {
 			ui.Error("%v", err)
@@ -193,6 +199,8 @@ func runCommand(ctx context.Context, cfg *config.Config, runner run.Runner, comm
 		err = resourcescmd.Run(ctx, cfg, runner, args)
 	case "setup":
 		err = setupcmd.RunSetup(ctx, cfg, runner, args)
+	case "check":
+		err = setupcmd.RunCheck(ctx, cfg, runner, args)
 	case "secrets":
 		err = secretscmd.RunSecrets(ctx, cfg, runner, args)
 	case "ssh":
@@ -235,6 +243,7 @@ func showHelp() {
 	fmt.Println()
 	helpSection("System")
 	helpEntry("build", "*", "Rebuild the local dvv binary")
+	helpEntry("check", "*", "Run build, tests, vet, and smoke from the project root")
 	helpEntry("setup", "*", "Install zsh completion, shell shortcuts, and tmux shortcuts")
 	helpEntry("bootstrap", "*", "Restore AGE/Bitwarden secrets and SSH backup")
 	helpEntry("secrets", ">", "Open the local secrets hub")

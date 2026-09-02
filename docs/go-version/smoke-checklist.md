@@ -4,18 +4,18 @@ Use this checklist before treating `go-version` as merge-ready. Automated smoke 
 
 ## Automated Smoke
 
-Run from the repository root:
+Run from any directory:
 
 ```bash
-npm run smoke
+dvv check
 ```
 
-The smoke script validates:
+`dvv check` runs build, tests, `go vet`, and the smoke script from the project root. The smoke script validates:
 
 | Area | Check |
 | --- | --- |
 | Build | `scripts/build.js` and `dvv build` from a non-repository directory. |
-| Help | Root help and hub help for `ssh`, `workspace`, `tmux`, `db`, `resources`, `secrets`, `config`, and `bootstrap`. |
+| Help | Root help and hub help for `ssh`, `workspace`, `tmux`, `db`, `resources`, `secrets`, `config`, `bootstrap`, and `check`. |
 | Doctor | `dvv doctor` exits cleanly in a temporary home directory. |
 | Setup | `dvv setup` writes completion, managed zsh shortcuts, and managed tmux shortcuts to temporary files only. |
 | Compatibility | Script-friendly `ssh:list` and `workspace:list` still run without being advertised as primary UX. |

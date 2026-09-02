@@ -285,6 +285,9 @@ func TestLoadProjectConfigMergesWorkspaceDefaults(t *testing.T) {
 	if cfg.Workspace.Interactive.Shortcuts.Template != "shift+t" {
 		t.Fatalf("template shortcut = %q", cfg.Workspace.Interactive.Shortcuts.Template)
 	}
+	if cfg.Workspace.TemplateHub.Shortcuts.Create != "shift+c" || cfg.Workspace.TemplateHub.Shortcuts.Edit != "shift+e" || cfg.Workspace.TemplateHub.Shortcuts.Delete != "shift+d" {
+		t.Fatalf("template hub shortcuts = %#v", cfg.Workspace.TemplateHub.Shortcuts)
+	}
 	if cfg.Workspace.ProjectSearchDepth != 4 {
 		t.Fatalf("search depth = %d", cfg.Workspace.ProjectSearchDepth)
 	}
@@ -309,6 +312,9 @@ func TestResolveWorkspaceConfigUsesEnvOverrides(t *testing.T) {
 	t.Setenv("DVV_WORKSPACE_MANAGE_SHORTCUT", "alt-m")
 	t.Setenv("DVV_WORKSPACE_DELETE_SHORTCUT", "alt-d")
 	t.Setenv("DVV_WORKSPACE_TEMPLATE_SHORTCUT", "alt-t")
+	t.Setenv("DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT", "ctrl-c")
+	t.Setenv("DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT", "ctrl-e")
+	t.Setenv("DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT", "ctrl-d")
 	t.Setenv("DVV_WORKSPACE_TEMPLATES", `[{"name":"fullstack","baseKind":"other","baseBranch":"release","projects":[{"name":"api","path":"~/api"},{"path":"~/web"}]}]`)
 	t.Setenv("DVV_WORKSPACE_REQUIRE_CONFIRMATION", "0")
 	t.Setenv("DVV_WORKSPACE_BLOCK_DIRTY_PROJECTS", "false")
@@ -332,6 +338,9 @@ func TestResolveWorkspaceConfigUsesEnvOverrides(t *testing.T) {
 	}
 	if cfg.Interactive.Shortcuts.Create != "alt-c" || cfg.Interactive.Shortcuts.Manage != "alt-m" || cfg.Interactive.Shortcuts.Delete != "alt-d" || cfg.Interactive.Shortcuts.Template != "alt-t" {
 		t.Fatalf("workspace shortcuts = %#v", cfg.Interactive.Shortcuts)
+	}
+	if cfg.TemplateHub.Shortcuts.Create != "ctrl-c" || cfg.TemplateHub.Shortcuts.Edit != "ctrl-e" || cfg.TemplateHub.Shortcuts.Delete != "ctrl-d" {
+		t.Fatalf("template hub shortcuts = %#v", cfg.TemplateHub.Shortcuts)
 	}
 	if len(cfg.Templates) != 1 || cfg.Templates[0].BaseBranch != "release" || cfg.Templates[0].Projects[0].Path != "/home/tester/api" || cfg.Templates[0].Projects[1].Name != "web" {
 		t.Fatalf("workspace templates = %#v", cfg.Templates)

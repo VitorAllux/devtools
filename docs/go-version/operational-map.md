@@ -18,7 +18,8 @@ This document maps the operational details that are easy to forget while using o
 | Source install | Symlink `bin/dvv` from the checkout into a directory on `PATH`. | Re-run `dvv build` after pulling source changes. |
 | Local rebuild | `dvv build` rebuilds from any working directory. | Use this after source changes. |
 | Repository build | `npm run build` works only from this repo root. | Do not run it from `~`; npm will search for `/root/package.json`. |
-| Validation | `npm run check` runs build, tests, vet, and non-destructive smoke. | Use it before pushing behavior changes. |
+| Validation | `dvv check` runs build, tests, vet, and non-destructive smoke from the project root. | Use it before pushing behavior changes. |
+| Repository validation | `npm run check` works only from this repo root. | Prefer `dvv check` when the terminal may be in `~`, a tmux home tab, or another project. |
 | Versioned launcher | `bin/dvv` is committed as the source-checkout launcher and rebuild helper. | Keep it small and source-controlled. |
 | Compiled binary | `dist/dvv` is a build artifact. | Do not commit it. |
 | Shell integration | `dvv setup` installs completion and managed zsh shortcuts. | Run only when setup, completion, or shortcut behavior changes. |

@@ -133,6 +133,13 @@
         "template": "shift+t"
       }
     },
+    "templateHub": {
+      "shortcuts": {
+        "create": "shift+c",
+        "edit": "shift+e",
+        "delete": "shift+d"
+      }
+    },
     "bootstrap": {
       "onCreate": true,
       "onAdd": true,

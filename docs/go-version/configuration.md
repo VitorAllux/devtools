@@ -140,6 +140,13 @@ The file is versioned because it defines project behavior, theme identity, and d
         "delete": "shift+d",
         "template": "shift+t"
       }
+    },
+    "templateHub": {
+      "shortcuts": {
+        "create": "shift+c",
+        "edit": "shift+e",
+        "delete": "shift+d"
+      }
     }
   }
 }
@@ -290,6 +297,7 @@ The `workspace` section contains these groups:
 - `projectSearchDepth`: discovery depth below each project search root.
 - `git`: remote name, base branch priority, branch reuse/creation rules, branch name template, and base branch by workspace type.
 - `interactive`: selector, opener, and configurable hub shortcuts.
+- `templateHub`: configurable shortcuts for creating, editing, and deleting workspace templates.
 - `bootstrap`: copy rules and conditional commands.
 - `workspaceHarness`: generated workspace `AGENTS.md` behavior.
 - `hooks`: commands for workspace and project lifecycle events.
@@ -303,7 +311,7 @@ Workspace metadata is stored inside each workspace:
 
 Existing `workspace-*` directories are adopted when the hub opens if this metadata is missing. Adoption is additive only: it writes `.workspace/config.json` from detected worktrees and leaves all existing files in place.
 
-Workspace templates can be defined in `workspace.templates` or persisted through `DVV_WORKSPACE_TEMPLATES`. The workspace hub saves templates with `Shift+T`: the flow asks for a template name, base selection, optional source branch, and projects. During `Shift+C` workspace creation, the base selector also lists saved templates, so selecting a template reuses its project list and base branch rule.
+Workspace templates can be defined in `workspace.templates` or persisted through `DVV_WORKSPACE_TEMPLATES`. The workspace hub opens template management with `Shift+T`, and the template hub can create, edit, or delete templates with its own configurable shortcuts. During `Shift+C` workspace creation, the base selector also lists saved templates, so selecting a template reuses its project list and base branch rule.
 
 Supported lifecycle hook events are `workspace.creating`, `workspace.created`, `workspace.opened`, `workspace.removing`, `workspace.removed`, `project.adding`, `project.added`, `project.bootstrap`, `project.removing`, and `project.removed`.
 

@@ -37,6 +37,7 @@ const env = {
 
 run("build script", process.execPath, [path.join(root, "scripts", "build.js")], { cwd: root });
 run("dvv build from another directory", bin, ["build"], { cwd: home });
+run("dvv check help", bin, ["check", "help"], { cwd: home });
 run("root help", bin, ["help"]);
 run("ssh help", bin, ["ssh", "help"]);
 run("workspace help", bin, ["workspace", "help"]);
@@ -63,8 +64,10 @@ assertExcludes(zshrc, "devv ", "legacy devv shortcut");
 
 const tmuxConf = readFile(path.join(home, ".tmux.conf"));
 assertIncludes(tmuxConf, "dvv tmux:reset-api", "managed tmux reset shortcut");
+assertIncludes(tmuxConf, "unbind-key -n M-r", "managed Alt+R stale unbind");
 assertIncludes(tmuxConf, "bind-key -n M-r", "managed Alt+R tmux sequence");
 assertIncludes(tmuxConf, "tmux display-message", "managed Alt+R failure feedback");
+assertIncludes(tmuxConf, "tmux-reset.log", "managed Alt+R silent log");
 
 const completion = readFile(path.join(root, "completions", "_dvv"));
 assertIncludes(completion, "DVV_COMPLETE_COMPAT", "compatibility completion gate");

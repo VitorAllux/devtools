@@ -211,8 +211,18 @@ func TestApplyOptionsInstallsResetShortcut(t *testing.T) {
 
 	manager.applyOptions(context.Background())
 
+	if !runner.hasRun("tmux unbind-key -n M-r") {
+		t.Fatalf("reset shortcut unbind missing: %#v", runner.runs)
+	}
 	if !runner.hasRun("tmux bind-key -n M-r run-shell -b " + manager.resetAPIShortcutCommand()) {
 		t.Fatalf("reset shortcut binding missing: %#v", runner.runs)
+	}
+	command := manager.resetAPIShortcutCommand()
+	if !strings.Contains(command, "tmux-reset.log") || !strings.Contains(command, "display-message -d 5000") {
+		t.Fatalf("reset shortcut should write failures to a log and show a visible message: %s", command)
+	}
+	if strings.Contains(command, `exit "$status"`) {
+		t.Fatalf("reset shortcut should not bubble failures to the key binding: %s", command)
 	}
 }
 
@@ -253,6 +263,79 @@ func TestResetCurrentAPIUsesCurrentTmuxWindowAndSkipsWeb(t *testing.T) {
 		if strings.Contains(run, "workspace-task:dev.2") {
 			t.Fatalf("reset should not touch the Web pane: %#v", runner.runs)
 		}
+	}
+}
+
+func TestResetCurrentAPIFindsLaravelPaneOutsidePaneZero(t *testing.T) {
+	root := t.TempDir()
+	apiDir := filepath.Join(root, "api")
+	webDir := filepath.Join(root, "web")
+	apiSubdir := filepath.Join(apiDir, "app")
+	mustMkdir(t, apiSubdir)
+	mustMkdir(t, webDir)
+	if err := os.WriteFile(filepath.Join(apiDir, "artisan"), []byte("#!/usr/bin/env php\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile artisan failed: %v", err)
+	}
+
+	runner := &fakeRunner{
+		paths:            map[string]bool{"tmux": true},
+		existingSessions: map[string]bool{"workspace-task": true},
+		currentSession:   "workspace-task",
+		currentWindow:    "dev",
+		activePanes:      map[string]string{"workspace-task:dev": "0"},
+		paneIndexes:      map[string][]string{"workspace-task:dev": {"0", "1", "2"}},
+		panePaths: map[string]string{
+			"workspace-task:dev.0": webDir,
+			"workspace-task:dev.1": apiSubdir,
+			"workspace-task:dev.2": apiDir,
+		},
+	}
+	manager := NewManager(testConfig(root), runner)
+
+	if err := manager.ResetCurrentAPI(context.Background(), "", ""); err != nil {
+		t.Fatalf("ResetCurrentAPI returned error: %v", err)
+	}
+	if !runner.hasRun("tmux send-keys -t workspace-task:dev.1 cd '" + apiDir + "' && php artisan config:cache Enter") {
+		t.Fatalf("config cache command should target detected API pane: %#v", runner.runs)
+	}
+	if !runner.hasRun("tmux send-keys -t workspace-task:dev.2 cd '" + apiDir + "' && php artisan horizon Enter") {
+		t.Fatalf("horizon command should target the second API pane: %#v", runner.runs)
+	}
+	for _, run := range runner.runs {
+		if strings.Contains(run, "workspace-task:dev.0") {
+			t.Fatalf("reset should not send commands to the Web pane: %#v", runner.runs)
+		}
+	}
+}
+
+func TestResetCurrentAPIShowsSpecificTmuxFailure(t *testing.T) {
+	root := t.TempDir()
+	webDir := filepath.Join(root, "web")
+	mustMkdir(t, webDir)
+
+	runner := &fakeRunner{
+		paths:            map[string]bool{"tmux": true},
+		existingSessions: map[string]bool{"home": true},
+		currentSession:   "home",
+		currentWindow:    "root",
+		paneIndexes:      map[string][]string{"home:root": {"0"}},
+		panePaths:        map[string]string{"home:root.0": webDir},
+	}
+	manager := NewManager(testConfig(root), runner)
+
+	err := manager.ResetCurrentAPI(context.Background(), "", "")
+	if err == nil {
+		t.Fatal("expected reset to fail without a Laravel pane")
+	}
+	found := false
+	for _, run := range runner.runs {
+		if strings.Contains(run, "tmux display-message -t home:root dvv reset failed: cannot find a Laravel API pane") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("specific failure message missing: %#v", runner.runs)
 	}
 }
 

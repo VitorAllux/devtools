@@ -149,6 +149,7 @@ type WorkspaceConfig struct {
 	ProjectSearchDepth int                     `json:"projectSearchDepth"`
 	Git                WorkspaceGitConfig      `json:"git"`
 	Interactive        WorkspaceInteractive    `json:"interactive"`
+	TemplateHub        WorkspaceTemplateHub    `json:"templateHub"`
 	Bootstrap          WorkspaceBootstrap      `json:"bootstrap"`
 	WorkspaceHarness   WorkspaceHarnessConfig  `json:"workspaceHarness"`
 	Hooks              map[string][]HookConfig `json:"hooks"`
@@ -190,6 +191,16 @@ type WorkspaceHubShortcutConfig struct {
 	Manage   string `json:"manage"`
 	Delete   string `json:"delete"`
 	Template string `json:"template"`
+}
+
+type WorkspaceTemplateHub struct {
+	Shortcuts WorkspaceTemplateHubShortcutConfig `json:"shortcuts"`
+}
+
+type WorkspaceTemplateHubShortcutConfig struct {
+	Create string `json:"create"`
+	Edit   string `json:"edit"`
+	Delete string `json:"delete"`
 }
 
 type WorkspaceBootstrap struct {
@@ -535,6 +546,13 @@ func defaultWorkspaceConfig() WorkspaceConfig {
 				Template: "shift+t",
 			},
 		},
+		TemplateHub: WorkspaceTemplateHub{
+			Shortcuts: WorkspaceTemplateHubShortcutConfig{
+				Create: "shift+c",
+				Edit:   "shift+e",
+				Delete: "shift+d",
+			},
+		},
 		Bootstrap: WorkspaceBootstrap{
 			OnCreate: false,
 			OnAdd:    true,
@@ -859,6 +877,15 @@ func mergeWorkspaceConfigDefaults(target WorkspaceConfig, defaults WorkspaceConf
 	if strings.TrimSpace(target.Interactive.Shortcuts.Template) == "" {
 		target.Interactive.Shortcuts.Template = defaults.Interactive.Shortcuts.Template
 	}
+	if strings.TrimSpace(target.TemplateHub.Shortcuts.Create) == "" {
+		target.TemplateHub.Shortcuts.Create = defaults.TemplateHub.Shortcuts.Create
+	}
+	if strings.TrimSpace(target.TemplateHub.Shortcuts.Edit) == "" {
+		target.TemplateHub.Shortcuts.Edit = defaults.TemplateHub.Shortcuts.Edit
+	}
+	if strings.TrimSpace(target.TemplateHub.Shortcuts.Delete) == "" {
+		target.TemplateHub.Shortcuts.Delete = defaults.TemplateHub.Shortcuts.Delete
+	}
 	if target.Bootstrap.CopyRules == nil {
 		target.Bootstrap.CopyRules = defaults.Bootstrap.CopyRules
 	}
@@ -1012,6 +1039,15 @@ func resolveWorkspaceConfig(cfg WorkspaceConfig) WorkspaceConfig {
 	}
 	if shortcut := firstSetEnv("DVV_WORKSPACE_TEMPLATE_SHORTCUT"); shortcut != "" {
 		cfg.Interactive.Shortcuts.Template = shortcut
+	}
+	if shortcut := firstSetEnv("DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT"); shortcut != "" {
+		cfg.TemplateHub.Shortcuts.Create = shortcut
+	}
+	if shortcut := firstSetEnv("DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT"); shortcut != "" {
+		cfg.TemplateHub.Shortcuts.Edit = shortcut
+	}
+	if shortcut := firstSetEnv("DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT"); shortcut != "" {
+		cfg.TemplateHub.Shortcuts.Delete = shortcut
 	}
 	if value, ok := firstBoolEnv("DVV_WORKSPACE_REQUIRE_CONFIRMATION"); ok {
 		cfg.Safety.RequireConfirmation = value

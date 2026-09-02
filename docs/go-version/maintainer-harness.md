@@ -34,6 +34,7 @@ For workspace changes, also read `internal/workspace`, `internal/git`, `internal
 | `dvv setup` | `internal/setup`, `completions/_dvv`, `scripts/setup.js` | `shortcuts`, `paths` | zsh completion, managed zsh shortcut block, managed tmux shortcut block | `internal/setup`, completion checks, README |
 | `dvv doctor` | `internal/setup`, feature dependency checks | `paths`, `integrations`, `terminal` | local binaries, shell/tmux integration, workspace names, runtime directories, safe fixes | `internal/setup`, smoke script, README |
 | `dvv build` | `internal/setup`, `scripts/build.js`, `bin/dvv` | none | `dist/dvv`, Go toolchain, source checkout | smoke script, merge readiness |
+| `dvv check` | `internal/setup`, `package.json`, `scripts/smoke.js` | none | project validation suite from the source checkout | `internal/setup`, `internal/app`, smoke script, README |
 
 Compatibility routes may exist for scripts, tests, and old migration entrypoints. Public help and default autocomplete should stay hub-first.
 

@@ -55,6 +55,7 @@ func TestRunHelpRoutesForPublicCommands(t *testing.T) {
 		{"doctor", "help"},
 		{"setup", "help"},
 		{"build", "help"},
+		{"check", "help"},
 	}
 	for _, args := range commands {
 		t.Run(args[0], func(t *testing.T) {

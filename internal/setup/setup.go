@@ -54,6 +54,18 @@ func RunBuild(ctx context.Context, cfg *config.Config, runner run.Runner, args [
 	return manager.Build(ctx)
 }
 
+func RunCheck(ctx context.Context, cfg *config.Config, runner run.Runner, args []string) error {
+	if len(args) > 0 && isHelpArg(args[0]) {
+		showCheckHelp()
+		return nil
+	}
+	if len(args) > 0 {
+		return fmt.Errorf("check does not accept arguments")
+	}
+	manager := Manager{Config: cfg, Runner: runner}
+	return manager.Check(ctx)
+}
+
 func (m Manager) Build(ctx context.Context) error {
 	ui.Title("Build")
 	if err := m.Runner.Run(ctx, m.Config.RootDir, "node", "scripts/build.js"); err != nil {
@@ -61,6 +73,11 @@ func (m Manager) Build(ctx context.Context) error {
 	}
 	ui.OK("Build complete. Run `dvv setup` only when completion, shell shortcuts, or tmux shortcuts changed.")
 	return nil
+}
+
+func (m Manager) Check(ctx context.Context) error {
+	ui.Title("Check")
+	return m.Runner.Run(ctx, m.Config.RootDir, "npm", "run", "check")
 }
 
 func (m Manager) Setup(ctx context.Context) error {
@@ -412,8 +429,8 @@ func tmuxResetShortcutCommand(cfg *config.Config) string {
 			binary = candidate
 		}
 	}
-	command := shellWord(binary) + ` tmux:reset-api --session "#{session_name}" --window "#{window_name}"`
-	return command + ` || tmux display-message -t "#{session_name}:#{window_name}" "dvv reset failed"`
+	command := `NO_COLOR=1 ` + shellWord(binary) + ` tmux:reset-api --session "#{session_name}" --window "#{window_name}"`
+	return `log_dir="${XDG_CACHE_HOME:-$HOME/.cache}/devv"; log_file="$log_dir/tmux-reset.log"; mkdir -p "$log_dir"; ` + command + ` >"$log_file" 2>&1; status=$?; if [ "$status" -ne 0 ]; then message="$(tail -n 1 "$log_file" 2>/dev/null)"; [ -n "$message" ] || message="dvv reset failed; see $log_file"; tmux display-message -d 5000 -t "#{session_name}:#{window_name}" "$message"; fi`
 }
 
 func shellWord(value string) string {
@@ -531,6 +548,14 @@ func showBuildHelp() {
 	helpSection("Actions")
 	helpEntry("dvv build", "Rebuild the local Go binary from any working directory")
 	helpEntry("dvv setup", "Refresh completion, shell shortcuts, and tmux shortcuts when those files changed")
+}
+
+func showCheckHelp() {
+	ui.Title("Check")
+	fmt.Printf("  %s dvv check\n\n", ui.Bold("Usage:"))
+	helpSection("Actions")
+	helpEntry("dvv check", "Run build, tests, go vet, and smoke from any working directory")
+	helpEntry("npm run check", "Run the same validation suite from the repository root")
 }
 
 func helpSection(title string) {
