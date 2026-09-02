@@ -91,11 +91,15 @@
       "sessionName": "home",
       "shortcut": "alt+f"
     },
+    "reset": {
+      "shortcut": "alt+r"
+    },
     "environments": []
   },
   "workspace": {
     "root": "~/workspace",
     "projects": [],
+    "templates": [],
     "projectSearchRoots": [
       "~/workspace",
       "~/Development/projects",
@@ -125,7 +129,8 @@
       "shortcuts": {
         "create": "shift+c",
         "manage": "shift+m",
-        "delete": "shift+d"
+        "delete": "shift+d",
+        "template": "shift+t"
       }
     },
     "bootstrap": {

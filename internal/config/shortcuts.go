@@ -18,9 +18,10 @@ type SSHHubKeyBindings struct {
 }
 
 type WorkspaceHubKeyBindings struct {
-	Create KeyBinding
-	Manage KeyBinding
-	Delete KeyBinding
+	Create   KeyBinding
+	Manage   KeyBinding
+	Delete   KeyBinding
+	Template KeyBinding
 }
 
 type ResourcesHubKeyBindings struct {
@@ -48,9 +49,10 @@ func (c *Config) SSHHubKeys() SSHHubKeyBindings {
 func (c *Config) WorkspaceHubKeys() WorkspaceHubKeyBindings {
 	defaults := DefaultProjectConfig().Workspace.Interactive.Shortcuts
 	return WorkspaceHubKeyBindings{
-		Create: normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Create, defaults.Create),
-		Manage: normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Manage, defaults.Manage),
-		Delete: normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Delete, defaults.Delete),
+		Create:   normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Create, defaults.Create),
+		Manage:   normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Manage, defaults.Manage),
+		Delete:   normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Delete, defaults.Delete),
+		Template: normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Template, defaults.Template),
 	}
 }
 

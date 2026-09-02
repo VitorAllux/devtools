@@ -238,6 +238,15 @@ func TestLoadProjectConfigMergesWorkspaceDefaults(t *testing.T) {
         "create": "alt-c"
       }
     },
+    "templates": [
+      {
+        "name": "fullstack issue",
+        "baseKind": "issue",
+        "projects": [
+          {"name": "api", "path": "~/src/api"}
+        ]
+      }
+    ],
     "bootstrap": {
       "copyRules": []
     }
@@ -261,6 +270,9 @@ func TestLoadProjectConfigMergesWorkspaceDefaults(t *testing.T) {
 	if cfg.Tmux.Home.Directory != "~" || cfg.Tmux.Home.SessionName != "home" || cfg.Tmux.Home.Shortcut != "alt+f" {
 		t.Fatalf("tmux home defaults = %#v", cfg.Tmux.Home)
 	}
+	if cfg.Tmux.Reset.Shortcut != "alt+r" {
+		t.Fatalf("tmux reset shortcut = %q", cfg.Tmux.Reset.Shortcut)
+	}
 	if cfg.Tmux.Session.SearchDepth != 3 {
 		t.Fatalf("tmux search depth = %d", cfg.Tmux.Session.SearchDepth)
 	}
@@ -270,8 +282,14 @@ func TestLoadProjectConfigMergesWorkspaceDefaults(t *testing.T) {
 	if cfg.Workspace.Interactive.Shortcuts.Delete != "shift+d" {
 		t.Fatalf("delete shortcut = %q", cfg.Workspace.Interactive.Shortcuts.Delete)
 	}
+	if cfg.Workspace.Interactive.Shortcuts.Template != "shift+t" {
+		t.Fatalf("template shortcut = %q", cfg.Workspace.Interactive.Shortcuts.Template)
+	}
 	if cfg.Workspace.ProjectSearchDepth != 4 {
 		t.Fatalf("search depth = %d", cfg.Workspace.ProjectSearchDepth)
+	}
+	if len(cfg.Workspace.Templates) != 1 || cfg.Workspace.Templates[0].Name != "fullstack issue" {
+		t.Fatalf("workspace templates = %#v", cfg.Workspace.Templates)
 	}
 	if len(cfg.Workspace.Bootstrap.CopyRules) != 0 {
 		t.Fatalf("explicit empty copy rules should be preserved: %#v", cfg.Workspace.Bootstrap.CopyRules)
@@ -290,6 +308,8 @@ func TestResolveWorkspaceConfigUsesEnvOverrides(t *testing.T) {
 	t.Setenv("DVV_WORKSPACE_CREATE_SHORTCUT", "alt-c")
 	t.Setenv("DVV_WORKSPACE_MANAGE_SHORTCUT", "alt-m")
 	t.Setenv("DVV_WORKSPACE_DELETE_SHORTCUT", "alt-d")
+	t.Setenv("DVV_WORKSPACE_TEMPLATE_SHORTCUT", "alt-t")
+	t.Setenv("DVV_WORKSPACE_TEMPLATES", `[{"name":"fullstack","baseKind":"other","baseBranch":"release","projects":[{"name":"api","path":"~/api"},{"path":"~/web"}]}]`)
 	t.Setenv("DVV_WORKSPACE_REQUIRE_CONFIRMATION", "0")
 	t.Setenv("DVV_WORKSPACE_BLOCK_DIRTY_PROJECTS", "false")
 	t.Setenv("DVV_WORKSPACE_ALLOW_FORCE_REMOVE", "true")
@@ -310,8 +330,11 @@ func TestResolveWorkspaceConfigUsesEnvOverrides(t *testing.T) {
 	if cfg.Interactive.Opener != "cursor" {
 		t.Fatalf("opener = %q", cfg.Interactive.Opener)
 	}
-	if cfg.Interactive.Shortcuts.Create != "alt-c" || cfg.Interactive.Shortcuts.Manage != "alt-m" || cfg.Interactive.Shortcuts.Delete != "alt-d" {
+	if cfg.Interactive.Shortcuts.Create != "alt-c" || cfg.Interactive.Shortcuts.Manage != "alt-m" || cfg.Interactive.Shortcuts.Delete != "alt-d" || cfg.Interactive.Shortcuts.Template != "alt-t" {
 		t.Fatalf("workspace shortcuts = %#v", cfg.Interactive.Shortcuts)
+	}
+	if len(cfg.Templates) != 1 || cfg.Templates[0].BaseBranch != "release" || cfg.Templates[0].Projects[0].Path != "/home/tester/api" || cfg.Templates[0].Projects[1].Name != "web" {
+		t.Fatalf("workspace templates = %#v", cfg.Templates)
 	}
 	if cfg.Safety.RequireConfirmation || cfg.Safety.BlockRemoveWithDirtyProjects || !cfg.Safety.AllowForceRemove || cfg.Safety.OnlyRemoveDirectChildren || cfg.Safety.ConfirmLeftoverDeletion {
 		t.Fatalf("workspace safety overrides were not applied: %#v", cfg.Safety)
@@ -356,6 +379,7 @@ func TestResolveTmuxConfigUsesEnvOverrides(t *testing.T) {
 	t.Setenv("DVV_TMUX_HOME_DIR", "~/terminal-home")
 	t.Setenv("DVV_TMUX_HOME_SESSION_NAME", "root")
 	t.Setenv("DVV_TMUX_HOME_SHORTCUT", "ctrl+shift+p")
+	t.Setenv("DVV_TMUX_RESET_SHORTCUT", "alt-x")
 	t.Setenv("DVV_TMUX_ENVIRONMENTS", `[{"name":"local","apiDir":"~/api","webDir":"~/web"}]`)
 
 	cfg := resolveTmuxConfig(defaultTmuxConfig())
@@ -380,6 +404,9 @@ func TestResolveTmuxConfigUsesEnvOverrides(t *testing.T) {
 	}
 	if cfg.Home.Shortcut != "ctrl+shift+p" {
 		t.Fatalf("tmux home shortcut = %q", cfg.Home.Shortcut)
+	}
+	if cfg.Reset.Shortcut != "alt-x" {
+		t.Fatalf("tmux reset shortcut = %q", cfg.Reset.Shortcut)
 	}
 	if len(cfg.Environments) != 1 || cfg.Environments[0].Name != "local" || cfg.Environments[0].APIDir != "/home/tester/api" || cfg.Environments[0].WebDir != "/home/tester/web" {
 		t.Fatalf("tmux environments = %#v", cfg.Environments)

@@ -112,6 +112,7 @@ type SecretsHubShortcuts struct {
 type TmuxConfig struct {
 	Session      TmuxSessionConfig       `json:"session"`
 	Home         TmuxHomeConfig          `json:"home"`
+	Reset        TmuxResetConfig         `json:"reset"`
 	Environments []TmuxEnvironmentConfig `json:"environments"`
 }
 
@@ -128,6 +129,10 @@ type TmuxHomeConfig struct {
 	Shortcut    string `json:"shortcut"`
 }
 
+type TmuxResetConfig struct {
+	Shortcut string `json:"shortcut"`
+}
+
 type TmuxEnvironmentConfig struct {
 	Name    string `json:"name"`
 	Session string `json:"session"`
@@ -139,6 +144,7 @@ type TmuxEnvironmentConfig struct {
 type WorkspaceConfig struct {
 	Root               string                  `json:"root"`
 	Projects           []WorkspaceProject      `json:"projects"`
+	Templates          []WorkspaceTemplate     `json:"templates"`
 	ProjectSearchRoots []string                `json:"projectSearchRoots"`
 	ProjectSearchDepth int                     `json:"projectSearchDepth"`
 	Git                WorkspaceGitConfig      `json:"git"`
@@ -153,6 +159,14 @@ type WorkspaceProject struct {
 	Name    string `json:"name"`
 	Path    string `json:"path"`
 	Enabled *bool  `json:"enabled,omitempty"`
+}
+
+type WorkspaceTemplate struct {
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	BaseKind    string             `json:"baseKind"`
+	BaseBranch  string             `json:"baseBranch"`
+	Projects    []WorkspaceProject `json:"projects"`
 }
 
 type WorkspaceGitConfig struct {
@@ -172,9 +186,10 @@ type WorkspaceInteractive struct {
 }
 
 type WorkspaceHubShortcutConfig struct {
-	Create string `json:"create"`
-	Manage string `json:"manage"`
-	Delete string `json:"delete"`
+	Create   string `json:"create"`
+	Manage   string `json:"manage"`
+	Delete   string `json:"delete"`
+	Template string `json:"template"`
 }
 
 type WorkspaceBootstrap struct {
@@ -480,6 +495,9 @@ func defaultTmuxConfig() TmuxConfig {
 			SessionName: "home",
 			Shortcut:    "alt+f",
 		},
+		Reset: TmuxResetConfig{
+			Shortcut: "alt+r",
+		},
 	}
 }
 
@@ -511,9 +529,10 @@ func defaultWorkspaceConfig() WorkspaceConfig {
 			Selector: "fzf",
 			Opener:   "",
 			Shortcuts: WorkspaceHubShortcutConfig{
-				Create: "shift+c",
-				Manage: "shift+m",
-				Delete: "shift+d",
+				Create:   "shift+c",
+				Manage:   "shift+m",
+				Delete:   "shift+d",
+				Template: "shift+t",
 			},
 		},
 		Bootstrap: WorkspaceBootstrap{
@@ -792,6 +811,9 @@ func mergeTmuxConfigDefaults(target TmuxConfig, defaults TmuxConfig) TmuxConfig 
 	if strings.TrimSpace(target.Home.Shortcut) == "" {
 		target.Home.Shortcut = defaults.Home.Shortcut
 	}
+	if strings.TrimSpace(target.Reset.Shortcut) == "" {
+		target.Reset.Shortcut = defaults.Reset.Shortcut
+	}
 	for index := range target.Environments {
 		if strings.TrimSpace(target.Environments[index].Window) == "" {
 			target.Environments[index].Window = "dev"
@@ -833,6 +855,9 @@ func mergeWorkspaceConfigDefaults(target WorkspaceConfig, defaults WorkspaceConf
 	}
 	if strings.TrimSpace(target.Interactive.Shortcuts.Delete) == "" {
 		target.Interactive.Shortcuts.Delete = defaults.Interactive.Shortcuts.Delete
+	}
+	if strings.TrimSpace(target.Interactive.Shortcuts.Template) == "" {
+		target.Interactive.Shortcuts.Template = defaults.Interactive.Shortcuts.Template
 	}
 	if target.Bootstrap.CopyRules == nil {
 		target.Bootstrap.CopyRules = defaults.Bootstrap.CopyRules
@@ -879,6 +904,9 @@ func resolveTmuxConfig(cfg TmuxConfig) TmuxConfig {
 	}
 	if shortcut := firstSetEnv("DVV_TMUX_HOME_SHORTCUT", "DEVT_TMUX_HOME_SHORTCUT"); shortcut != "" {
 		cfg.Home.Shortcut = shortcut
+	}
+	if shortcut := firstSetEnv("DVV_TMUX_RESET_SHORTCUT", "DEVT_TMUX_RESET_SHORTCUT"); shortcut != "" {
+		cfg.Reset.Shortcut = shortcut
 	}
 	if environments := firstSetEnv("DVV_TMUX_ENVIRONMENTS", "DEVT_TMUX_ENVIRONMENTS"); environments != "" {
 		cfg.Environments = append(cfg.Environments, parseTmuxEnvironments(environments)...)
@@ -958,6 +986,13 @@ func resolveWorkspaceConfig(cfg WorkspaceConfig) WorkspaceConfig {
 	for index, project := range cfg.Projects {
 		cfg.Projects[index].Path = ExpandPath(project.Path)
 	}
+	if templates := firstSetEnv("DVV_WORKSPACE_TEMPLATES", "DEVT_WORKSPACE_TEMPLATES"); templates != "" {
+		cfg.Templates = append(cfg.Templates, parseWorkspaceTemplates(templates)...)
+	}
+	for index := range cfg.Templates {
+		cfg.Templates[index] = normalizeWorkspaceTemplate(cfg.Templates[index])
+	}
+	cfg.Templates = uniqueWorkspaceTemplates(cfg.Templates)
 	if depth := firstSetEnv("DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "DEVT_WORKSPACE_PROJECT_SEARCH_DEPTH"); depth != "" {
 		if parsed := parsePositiveInt(depth); parsed > 0 {
 			cfg.ProjectSearchDepth = parsed
@@ -975,6 +1010,9 @@ func resolveWorkspaceConfig(cfg WorkspaceConfig) WorkspaceConfig {
 	if shortcut := firstSetEnv("DVV_WORKSPACE_DELETE_SHORTCUT"); shortcut != "" {
 		cfg.Interactive.Shortcuts.Delete = shortcut
 	}
+	if shortcut := firstSetEnv("DVV_WORKSPACE_TEMPLATE_SHORTCUT"); shortcut != "" {
+		cfg.Interactive.Shortcuts.Template = shortcut
+	}
 	if value, ok := firstBoolEnv("DVV_WORKSPACE_REQUIRE_CONFIRMATION"); ok {
 		cfg.Safety.RequireConfirmation = value
 	}
@@ -991,6 +1029,61 @@ func resolveWorkspaceConfig(cfg WorkspaceConfig) WorkspaceConfig {
 		cfg.Safety.ConfirmLeftoverDeletion = value
 	}
 	return cfg
+}
+
+func parseWorkspaceTemplates(value string) []WorkspaceTemplate {
+	var templates []WorkspaceTemplate
+	if err := json.Unmarshal([]byte(value), &templates); err != nil {
+		return nil
+	}
+	return templates
+}
+
+func normalizeWorkspaceTemplate(template WorkspaceTemplate) WorkspaceTemplate {
+	template.Name = strings.TrimSpace(template.Name)
+	template.Description = strings.TrimSpace(template.Description)
+	template.BaseKind = strings.ToLower(strings.TrimSpace(template.BaseKind))
+	template.BaseBranch = strings.TrimSpace(template.BaseBranch)
+	if template.BaseKind == "" {
+		if template.BaseBranch != "" {
+			template.BaseKind = "other"
+		} else {
+			template.BaseKind = "issue"
+		}
+	}
+	projects := make([]WorkspaceProject, 0, len(template.Projects))
+	for _, project := range template.Projects {
+		project.Name = strings.TrimSpace(project.Name)
+		project.Path = strings.TrimSpace(project.Path)
+		if project.Path == "" {
+			continue
+		}
+		project.Path = ExpandPath(project.Path)
+		if project.Name == "" {
+			project.Name = filepath.Base(project.Path)
+		}
+		projects = append(projects, project)
+	}
+	template.Projects = projects
+	return template
+}
+
+func uniqueWorkspaceTemplates(templates []WorkspaceTemplate) []WorkspaceTemplate {
+	seen := map[string]bool{}
+	out := make([]WorkspaceTemplate, 0, len(templates))
+	for index := len(templates) - 1; index >= 0; index-- {
+		template := templates[index]
+		key := strings.ToLower(strings.TrimSpace(template.Name))
+		if key == "" || len(template.Projects) == 0 || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, template)
+	}
+	for left, right := 0, len(out)-1; left < right; left, right = left+1, right-1 {
+		out[left], out[right] = out[right], out[left]
+	}
+	return out
 }
 
 func legacyWorkspaceProjectRoots() []string {

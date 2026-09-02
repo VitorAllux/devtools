@@ -199,9 +199,9 @@ func (m Manager) basicCategoryHub(ctx context.Context, entries []Entry) error {
 func configCategories() []Category {
 	return []Category{
 		{"theme", "Theme", "Select and preview CLI themes"},
-		{"keys", "Keys", "Edit raw runtime config keys"},
+		{"keys", "All Keys", "Edit every known runtime config key, including focused category keys and custom values"},
 		{"paths", "Paths", "Manage workspace, dumps, SSH, AGE, and config paths"},
-		{"shortcuts", "Shortcuts", "Manage shell shortcuts and hub action keys"},
+		{"shortcuts", "Shortcuts", "Manage shell, tmux, and hub action keys"},
 		{"workspace", "Workspace", "Manage workspace root, discovery, opener, and action keys"},
 		{"database", "Database", "Manage MySQL, dumps, rclone, and DB safety defaults"},
 		{"tmux", "Tmux", "Manage directory picker and home session settings"},
@@ -892,6 +892,8 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.Tmux.Home.SessionName = value
 	case "DVV_TMUX_HOME_SHORTCUT":
 		m.Config.Project.Tmux.Home.Shortcut = value
+	case "DVV_TMUX_RESET_SHORTCUT":
+		m.Config.Project.Tmux.Reset.Shortcut = value
 	case "DVV_TMUX_ENVIRONMENTS":
 		m.Config.Project.Tmux.Environments = parseRuntimeTmuxEnvironments(value)
 	case "DVV_WORKSPACES_DIR":
@@ -910,6 +912,10 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.Workspace.Interactive.Shortcuts.Manage = value
 	case "DVV_WORKSPACE_DELETE_SHORTCUT":
 		m.Config.Project.Workspace.Interactive.Shortcuts.Delete = value
+	case "DVV_WORKSPACE_TEMPLATE_SHORTCUT":
+		m.Config.Project.Workspace.Interactive.Shortcuts.Template = value
+	case "DVV_WORKSPACE_TEMPLATES":
+		m.Config.Project.Workspace.Templates = parseRuntimeWorkspaceTemplates(value)
 	case "DVV_DB_HOST":
 		m.Config.Project.DB.Host = value
 	case "DVV_DB_PORT":
@@ -1178,16 +1184,19 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Tmux", "DVV_TMUX_ENVIRONMENTS", "Stores custom API/Web tmux environments as JSON.", "json", tmuxEnvironmentsJSON(cfg.Project.Tmux.Environments), "", false},
 		{"Shortcuts", "DVV_TMUX_SESSION_SHORTCUT", "Sets the zsh shortcut for the tmux directory picker.", "shortcut", cfg.Project.Tmux.Session.Shortcut, "", false},
 		{"Shortcuts", "DVV_TMUX_HOME_SHORTCUT", "Sets the zsh shortcut for opening a home tmux tab.", "shortcut", cfg.Project.Tmux.Home.Shortcut, "", false},
+		{"Shortcuts", "DVV_TMUX_RESET_SHORTCUT", "Sets the tmux shortcut for resetting API and Horizon panes.", "shortcut", cfg.Project.Tmux.Reset.Shortcut, "", false},
 		{"Shortcuts", "DVV_SSH_ADD_SHORTCUT", "Sets the SSH hub shortcut for adding an entry.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Add, "", false},
 		{"Shortcuts", "DVV_SSH_REMOVE_SHORTCUT", "Sets the SSH hub shortcut for removing an entry.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Remove, "", false},
 		{"Shortcuts", "DVV_SSH_NEW_TERMINAL_SHORTCUT", "Sets the SSH hub shortcut for opening a new tab.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.NewTerminal, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_CREATE_SHORTCUT", "Sets the workspace hub shortcut for creating a workspace.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Create, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_MANAGE_SHORTCUT", "Sets the workspace hub shortcut for managing projects.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Manage, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_DELETE_SHORTCUT", "Sets the workspace hub shortcut for deleting workspaces.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Delete, "", false},
+		{"Shortcuts", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "Sets the workspace hub shortcut for saving templates.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Template, "", false},
 		{"Workspace", "DVV_WORKSPACES_DIR", "Sets where workspace-* folders are created.", "path", cfg.Project.Workspace.Root, "", false},
 		{"Workspace", "DVV_WORKSPACE_PROJECT_ROOTS", "Sets roots scanned for base git repositories.", "path-list", strings.Join(cfg.Project.Workspace.ProjectSearchRoots, string(os.PathListSeparator)), "", false},
 		{"Workspace", "DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "Limits repository discovery depth.", "number", fmt.Sprintf("%d", cfg.Project.Workspace.ProjectSearchDepth), "", false},
 		{"Workspace", "DVV_WORKSPACE_OPENER", "Sets how a selected workspace opens.", "choice", defaultString(cfg.Project.Workspace.Interactive.Opener, "auto"), "", false},
+		{"Workspace", "DVV_WORKSPACE_TEMPLATES", "Stores saved workspace templates with base branch and project list.", "json", workspaceTemplatesJSON(cfg.Project.Workspace.Templates), "", false},
 		{"Database", "DVV_DB_HOST", "Sets the MySQL host; empty uses client defaults.", "text", cfg.Project.DB.Host, "", false},
 		{"Database", "DVV_DB_PORT", "Sets the MySQL TCP port when a host is set.", "number", cfg.Project.DB.Port, "", false},
 		{"Database", "DVV_DB_USER", "Sets the MySQL user for database actions.", "text", cfg.Project.DB.User, "", false},
@@ -1236,6 +1245,30 @@ func parseRuntimeTmuxEnvironments(value string) []config.TmuxEnvironmentConfig {
 		environments[index].WebDir = config.ExpandPath(environments[index].WebDir)
 	}
 	return environments
+}
+
+func workspaceTemplatesJSON(templates []config.WorkspaceTemplate) string {
+	if len(templates) == 0 {
+		return "[]"
+	}
+	content, err := json.Marshal(templates)
+	if err != nil {
+		return "[]"
+	}
+	return string(content)
+}
+
+func parseRuntimeWorkspaceTemplates(value string) []config.WorkspaceTemplate {
+	var templates []config.WorkspaceTemplate
+	if err := json.Unmarshal([]byte(value), &templates); err != nil {
+		return nil
+	}
+	for templateIndex := range templates {
+		for projectIndex := range templates[templateIndex].Projects {
+			templates[templateIndex].Projects[projectIndex].Path = config.ExpandPath(templates[templateIndex].Projects[projectIndex].Path)
+		}
+	}
+	return templates
 }
 
 func profileNamesFromConfigEnv() []string {
