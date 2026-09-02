@@ -146,7 +146,7 @@ The managed block is written to `~/.zshrc`. Set `DVV_SKIP_SHELL_INTEGRATION=1` b
 | --- | --- |
 | `Alt+R` | `dist/dvv tmux:reset-api --session "#{session_name}" --window "#{window_name}"` |
 
-`Alt+R` resets the current tmux window's API/Horizon panes. It sends `Ctrl+C` to pane `0`, runs Laravel cache/config reset commands, starts `php artisan serve`, and restarts Horizon only when pane `1` points at the same API project. It does not touch the Web pane.
+`Alt+R` resets the current tmux window's API/Horizon panes. It looks for a Laravel project in the current window, prefers pane `0` when it is an API pane, runs Laravel cache/config reset commands, starts `php artisan serve`, and restarts Horizon only when another pane points at the same API project. It does not touch the Web pane.
 
 Set `tmux.reset.shortcut` or `DVV_TMUX_RESET_SHORTCUT` to change it. Use `none` to disable the managed tmux shortcut. `dvv setup` writes the config, prefers the absolute built binary when available, and attempts to reload it in any running tmux server. Set `DVV_SKIP_TMUX_INTEGRATION=1` before setup to skip `.tmux.conf` changes.
 
@@ -492,6 +492,7 @@ Common cases:
 | `npm ERR! path /root/package.json` | You ran `npm run build` outside the repo. Use `dvv build`. |
 | `Ctrl+Shift+F` opens terminal Find | This is a Windows Terminal shortcut. Use `Alt+F` after `dvv setup`, or run `dvv tmux:home`. |
 | `Alt+R` does nothing in tmux | Run `dvv build`, then `dvv setup`. If a tmux server was already open, run `tmux source-file ~/.tmux.conf` or open the environment again with `dvv tmux`. |
+| `Alt+R` shows `cannot find a Laravel API pane` | Press it inside the tmux window that has the API/Web panes. A home/root-only tmux window has no API target to reset. |
 | Autocomplete did not update | Run `dvv setup`, then open a new terminal or run `exec zsh`. |
 | Theme colors look different inside tmux | Rebuild with `dvv build` and open a new tmux tab. `dvv` configures tmux truecolor for sessions it creates; old sessions may need to be recreated. |
 | Workspace opens as missing in VS Code | Run `dvv doctor` and check for invalid workspace names or stale VS Code recent entries. |

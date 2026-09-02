@@ -413,7 +413,7 @@ func tmuxResetShortcutCommand(cfg *config.Config) string {
 		}
 	}
 	command := shellWord(binary) + ` tmux:reset-api --session "#{session_name}" --window "#{window_name}"`
-	return command + ` || tmux display-message -t "#{session_name}:#{window_name}" "dvv reset failed"`
+	return command + `; status=$?; if [ "$status" -eq 126 ] || [ "$status" -eq 127 ]; then tmux display-message -t "#{session_name}:#{window_name}" "dvv reset command unavailable"; fi; exit "$status"`
 }
 
 func shellWord(value string) string {

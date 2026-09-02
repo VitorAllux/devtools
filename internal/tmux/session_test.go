@@ -197,6 +197,7 @@ type fakeRunner struct {
 	existingSessions map[string]bool
 	currentSession   string
 	currentWindow    string
+	activePanes      map[string]string
 	paneIndexes      map[string][]string
 	panePaths        map[string]string
 	runs             []string
@@ -244,6 +245,22 @@ func (r *fakeRunner) Output(_ context.Context, _ string, name string, args ...st
 			return nil, errors.New("panes not found")
 		}
 		return []byte(strings.Join(indexes, "\n") + "\n"), nil
+	}
+	if name == "tmux" && len(args) == 5 && args[0] == "list-panes" && args[1] == "-t" && args[3] == "-F" && args[4] == "#{pane_index}\t#{pane_active}\t#{pane_current_path}" {
+		indexes := r.paneIndexes[args[2]]
+		if len(indexes) == 0 {
+			return nil, errors.New("panes not found")
+		}
+		activePane := r.activePanes[args[2]]
+		var lines []string
+		for _, index := range indexes {
+			active := "0"
+			if index == activePane || activePane == "" && index == "0" {
+				active = "1"
+			}
+			lines = append(lines, strings.Join([]string{index, active, r.panePaths[args[2]+"."+index]}, "\t"))
+		}
+		return []byte(strings.Join(lines, "\n") + "\n"), nil
 	}
 	return nil, errors.New("unexpected output command")
 }
