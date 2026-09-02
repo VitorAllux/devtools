@@ -49,6 +49,7 @@ func TestRunHelpRoutesForPublicCommands(t *testing.T) {
 		{"tmux", "help"},
 		{"tmux:session", "help"},
 		{"tmux:home", "help"},
+		{"tmux:reset-api", "help"},
 		{"workspace", "help"},
 		{"bootstrap", "help"},
 		{"doctor", "help"},

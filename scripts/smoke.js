@@ -28,6 +28,7 @@ const env = {
   DVV_AUTO_BUILD: "0",
   DVV_DIR: root,
   DVV_NO_LOADER: "1",
+  DVV_SKIP_TMUX_SOURCE: "1",
   DVV_ZSH_COMPLETION_DIR: completionDir,
   DVV_WORKSPACES_DIR: workspaceRoot,
   DVV_DUMPS_DIR: dumpsDir,
@@ -59,6 +60,11 @@ assertIncludes(zshrc, "dvv tmux:home\\n", "managed Alt+F shortcut");
 assertIncludes(zshrc, "\\ef", "managed Alt+F sequence");
 assertIncludes(zshrc, "dvv ssh\\n", "managed Alt+S shortcut");
 assertExcludes(zshrc, "devv ", "legacy devv shortcut");
+
+const tmuxConf = readFile(path.join(home, ".tmux.conf"));
+assertIncludes(tmuxConf, "dvv tmux:reset-api", "managed tmux reset shortcut");
+assertIncludes(tmuxConf, "bind-key -n M-r", "managed Alt+R tmux sequence");
+assertIncludes(tmuxConf, "tmux display-message", "managed Alt+R failure feedback");
 
 const completion = readFile(path.join(root, "completions", "_dvv"));
 assertIncludes(completion, "DVV_COMPLETE_COMPAT", "compatibility completion gate");

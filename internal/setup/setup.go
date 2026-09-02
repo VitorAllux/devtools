@@ -59,7 +59,7 @@ func (m Manager) Build(ctx context.Context) error {
 	if err := m.Runner.Run(ctx, m.Config.RootDir, "node", "scripts/build.js"); err != nil {
 		return err
 	}
-	ui.OK("Build complete. Run `dvv setup` only when completion or shell shortcuts changed.")
+	ui.OK("Build complete. Run `dvv setup` only when completion, shell shortcuts, or tmux shortcuts changed.")
 	return nil
 }
 
@@ -108,6 +108,7 @@ func (m Manager) Doctor(ctx context.Context, fix bool) error {
 	checkPath("Dumps dir", m.Config.Project.DB.DumpsDir, false)
 	checkZshCompletion(m.Config.RootDir)
 	checkZshShortcutBlock(m.Config)
+	checkTmuxShortcutBlock(m.Config)
 	if fix {
 		fmt.Println()
 		return m.Fix(ctx)
@@ -140,7 +141,7 @@ func (m Manager) Fix(ctx context.Context) error {
 	}); err != nil {
 		return err
 	}
-	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "installing", Subject: "shell integration", ShowResult: true, SuccessAction: "installed"}, func() error {
+	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "installing", Subject: "local integration", ShowResult: true, SuccessAction: "installed"}, func() error {
 		return run.Quiet(ctx, m.Runner, m.Config.RootDir, "node", "scripts/setup.js")
 	}); err != nil {
 		return err
@@ -357,6 +358,100 @@ func zshShortcutsStale(content string, cfg *config.Config) bool {
 	return strings.Contains(content, "devv ")
 }
 
+func checkTmuxShortcutBlock(cfg *config.Config) {
+	path := filepath.Join(homeDir(), ".tmux.conf")
+	key := shortcutToTmuxKey(firstNonEmpty(cfg.Project.Tmux.Reset.Shortcut, "alt+r"))
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if key == "" {
+			ui.Info("%-16s disabled", "Tmux shortcuts")
+			return
+		}
+		ui.Warn("%-16s missing: %s", "Tmux shortcuts", path)
+		return
+	}
+	text := string(content)
+	if key == "" {
+		if strings.Contains(text, "# >>> dvv tmux shortcuts >>>") {
+			ui.Warn("%-16s stale: %s; run `dvv setup`", "Tmux shortcuts", path)
+			return
+		}
+		ui.Info("%-16s disabled", "Tmux shortcuts")
+		return
+	}
+	if !strings.Contains(text, "# >>> dvv tmux shortcuts >>>") {
+		ui.Warn("%-16s not installed; run `dvv setup`", "Tmux shortcuts")
+		return
+	}
+	if tmuxShortcutsStale(text, cfg) {
+		ui.Warn("%-16s stale: %s; run `dvv setup`", "Tmux shortcuts", path)
+		return
+	}
+	ui.OK("%-16s %s", "Tmux shortcuts", path)
+}
+
+func tmuxShortcutsStale(content string, cfg *config.Config) bool {
+	key := shortcutToTmuxKey(firstNonEmpty(cfg.Project.Tmux.Reset.Shortcut, "alt+r"))
+	if key == "" {
+		return strings.Contains(content, "# >>> dvv tmux shortcuts >>>")
+	}
+	return !strings.Contains(content, tmuxResetShortcutBindingLine(cfg))
+}
+
+func tmuxResetShortcutBindingLine(cfg *config.Config) string {
+	key := shortcutToTmuxKey(firstNonEmpty(cfg.Project.Tmux.Reset.Shortcut, "alt+r"))
+	command := tmuxResetShortcutCommand(cfg)
+	return fmt.Sprintf("bind-key -n %s run-shell -b %s", key, shellQuote(command))
+}
+
+func tmuxResetShortcutCommand(cfg *config.Config) string {
+	binary := "dvv"
+	if cfg != nil && strings.TrimSpace(cfg.RootDir) != "" {
+		candidate := filepath.Join(cfg.RootDir, "dist", binaryName())
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			binary = candidate
+		}
+	}
+	command := shellWord(binary) + ` tmux:reset-api --session "#{session_name}" --window "#{window_name}"`
+	return command + ` || tmux display-message -t "#{session_name}:#{window_name}" "dvv reset failed"`
+}
+
+func shellWord(value string) string {
+	if value != "" && strings.IndexFunc(value, func(r rune) bool {
+		return !(r == '/' || r == '.' || r == '-' || r == '_' || r == ':' || r == '+' || r == '=' || r >= '0' && r <= '9' || r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z')
+	}) == -1 {
+		return value
+	}
+	return shellQuote(value)
+}
+
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
+}
+
+func shortcutToTmuxKey(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	normalized = strings.ReplaceAll(normalized, " ", "")
+	normalized = strings.ReplaceAll(normalized, "_", "-")
+	normalized = strings.ReplaceAll(normalized, "+", "-")
+	if normalized == "" || normalized == "none" || normalized == "off" || normalized == "disabled" {
+		return ""
+	}
+	if key, ok := strings.CutPrefix(normalized, "alt-"); ok && len([]rune(key)) == 1 {
+		return "M-" + key
+	}
+	if key, ok := strings.CutPrefix(normalized, "ctrl-"); ok && len([]rune(key)) == 1 {
+		return "C-" + key
+	}
+	if key, ok := strings.CutPrefix(normalized, "shift-"); ok && len([]rune(key)) == 1 {
+		return strings.ToUpper(key)
+	}
+	if len([]rune(normalized)) == 1 {
+		return normalized
+	}
+	return ""
+}
+
 func shortcutToZshSequences(value string) []string {
 	normalized := strings.ToLower(strings.TrimSpace(value))
 	normalized = strings.ReplaceAll(normalized, " ", "")
@@ -417,15 +512,16 @@ func showSetupHelp() {
 	helpSection("Actions")
 	helpEntry("zsh completion", "Copy completions/_dvv to ~/.zfunc/_dvv when possible")
 	helpEntry("shell shortcuts", "Install managed Ctrl+F, Alt+F, and Alt+S zsh shortcuts")
+	helpEntry("tmux shortcuts", "Install managed Alt+R tmux reset shortcut")
 }
 
 func showDoctorHelp() {
 	ui.Title("Doctor")
 	fmt.Printf("  %s dvv doctor [--fix]\n\n", ui.Bold("Usage:"))
-	helpEntry("dvv doctor --fix", "Create safe local files, rebuild, and reinstall shell integration")
+	helpEntry("dvv doctor --fix", "Create safe local files, rebuild, and reinstall shell/tmux integration")
 	helpSection("Checks")
 	helpEntry("commands", "dvv, legacy devv, Node/npm, Git, SSH, tmux, fzf, editors, DB, secrets, Docker, and service tools")
-	helpEntry("files", "dist binary, SSH/secrets files, workspace root, dumps dir, completion, and shortcuts")
+	helpEntry("files", "dist binary, SSH/secrets files, workspace root, dumps dir, completion, shell shortcuts, and tmux shortcuts")
 	helpEntry("workspaces", "Detect invalid workspace directory names ignored by the hub")
 }
 
@@ -434,7 +530,7 @@ func showBuildHelp() {
 	fmt.Printf("  %s dvv build\n\n", ui.Bold("Usage:"))
 	helpSection("Actions")
 	helpEntry("dvv build", "Rebuild the local Go binary from any working directory")
-	helpEntry("dvv setup", "Refresh completion and shell shortcuts when those files changed")
+	helpEntry("dvv setup", "Refresh completion, shell shortcuts, and tmux shortcuts when those files changed")
 }
 
 func helpSection(title string) {

@@ -195,10 +195,15 @@ func mustMkdir(t *testing.T, path string) {
 type fakeRunner struct {
 	paths            map[string]bool
 	existingSessions map[string]bool
+	currentSession   string
+	currentWindow    string
+	paneIndexes      map[string][]string
+	panePaths        map[string]string
 	runs             []string
 	outputs          []string
 	starts           []string
 	fzfArgs          []string
+	fzfInputs        []string
 	fzfOutput        []byte
 }
 
@@ -216,14 +221,39 @@ func (r *fakeRunner) Output(_ context.Context, _ string, name string, args ...st
 		}
 		return nil, errors.New("session not found")
 	}
+	if name == "tmux" && len(args) == 3 && args[0] == "display-message" && args[1] == "-p" && args[2] == "#{session_name}\t#{window_name}" {
+		session := r.currentSession
+		if session == "" {
+			session = "dev"
+		}
+		window := r.currentWindow
+		if window == "" {
+			window = "main"
+		}
+		return []byte(session + "\t" + window + "\n"), nil
+	}
+	if name == "tmux" && len(args) == 5 && args[0] == "display-message" && args[1] == "-p" && args[2] == "-t" && args[4] == "#{pane_current_path}" {
+		if path := r.panePaths[args[3]]; path != "" {
+			return []byte(path + "\n"), nil
+		}
+		return nil, errors.New("pane path not found")
+	}
+	if name == "tmux" && len(args) == 5 && args[0] == "list-panes" && args[1] == "-t" && args[3] == "-F" && args[4] == "#{pane_index}" {
+		indexes := r.paneIndexes[args[2]]
+		if len(indexes) == 0 {
+			return nil, errors.New("panes not found")
+		}
+		return []byte(strings.Join(indexes, "\n") + "\n"), nil
+	}
 	return nil, errors.New("unexpected output command")
 }
 
-func (r *fakeRunner) OutputWithInput(_ context.Context, _ string, _ []byte, name string, args ...string) ([]byte, error) {
+func (r *fakeRunner) OutputWithInput(_ context.Context, _ string, input []byte, name string, args ...string) ([]byte, error) {
 	if name != "fzf" {
 		return nil, errors.New("unexpected output with input command")
 	}
 	r.fzfArgs = append([]string(nil), args...)
+	r.fzfInputs = append(r.fzfInputs, string(input))
 	return r.fzfOutput, nil
 }
 

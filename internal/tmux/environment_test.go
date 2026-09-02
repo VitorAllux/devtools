@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/VitorAllux/devtools/internal/config"
+	"github.com/VitorAllux/devtools/internal/discovery"
 )
 
 func TestTmuxPreviewPreservesCommandArgs(t *testing.T) {
@@ -19,7 +20,7 @@ func TestTmuxPreviewPreservesCommandArgs(t *testing.T) {
 	if strings.Contains(preview, "DVV_FZF_COMMANDS") {
 		t.Fatalf("preview should render shortcut commands directly: %s", preview)
 	}
-	for _, want := range []string{"Alt+U", "start/open", "Alt+D", "stop", "Alt+A", "restart API", "Alt+W", "restart Web"} {
+	for _, want := range []string{"Alt+U", "start/open", "Alt+D", "stop", "Alt+A", "restart API", "Alt+W", "restart Web", "Alt+N", "save custom API/Web tmux target"} {
 		if !strings.Contains(preview, want) {
 			t.Fatalf("preview missing %q: %s", want, preview)
 		}
@@ -76,6 +77,36 @@ func TestTmuxActionLoaderOptions(t *testing.T) {
 	}
 	if _, err := tmuxActionLoaderOptions("unknown", target); err == nil {
 		t.Fatal("expected unknown action error")
+	}
+}
+
+func TestFZFSelectEnvironmentProjectUsesProjectRows(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	root := t.TempDir()
+	apiDir := filepath.Join(root, "api")
+	mustMkdir(t, apiDir)
+	if err := os.WriteFile(filepath.Join(apiDir, "artisan"), []byte("#!/usr/bin/env php\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile artisan failed: %v", err)
+	}
+	projects := []discovery.Project{{Name: "api", Path: apiDir}}
+	runner := &fakeRunner{
+		paths:     map[string]bool{"fzf": true},
+		fzfOutput: []byte(apiDir + "\t" + environmentProjectRow(0, projects[0]) + "\n"),
+	}
+	manager := NewManager(testConfig(root), runner)
+
+	got, ok, err := manager.fzfSelectEnvironmentProject(context.Background(), "Select API Project", "api", projects)
+	if err != nil {
+		t.Fatalf("fzfSelectEnvironmentProject returned error: %v", err)
+	}
+	if !ok || got != apiDir {
+		t.Fatalf("selection ok=%v path=%q, want %q", ok, got, apiDir)
+	}
+	if len(runner.fzfInputs) != 1 || !strings.Contains(runner.fzfInputs[0], "api") || !strings.Contains(runner.fzfInputs[0], apiDir) {
+		t.Fatalf("fzf input should include project rows: %#v", runner.fzfInputs)
+	}
+	if !runner.hasArgPrefix("--border-label=") {
+		t.Fatalf("fzf args should include styled border label: %#v", runner.fzfArgs)
 	}
 }
 
@@ -171,6 +202,57 @@ func TestStartEnvironmentCreatesLayoutAndOpensTerminal(t *testing.T) {
 	}
 	if !runner.hasStart("x-terminal-emulator -e env COLORTERM=truecolor tmux attach -t dev") {
 		t.Fatalf("terminal attach missing: %#v", runner.starts)
+	}
+}
+
+func TestApplyOptionsInstallsResetShortcut(t *testing.T) {
+	runner := &fakeRunner{}
+	manager := NewManager(testConfig(t.TempDir()), runner)
+
+	manager.applyOptions(context.Background())
+
+	if !runner.hasRun("tmux bind-key -n M-r run-shell -b " + manager.resetAPIShortcutCommand()) {
+		t.Fatalf("reset shortcut binding missing: %#v", runner.runs)
+	}
+}
+
+func TestResetCurrentAPIUsesCurrentTmuxWindowAndSkipsWeb(t *testing.T) {
+	root := t.TempDir()
+	apiDir := filepath.Join(root, "api")
+	webDir := filepath.Join(root, "web")
+	mustMkdir(t, apiDir)
+	mustMkdir(t, webDir)
+	if err := os.WriteFile(filepath.Join(apiDir, "artisan"), []byte("#!/usr/bin/env php\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile artisan failed: %v", err)
+	}
+
+	runner := &fakeRunner{
+		paths:            map[string]bool{"tmux": true},
+		existingSessions: map[string]bool{"workspace-task": true},
+		currentSession:   "workspace-task",
+		currentWindow:    "dev",
+		paneIndexes:      map[string][]string{"workspace-task:dev": {"0", "1", "2"}},
+		panePaths: map[string]string{
+			"workspace-task:dev.0": apiDir,
+			"workspace-task:dev.1": apiDir,
+			"workspace-task:dev.2": webDir,
+		},
+	}
+	manager := NewManager(testConfig(root), runner)
+
+	if err := manager.ResetCurrentAPI(context.Background(), "", ""); err != nil {
+		t.Fatalf("ResetCurrentAPI returned error: %v", err)
+	}
+	if !runner.hasRun("tmux send-keys -t workspace-task:dev.0 cd '" + apiDir + "' && php artisan config:cache Enter") {
+		t.Fatalf("config cache command missing: %#v", runner.runs)
+	}
+	if !runner.hasRun("tmux send-keys -t workspace-task:dev.1 cd '" + apiDir + "' && php artisan horizon Enter") {
+		t.Fatalf("horizon restart command missing: %#v", runner.runs)
+	}
+	for _, run := range runner.runs {
+		if strings.Contains(run, "workspace-task:dev.2") {
+			t.Fatalf("reset should not touch the Web pane: %#v", runner.runs)
+		}
 	}
 }
 

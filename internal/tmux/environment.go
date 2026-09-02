@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/VitorAllux/devtools/internal/config"
+	"github.com/VitorAllux/devtools/internal/discovery"
 	"github.com/VitorAllux/devtools/internal/run"
 	"github.com/VitorAllux/devtools/internal/terminal"
 	"github.com/VitorAllux/devtools/internal/ui"
@@ -27,6 +28,8 @@ type Target struct {
 	WebDir  string
 }
 
+const resetAPIShortcutArgs = `tmux:reset-api --session "#{session_name}" --window "#{window_name}"`
+
 func RunHub(ctx context.Context, cfg *config.Config, runner run.Runner, args []string) error {
 	manager := NewManager(cfg, runner)
 	if len(args) > 0 && isHelpArg(args[0]) {
@@ -37,12 +40,37 @@ func RunHub(ctx context.Context, cfg *config.Config, runner run.Runner, args []s
 	if len(args) > 0 {
 		action = args[0]
 	}
+	if action == "reset-api" {
+		return RunResetAPI(ctx, cfg, runner, args[1:])
+	}
 	switch action {
 	case "up", "down", "api-restart", "web-restart":
 	default:
 		return fmt.Errorf("unknown tmux action: %s", action)
 	}
 	return manager.EnvironmentHub(ctx, action, len(args) > 0)
+}
+
+func RunResetAPI(ctx context.Context, cfg *config.Config, runner run.Runner, args []string) error {
+	manager := NewManager(cfg, runner)
+	if len(args) > 0 && isHelpArg(args[0]) {
+		showResetAPIHelp(cfg)
+		return nil
+	}
+	session, window, err := parseResetAPIArgs(args)
+	if err != nil {
+		return err
+	}
+	subject := firstNonEmpty(session, "current tmux window")
+	return ui.RunWithRoyalLoader(ui.LoaderOptions{
+		Action:        "resetting",
+		Subject:       subject,
+		Detail:        "api/horizon",
+		ShowResult:    true,
+		SuccessAction: "reset",
+	}, func() error {
+		return manager.ResetCurrentAPI(ctx, session, window)
+	})
 }
 
 func (m *Manager) EnvironmentHub(ctx context.Context, defaultAction string, singleAction bool) error {
@@ -208,7 +236,7 @@ func (m *Manager) basicEnvironmentHub(ctx context.Context, targets []Target, def
 		fmt.Printf("  %2d. %-28s %-14s %s\n", index+1, target.Label, target.Status, ui.Dim(target.Details))
 	}
 	fmt.Println()
-	ui.Info("Use `n` to add a custom API/Web environment.")
+	ui.Info("Use `n` to save a custom API/Web tmux target.")
 	value, err := ui.Prompt("Target number")
 	if err != nil {
 		return false, "", err
@@ -238,13 +266,23 @@ func (m *Manager) AddEnvironment(ctx context.Context) error {
 	if name == "" {
 		return nil
 	}
-	apiDir, err := ui.Prompt("API directory")
+	projects, err := m.discoverEnvironmentProjects(ctx)
 	if err != nil {
 		return err
 	}
-	webDir, err := ui.Prompt("Web directory")
+	apiDir, ok, err := m.selectEnvironmentProject(ctx, "Select API Project", "api", projects)
 	if err != nil {
 		return err
+	}
+	if !ok {
+		return nil
+	}
+	webDir, ok, err := m.selectEnvironmentProject(ctx, "Select Web Project", "web", projects)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
 	}
 	environment := config.TmuxEnvironmentConfig{
 		Name:    name,
@@ -265,6 +303,69 @@ func (m *Manager) AddEnvironment(ctx context.Context) error {
 	m.Config.Project.Tmux.Environments = environments
 	ui.OK("Tmux environment saved: %s", name)
 	return nil
+}
+
+func (m *Manager) discoverEnvironmentProjects(ctx context.Context) ([]discovery.Project, error) {
+	var projects []discovery.Project
+	err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "scanning", Subject: "projects"}, func() error {
+		var discoverErr error
+		projects, discoverErr = workspacecmd.NewManager(m.Config, m.Runner).DiscoverProjects(ctx)
+		return discoverErr
+	})
+	return projects, err
+}
+
+func (m *Manager) selectEnvironmentProject(ctx context.Context, label string, role string, projects []discovery.Project) (string, bool, error) {
+	if len(projects) > 0 && m.shouldUseFZF() {
+		return m.fzfSelectEnvironmentProject(ctx, label, role, projects)
+	}
+	if len(projects) == 0 {
+		ui.Info("No git projects found from workspace.projectSearchRoots; type a path manually.")
+	} else {
+		printEnvironmentProjectList(projects)
+	}
+
+	value, err := ui.Prompt(strings.ToUpper(role) + " project number or path")
+	if err != nil {
+		return "", false, err
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", false, nil
+	}
+	if index, ok := parseTargetIndex(value, len(projects)); ok {
+		return projects[index].Path, true, nil
+	}
+	return config.ExpandPath(value), true, nil
+}
+
+func (m *Manager) fzfSelectEnvironmentProject(ctx context.Context, label string, role string, projects []discovery.Project) (string, bool, error) {
+	args := ui.FZFHub{
+		Prompt:        ui.Crown(role) + ui.Muted("> "),
+		BorderLabel:   "dvv tmux / " + label,
+		Preview:       environmentProjectPreviewCommand(),
+		PreviewLabel:  "project",
+		PreviewWindow: "right,38%,border-rounded,wrap",
+		Shortcuts: []ui.FZFShortcut{
+			{Label: "Enter", Description: "select " + role + " project"},
+			{Label: "Esc", Description: "cancel"},
+		},
+		ExtraArgs: append(ui.FZFHiddenRowArgs(),
+			"--header-lines=1",
+		),
+	}.Args()
+	output, err := m.Runner.OutputWithInput(ctx, "", []byte(environmentProjectRows(projects)), "fzf", args...)
+	if err != nil && len(output) == 0 {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	path := ui.FZFSelectedRaw(strings.TrimSpace(string(output)))
+	if path == "" {
+		return "", false, nil
+	}
+	return path, true, nil
 }
 
 func (m *Manager) RunEnvironmentAction(ctx context.Context, action string, target Target) error {
@@ -361,29 +462,179 @@ func (m *Manager) RestartAPI(ctx context.Context, target Target) error {
 	if !m.hasSession(ctx, target.Session) {
 		return m.StartEnvironment(ctx, target)
 	}
-	apiCD := shellQuote(target.APIDir)
+	return m.resetAPIPanes(ctx, target.Session, target.Window, target.APIDir)
+}
+
+func (m *Manager) ResetCurrentAPI(ctx context.Context, session string, window string) error {
+	if _, err := m.Runner.LookPath("tmux"); err != nil {
+		return fmt.Errorf("tmux is required")
+	}
+	if strings.TrimSpace(session) == "" || strings.TrimSpace(window) == "" {
+		currentSession, currentWindow, err := m.currentTmuxWindow(ctx)
+		if err != nil {
+			return err
+		}
+		session = firstNonEmpty(session, currentSession)
+		window = firstNonEmpty(window, currentWindow)
+	}
+	session = strings.TrimSpace(session)
+	window = strings.TrimSpace(window)
+	if session == "" || window == "" {
+		return fmt.Errorf("tmux reset requires a session and window")
+	}
+	if !m.hasSession(ctx, session) {
+		return fmt.Errorf("tmux session is not running: %s", session)
+	}
+	apiDir, err := m.apiDirForCurrentWindow(ctx, session, window)
+	if err != nil {
+		return err
+	}
+	m.displayTmuxMessage(ctx, session, window, "dvv resetting API/Horizon")
+	if err := m.resetAPIPanes(ctx, session, window, apiDir); err != nil {
+		m.displayTmuxMessage(ctx, session, window, "dvv reset failed")
+		return err
+	}
+	m.displayTmuxMessage(ctx, session, window, "dvv API/Horizon reset")
+	return nil
+}
+
+func (m *Manager) resetAPIPanes(ctx context.Context, session string, window string, apiDir string) error {
+	if !fileExists(filepath.Join(apiDir, "artisan")) {
+		return fmt.Errorf("api pane path is not a Laravel project: %s", apiDir)
+	}
+	panes, err := m.windowPanes(ctx, session, window)
+	if err != nil {
+		return err
+	}
+	if !panes["0"] {
+		return fmt.Errorf("api pane 0 was not found in %s", tmuxWindowTarget(session, window))
+	}
+	hasHorizonPane := false
+	if panes["1"] {
+		if horizonDir, err := m.paneCurrentPath(ctx, session, window, "1"); err == nil && sameDir(horizonDir, apiDir) {
+			hasHorizonPane = true
+		}
+	}
+
+	apiCD := shellQuote(apiDir)
 	commands := [][]string{
-		{"send-keys", "-t", target.Session + ":" + target.Window + ".0", "C-c"},
-		{"send-keys", "-t", target.Session + ":" + target.Window + ".1", "C-c"},
-		{"send-keys", "-t", target.Session + ":" + target.Window + ".0", "cd " + apiCD + " && php artisan optimize:clear", "Enter"},
-		{"send-keys", "-t", target.Session + ":" + target.Window + ".0", "cd " + apiCD + " && php artisan cache:clear", "Enter"},
-		{"send-keys", "-t", target.Session + ":" + target.Window + ".0", "cd " + apiCD + " && php artisan config:cache", "Enter"},
-		{"send-keys", "-t", target.Session + ":" + target.Window + ".0", "cd " + apiCD + " && php artisan horizon:forget --all || true", "Enter"},
-		{"send-keys", "-t", target.Session + ":" + target.Window + ".0", "cd " + apiCD + " && php artisan horizon:clear || true", "Enter"},
-		{"send-keys", "-t", target.Session + ":" + target.Window + ".0", "cd " + apiCD + " && php artisan queue:flush || true", "Enter"},
-		{"send-keys", "-t", target.Session + ":" + target.Window + ".0", "command -v redis-cli >/dev/null 2>&1 && redis-cli FLUSHDB || true", "Enter"},
-		{"send-keys", "-t", target.Session + ":" + target.Window + ".0", "cd " + apiCD + " && php artisan serve", "Enter"},
-		{"send-keys", "-t", target.Session + ":" + target.Window + ".1", "cd " + apiCD + " && php artisan horizon", "Enter"},
+		{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "C-c"},
+	}
+	if hasHorizonPane {
+		commands = append(commands, []string{"send-keys", "-t", tmuxPaneTarget(session, window, "1"), "C-c"})
+	}
+	commands = append(commands,
+		[]string{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "cd " + apiCD + " && php artisan optimize:clear", "Enter"},
+		[]string{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "cd " + apiCD + " && php artisan cache:clear", "Enter"},
+		[]string{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "cd " + apiCD + " && php artisan config:cache", "Enter"},
+		[]string{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "cd " + apiCD + " && php artisan horizon:forget --all || true", "Enter"},
+		[]string{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "cd " + apiCD + " && php artisan horizon:clear || true", "Enter"},
+		[]string{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "cd " + apiCD + " && php artisan queue:flush || true", "Enter"},
+		[]string{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "command -v redis-cli >/dev/null 2>&1 && redis-cli FLUSHDB || true", "Enter"},
+		[]string{"send-keys", "-t", tmuxPaneTarget(session, window, "0"), "cd " + apiCD + " && php artisan serve", "Enter"},
+	)
+	if hasHorizonPane {
+		commands = append(commands, []string{"send-keys", "-t", tmuxPaneTarget(session, window, "1"), "cd " + apiCD + " && php artisan horizon", "Enter"})
 	}
 	for index, args := range commands {
 		if err := m.Runner.Run(ctx, "", "tmux", args...); err != nil {
 			return err
 		}
-		if index == 1 {
+		if index == 1 || (!hasHorizonPane && index == 0) {
 			time.Sleep(600 * time.Millisecond)
 		}
 	}
 	return nil
+}
+
+func (m *Manager) currentTmuxWindow(ctx context.Context) (string, string, error) {
+	output, err := m.Runner.Output(ctx, "", "tmux", "display-message", "-p", "#{session_name}\t#{window_name}")
+	if err != nil {
+		return "", "", fmt.Errorf("tmux reset must run inside tmux or receive --session and --window: %w", err)
+	}
+	parts := strings.SplitN(strings.TrimSpace(string(output)), "\t", 2)
+	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
+		return "", "", fmt.Errorf("could not detect current tmux session/window")
+	}
+	return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]), nil
+}
+
+func (m *Manager) apiDirForCurrentWindow(ctx context.Context, session string, window string) (string, error) {
+	if path, err := m.paneCurrentPath(ctx, session, window, "0"); err == nil && fileExists(filepath.Join(path, "artisan")) {
+		return path, nil
+	}
+	if configured := m.configuredAPIDirFor(ctx, session, window); configured != "" {
+		return configured, nil
+	}
+	return "", fmt.Errorf("cannot find Laravel API project for %s; pane 0 must be inside a directory with artisan", tmuxWindowTarget(session, window))
+}
+
+func (m *Manager) configuredAPIDirFor(ctx context.Context, session string, window string) string {
+	targets, err := m.Targets(ctx)
+	if err != nil {
+		return ""
+	}
+	for _, target := range targets {
+		if target.Session != session || target.Window != window {
+			continue
+		}
+		if fileExists(filepath.Join(target.APIDir, "artisan")) {
+			return target.APIDir
+		}
+	}
+	return ""
+}
+
+func (m *Manager) paneCurrentPath(ctx context.Context, session string, window string, pane string) (string, error) {
+	output, err := m.Runner.Output(ctx, "", "tmux", "display-message", "-p", "-t", tmuxPaneTarget(session, window, pane), "#{pane_current_path}")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+func (m *Manager) windowPanes(ctx context.Context, session string, window string) (map[string]bool, error) {
+	output, err := m.Runner.Output(ctx, "", "tmux", "list-panes", "-t", tmuxWindowTarget(session, window), "-F", "#{pane_index}")
+	if err != nil {
+		return nil, fmt.Errorf("cannot list tmux panes in %s: %w", tmuxWindowTarget(session, window), err)
+	}
+	panes := map[string]bool{}
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			panes[line] = true
+		}
+	}
+	return panes, nil
+}
+
+func (m *Manager) displayTmuxMessage(ctx context.Context, session string, window string, message string) {
+	_ = m.Runner.Run(ctx, "", "tmux", "display-message", "-t", tmuxWindowTarget(session, window), message)
+}
+
+func sameDir(left string, right string) bool {
+	left = strings.TrimSpace(left)
+	right = strings.TrimSpace(right)
+	if left == "" || right == "" {
+		return false
+	}
+	leftReal, leftErr := realDir(left)
+	rightReal, rightErr := realDir(right)
+	if leftErr == nil && rightErr == nil {
+		return leftReal == rightReal
+	}
+	return filepath.Clean(left) == filepath.Clean(right)
+}
+
+func tmuxWindowTarget(session string, window string) string {
+	if strings.TrimSpace(window) == "" {
+		return session
+	}
+	return session + ":" + window
+}
+
+func tmuxPaneTarget(session string, window string, pane string) string {
+	return tmuxWindowTarget(session, window) + "." + pane
 }
 
 func (m *Manager) RestartWeb(ctx context.Context, target Target) error {
@@ -435,6 +686,7 @@ func (m *Manager) applyOptions(ctx context.Context) {
 	}
 	m.ensureListOption(ctx, "terminal-features", "*:RGB")
 	m.ensureListOption(ctx, "terminal-overrides", "*:Tc")
+	m.applyResetShortcut(ctx)
 }
 
 func (m *Manager) ensureListOption(ctx context.Context, option string, token string) {
@@ -452,6 +704,45 @@ func (m *Manager) ensureListOption(ctx context.Context, option string, token str
 		next = current + "," + token
 	}
 	_ = m.Runner.Run(ctx, "", "tmux", "set-option", "-gq", option, next)
+}
+
+func (m *Manager) applyResetShortcut(ctx context.Context) {
+	if m.Config == nil {
+		return
+	}
+	key := tmuxShortcutKey(m.Config.Project.Tmux.Reset.Shortcut)
+	if key == "" {
+		return
+	}
+	_ = m.Runner.Run(ctx, "", "tmux", "bind-key", "-n", key, "run-shell", "-b", m.resetAPIShortcutCommand())
+}
+
+func (m *Manager) resetAPIShortcutCommand() string {
+	command := shellQuote(executableCommand()) + " " + resetAPIShortcutArgs
+	return command + ` || tmux display-message -t "#{session_name}:#{window_name}" "dvv reset failed"`
+}
+
+func tmuxShortcutKey(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	normalized = strings.ReplaceAll(normalized, " ", "")
+	normalized = strings.ReplaceAll(normalized, "_", "-")
+	normalized = strings.ReplaceAll(normalized, "+", "-")
+	if normalized == "" || normalized == "none" || normalized == "off" || normalized == "disabled" {
+		return ""
+	}
+	if key, ok := strings.CutPrefix(normalized, "alt-"); ok && len([]rune(key)) == 1 {
+		return "M-" + key
+	}
+	if key, ok := strings.CutPrefix(normalized, "ctrl-"); ok && len([]rune(key)) == 1 {
+		return "C-" + key
+	}
+	if key, ok := strings.CutPrefix(normalized, "shift-"); ok && len([]rune(key)) == 1 {
+		return strings.ToUpper(key)
+	}
+	if len([]rune(normalized)) == 1 {
+		return normalized
+	}
+	return ""
 }
 
 func tmuxListOptionHas(value string, token string) bool {
@@ -542,7 +833,7 @@ func tmuxHubShortcuts() []ui.FZFShortcut {
 		{Key: "alt-d", Label: "Alt+D", Description: "stop"},
 		{Key: "alt-a", Label: "Alt+A", Description: "restart API"},
 		{Key: "alt-w", Label: "Alt+W", Description: "restart Web"},
-		{Key: "alt-n", Label: "Alt+N", Description: "add API/Web target"},
+		{Key: "alt-n", Label: "Alt+N", Description: "save custom API/Web tmux target"},
 		{Label: "Esc", Description: "exit"},
 	}
 }
@@ -624,6 +915,61 @@ func appendOrReplaceEnvironment(environments []config.TmuxEnvironmentConfig, nex
 		}
 	}
 	return append(environments, next)
+}
+
+func environmentProjectRows(projects []discovery.Project) string {
+	var builder strings.Builder
+	builder.WriteString(ui.FZFHiddenHeader(environmentProjectTableHeader()))
+	builder.WriteByte('\n')
+	for index, project := range projects {
+		builder.WriteString(ui.FZFHiddenRow(project.Path, environmentProjectRow(index, project)))
+		builder.WriteByte('\n')
+	}
+	return builder.String()
+}
+
+func environmentProjectRow(index int, project discovery.Project) string {
+	return fmt.Sprintf("%s  %s  %s  %s",
+		ui.Muted(fmt.Sprintf("%02d", index+1)),
+		ui.Accent(fixedWidth(project.Name, 28)),
+		ui.Gold(fixedWidth(environmentProjectKind(project.Path), 6)),
+		ui.Muted(project.Path),
+	)
+}
+
+func environmentProjectTableHeader() string {
+	return fmt.Sprintf(" %s  %s  %s  %s",
+		ui.Crown("NO"),
+		ui.Crown(fixedWidth("PROJECT", 28)),
+		ui.Crown(fixedWidth("KIND", 6)),
+		ui.Crown("PATH"),
+	)
+}
+
+func environmentProjectKind(path string) string {
+	switch {
+	case fileExists(filepath.Join(path, "artisan")):
+		return "api"
+	case fileExists(filepath.Join(path, "package.json")):
+		return "web"
+	default:
+		return "git"
+	}
+}
+
+func printEnvironmentProjectList(projects []discovery.Project) {
+	for index, project := range projects {
+		fmt.Printf("  %2d. %-28s %-6s %s\n", index+1, project.Name, environmentProjectKind(project.Path), ui.Dim(project.Path))
+	}
+}
+
+func environmentProjectPreviewCommand() string {
+	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
+project_path=$(printf "%s" "$line" | cut -f1)
+printf "%sProject%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Path" "$dvv_reset" "$project_path"
+printf "\n%sPick the repository that should back this tmux pane.%s\n" "$dvv_muted" "$dvv_reset"
+' sh {}`
 }
 
 func firstSelected(selected []string) string {
@@ -709,6 +1055,35 @@ func valueOr(value string, fallback string) string {
 	return value
 }
 
+func parseResetAPIArgs(args []string) (string, string, error) {
+	session := ""
+	window := ""
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+		switch {
+		case arg == "--session":
+			if index+1 >= len(args) {
+				return "", "", fmt.Errorf("--session requires a value")
+			}
+			index++
+			session = args[index]
+		case strings.HasPrefix(arg, "--session="):
+			session = strings.TrimPrefix(arg, "--session=")
+		case arg == "--window":
+			if index+1 >= len(args) {
+				return "", "", fmt.Errorf("--window requires a value")
+			}
+			index++
+			window = args[index]
+		case strings.HasPrefix(arg, "--window="):
+			window = strings.TrimPrefix(arg, "--window=")
+		default:
+			return "", "", fmt.Errorf("unknown tmux reset option: %s", arg)
+		}
+	}
+	return strings.TrimSpace(session), strings.TrimSpace(window), nil
+}
+
 func showTmuxHelp(cfg *config.Config) {
 	ui.Title("Tmux Hub")
 	fmt.Printf("  %s dvv tmux\n\n", ui.Bold("Usage:"))
@@ -725,9 +1100,24 @@ func showTmuxHelp(cfg *config.Config) {
 	helpEntry("Alt+D", "Stop selected environment")
 	helpEntry("Alt+A", "Restart API and Horizon")
 	helpEntry("Alt+W", "Restart Web")
+	helpEntry("Alt+N", "Save a custom API/Web tmux target")
 	helpEntry("Esc", "Exit")
 	fmt.Println()
 	helpSection("Shell Shortcuts")
 	helpEntry(shortcutLabel(cfg.Project.Tmux.Session.Shortcut, "ctrl+f"), "Run dvv tmux:session")
 	helpEntry(shortcutLabel(cfg.Project.Tmux.Home.Shortcut, "alt+f"), "Run dvv tmux:home without picker")
+	fmt.Println()
+	helpSection("Tmux Shortcut")
+	helpEntry(shortcutLabel(cfg.Project.Tmux.Reset.Shortcut, "alt+r"), "Reset API and Horizon panes in the current tmux window")
+}
+
+func showResetAPIHelp(cfg *config.Config) {
+	ui.Title("Tmux Reset")
+	fmt.Printf("  %s dvv tmux:reset-api [--session name --window name]\n\n", ui.Bold("Usage:"))
+	helpSection("Command")
+	helpEntry("dvv tmux:reset-api", "Reset API and Horizon panes in the current tmux window")
+	helpEntry("dvv tmux:reset-api --session <name> --window <name>", "Reset an explicit tmux window")
+	fmt.Println()
+	helpSection("Tmux Shortcut")
+	helpEntry(shortcutLabel(cfg.Project.Tmux.Reset.Shortcut, "alt+r"), "Installed by dvv setup in ~/.tmux.conf")
 }

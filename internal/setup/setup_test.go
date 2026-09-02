@@ -85,6 +85,65 @@ func TestShortcutToZshSequences(t *testing.T) {
 	}
 }
 
+func TestTmuxShortcutsStaleDetectsCurrentBinding(t *testing.T) {
+	cfg := &config.Config{Project: config.DefaultProjectConfig()}
+	expected := tmuxResetShortcutBindingLine(cfg)
+	current := strings.Join([]string{
+		`# >>> dvv tmux shortcuts >>>`,
+		expected,
+		`# <<< dvv tmux shortcuts <<<`,
+	}, "\n")
+
+	if tmuxShortcutsStale(current, cfg) {
+		t.Fatal("expected current tmux reset shortcut block to be fresh")
+	}
+
+	oldBinding := strings.Replace(current, "M-r", "M-x", 1)
+	if !tmuxShortcutsStale(oldBinding, cfg) {
+		t.Fatal("expected old tmux reset shortcut block to be stale")
+	}
+}
+
+func TestTmuxResetShortcutPrefersBuiltBinary(t *testing.T) {
+	root := t.TempDir()
+	dist := filepath.Join(root, "dist")
+	if err := os.MkdirAll(dist, 0o755); err != nil {
+		t.Fatalf("MkdirAll failed: %v", err)
+	}
+	binary := filepath.Join(dist, binaryName())
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile binary failed: %v", err)
+	}
+	cfg := &config.Config{RootDir: root, Project: config.DefaultProjectConfig()}
+
+	line := tmuxResetShortcutBindingLine(cfg)
+	if !strings.Contains(line, binary+" tmux:reset-api") {
+		t.Fatalf("tmux shortcut line = %q, want built binary", line)
+	}
+	if !strings.Contains(line, "tmux display-message") {
+		t.Fatalf("tmux shortcut line = %q, want visible failure fallback", line)
+	}
+}
+
+func TestShortcutToTmuxKey(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{input: "alt+r", want: "M-r"},
+		{input: "ctrl+r", want: "C-r"},
+		{input: "shift+r", want: "R"},
+		{input: "r", want: "r"},
+		{input: "none", want: ""},
+	}
+
+	for _, test := range tests {
+		if got := shortcutToTmuxKey(test.input); got != test.want {
+			t.Fatalf("shortcutToTmuxKey(%q) = %q, want %q", test.input, got, test.want)
+		}
+	}
+}
+
 func TestRunBuildRejectsArguments(t *testing.T) {
 	err := RunBuild(context.Background(), &config.Config{}, &fakeRunner{}, []string{"extra"})
 	if err == nil || !strings.Contains(err.Error(), "does not accept arguments") {
@@ -170,7 +229,10 @@ func TestZshCompletionKeepsHubFirstSurface(t *testing.T) {
 	if !strings.Contains(text, "tmux:home:Open the configured home tmux tab used by Alt+F") {
 		t.Fatal("completion should keep the Alt+F shortcut command documented")
 	}
-	if !strings.Contains(text, "--fix:Create safe runtime files, rebuild, and reinstall shell integration") {
+	if !strings.Contains(text, "tmux:reset-api:Reset API and Horizon panes in the current tmux window") {
+		t.Fatal("completion should keep the tmux reset shortcut command documented")
+	}
+	if !strings.Contains(text, "--fix:Create safe runtime files, rebuild, and reinstall shell/tmux integration") {
 		t.Fatal("completion should expose doctor --fix")
 	}
 }

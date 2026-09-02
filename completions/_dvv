@@ -19,7 +19,7 @@ _dvv() {
         "help:Show command help"
         "resources:Open the local resources hub"
         "secrets:Open the local secrets hub"
-        "setup:Install zsh completion and shell shortcuts"
+        "setup:Install zsh completion, shell shortcuts, and tmux shortcuts"
         "ssh:Open the SSH hub"
         "tmux:Open the tmux environment hub"
         "workspace:Open the workspace hub"
@@ -38,6 +38,7 @@ _dvv() {
           "ssh:list:List SSH entries"
           "tmux:session:Open the directory picker used by Ctrl+F"
           "tmux:home:Open the configured home tmux tab used by Alt+F"
+          "tmux:reset-api:Reset API and Horizon panes in the current tmux window"
           "workspace:list:List worktree workspaces"
         )
       fi
@@ -82,7 +83,7 @@ _dvv() {
           local -a doctor_flags
           doctor_flags=(
             "help:Show doctor help"
-            "--fix:Create safe runtime files, rebuild, and reinstall shell integration"
+            "--fix:Create safe runtime files, rebuild, and reinstall shell/tmux integration"
           )
           _describe -t doctor-flags 'doctor flags' doctor_flags
           ;;
@@ -107,6 +108,7 @@ _dvv() {
               "down:Stop the selected environment"
               "api-restart:Restart API and Horizon panes"
               "web-restart:Restart Web pane"
+              "reset-api:Reset API and Horizon panes in the current tmux window"
             )
           fi
           _describe -t tmux-actions 'tmux actions' tmux_actions
