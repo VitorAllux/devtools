@@ -18,6 +18,7 @@ _dvv() {
         "doctor:Check local dependencies and integration"
         "help:Show command help"
         "resources:Open the local resources hub"
+        "secrets:Open the local secrets hub"
         "setup:Install zsh completion and shell shortcuts"
         "ssh:Open the SSH hub"
         "tmux:Open the tmux environment hub"
@@ -32,12 +33,11 @@ _dvv() {
           "db:clean:Delete local dump files"
           "db:truncate:Truncate selected databases"
           "db:drop:Drop selected databases"
-          "resources:list:List detected local resources"
           "ssh:add:Add an SSH entry"
           "ssh:remove:Remove SSH entries"
           "ssh:list:List SSH entries"
           "tmux:session:Open the directory picker used by Ctrl+F"
-          "tmux:home:Open the configured home tmux tab used by Ctrl+Shift+F"
+          "tmux:home:Open the configured home tmux tab used by Alt+F"
           "workspace:list:List worktree workspaces"
         )
       fi
@@ -78,6 +78,14 @@ _dvv() {
           )
           _describe -t bootstrap-flags 'bootstrap flags' bootstrap_flags
           ;;
+        doctor)
+          local -a doctor_flags
+          doctor_flags=(
+            "help:Show doctor help"
+            "--fix:Create safe runtime files, rebuild, and reinstall shell integration"
+          )
+          _describe -t doctor-flags 'doctor flags' doctor_flags
+          ;;
         ssh)
           local -a ssh_flags
           ssh_flags=("help:Show SSH hub help")
@@ -113,9 +121,23 @@ _dvv() {
               "start:Start selected resource"
               "restart:Restart selected resource"
               "stop:Stop selected resource"
+              "logs:Open selected resource logs"
             )
           fi
           _describe -t resources-actions 'resources actions' resources_actions
+          ;;
+        secrets)
+          local -a secrets_actions
+          secrets_actions=("help:Show secrets hub help")
+          if [[ -n "${DVV_COMPLETE_COMPAT:-}" ]]; then
+            secrets_actions+=(
+              "status:Show local secrets status"
+              "prepare:Prepare local AGE and SSH files"
+              "restore:Restore SSH list from encrypted backup"
+              "sync:Sync encrypted SSH backup"
+            )
+          fi
+          _describe -t secrets-actions 'secrets actions' secrets_actions
           ;;
         workspace)
           local -a workspace_actions

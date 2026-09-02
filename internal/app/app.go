@@ -75,6 +75,12 @@ func Run(args []string) int {
 			return 1
 		}
 		return 0
+	case "secrets":
+		if err := secretscmd.RunSecrets(ctx, cfg, runner, commandArgs); err != nil {
+			ui.Error("%v", err)
+			return 1
+		}
+		return 0
 	case "build":
 		if err := setupcmd.RunBuild(ctx, cfg, runner, commandArgs); err != nil {
 			ui.Error("%v", err)
@@ -181,6 +187,8 @@ func runCommand(ctx context.Context, cfg *config.Config, runner run.Runner, comm
 		err = resourcescmd.Run(ctx, cfg, runner, args)
 	case "setup":
 		err = setupcmd.RunSetup(ctx, cfg, runner, args)
+	case "secrets":
+		err = secretscmd.RunSecrets(ctx, cfg, runner, args)
 	case "ssh":
 		err = sshcmd.Run(ctx, cfg, runner, args)
 	case "tmux":
@@ -221,6 +229,7 @@ func showHelp() {
 	helpEntry("build", "*", "Rebuild the local dvv binary")
 	helpEntry("setup", "*", "Install zsh completion and shell shortcuts")
 	helpEntry("bootstrap", "*", "Restore AGE/Bitwarden secrets and SSH backup")
+	helpEntry("secrets", ">", "Open the local secrets hub")
 	helpEntry("doctor", "?", "Check local dependencies and integration")
 	helpEntry("config", ">", "Open the configuration hub")
 	fmt.Println()
@@ -229,7 +238,7 @@ func showHelp() {
 	fmt.Println()
 	helpSection("Shell Shortcuts")
 	helpEntry("Ctrl+F", ">", "Open the directory picker in tmux")
-	helpEntry("Ctrl+Shift+F", ">", "Open a home tmux tab")
+	helpEntry("Alt+F", ">", "Open a home tmux tab")
 	helpEntry("Alt+S", ">", "Open the SSH hub")
 	fmt.Println()
 	fmt.Println("  Use `dvv <command> help` for hub details.")

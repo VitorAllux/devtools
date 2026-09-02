@@ -2,6 +2,7 @@ package tmux
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -86,6 +87,12 @@ func (m *Manager) Targets(ctx context.Context) ([]Target, error) {
 	session := cleanSessionName(firstNonEmpty(os.Getenv("TMUX_SESSION"), "eloverde"))
 
 	targets := []Target{m.buildTarget(ctx, "Default config", session, window, apiDir, webDir)}
+	for _, environment := range m.Config.Project.Tmux.Environments {
+		target := m.targetFromEnvironment(ctx, environment)
+		if target.Session != "" {
+			targets = append(targets, target)
+		}
+	}
 	workspaces, err := workspacecmd.NewManager(m.Config, m.Runner).Workspaces()
 	if err != nil {
 		return nil, err
@@ -101,7 +108,17 @@ func (m *Manager) Targets(ctx context.Context) ([]Target, error) {
 		))
 	}
 	sort.Slice(targets, func(i, j int) bool { return targets[i].Label < targets[j].Label })
-	return targets, nil
+	return uniqueTargets(targets), nil
+}
+
+func (m *Manager) targetFromEnvironment(ctx context.Context, environment config.TmuxEnvironmentConfig) Target {
+	label := firstNonEmpty(environment.Name, environment.Session)
+	if label == "" {
+		return Target{}
+	}
+	session := firstNonEmpty(environment.Session, label)
+	window := firstNonEmpty(environment.Window, "dev")
+	return m.buildTarget(ctx, label, cleanSessionName(session), cleanSessionName(window), environment.APIDir, environment.WebDir)
 }
 
 func (m *Manager) buildTarget(ctx context.Context, label string, session string, window string, apiDir string, webDir string) Target {
@@ -161,6 +178,12 @@ func (m *Manager) fzfEnvironmentHub(ctx context.Context, targets []Target, defau
 		return false, "", nil
 	}
 	key, selected := ui.ParseFZFExpectOutput(string(output))
+	if key == "alt-n" {
+		if err := m.AddEnvironment(ctx); err != nil {
+			return true, err.Error(), nil
+		}
+		return true, "", nil
+	}
 	selection := ui.FZFSelectedRaw(firstSelected(selected))
 	if selection == "" {
 		return false, "", nil
@@ -184,9 +207,17 @@ func (m *Manager) basicEnvironmentHub(ctx context.Context, targets []Target, def
 	for index, target := range targets {
 		fmt.Printf("  %2d. %-28s %-14s %s\n", index+1, target.Label, target.Status, ui.Dim(target.Details))
 	}
+	fmt.Println()
+	ui.Info("Use `n` to add a custom API/Web environment.")
 	value, err := ui.Prompt("Target number")
 	if err != nil {
 		return false, "", err
+	}
+	if strings.EqualFold(strings.TrimSpace(value), "n") {
+		if err := m.AddEnvironment(ctx); err != nil {
+			return true, err.Error(), nil
+		}
+		return true, "", nil
 	}
 	index, ok := parseTargetIndex(value, len(targets))
 	if !ok {
@@ -196,6 +227,44 @@ func (m *Manager) basicEnvironmentHub(ctx context.Context, targets []Target, def
 		return true, err.Error(), nil
 	}
 	return true, "", nil
+}
+
+func (m *Manager) AddEnvironment(ctx context.Context) error {
+	name, err := ui.Prompt("Environment name")
+	if err != nil {
+		return err
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil
+	}
+	apiDir, err := ui.Prompt("API directory")
+	if err != nil {
+		return err
+	}
+	webDir, err := ui.Prompt("Web directory")
+	if err != nil {
+		return err
+	}
+	environment := config.TmuxEnvironmentConfig{
+		Name:    name,
+		Session: cleanSessionName(name),
+		Window:  "dev",
+		APIDir:  config.ExpandPath(apiDir),
+		WebDir:  config.ExpandPath(webDir),
+	}
+	environments := append([]config.TmuxEnvironmentConfig{}, m.Config.Project.Tmux.Environments...)
+	environments = appendOrReplaceEnvironment(environments, environment)
+	content, err := json.Marshal(environments)
+	if err != nil {
+		return err
+	}
+	if err := config.SetEnvFileValue(m.Config.ConfigFile, "DVV_TMUX_ENVIRONMENTS", string(content)); err != nil {
+		return err
+	}
+	m.Config.Project.Tmux.Environments = environments
+	ui.OK("Tmux environment saved: %s", name)
+	return nil
 }
 
 func (m *Manager) RunEnvironmentAction(ctx context.Context, action string, target Target) error {
@@ -245,6 +314,7 @@ func (m *Manager) StartEnvironment(ctx context.Context, target Target) error {
 	if m.hasSession(ctx, target.Session) {
 		return m.openTmuxSessionInTerminal(ctx, target.Session)
 	}
+	m.applyOptions(ctx)
 
 	baseDir := commonAncestor(target.APIDir, target.WebDir)
 	if baseDir == "" {
@@ -256,7 +326,6 @@ func (m *Manager) StartEnvironment(ctx context.Context, target Target) error {
 	if err := m.Runner.Run(ctx, "", "tmux", "new-session", "-d", "-s", target.Session, "-c", baseDir); err != nil {
 		return err
 	}
-	m.applyOptions(ctx)
 	commands := [][]string{
 		{"rename-window", "-t", target.Session + ":0", target.Window},
 		{"split-window", "-h", "-t", target.Session + ":" + target.Window, "-c", target.APIDir},
@@ -358,13 +427,44 @@ func (m *Manager) applyOptions(ctx context.Context) {
 		{"set", "-g", "automatic-rename", "off"},
 		{"set", "-g", "allow-rename", "off"},
 		{"set", "-g", "renumber-windows", "on"},
+		{"set-option", "-gq", "default-terminal", "tmux-256color"},
+		{"set-environment", "-g", "COLORTERM", "truecolor"},
 	}
 	for _, args := range commands {
 		_ = m.Runner.Run(ctx, "", "tmux", args...)
 	}
+	m.ensureListOption(ctx, "terminal-features", "*:RGB")
+	m.ensureListOption(ctx, "terminal-overrides", "*:Tc")
+}
+
+func (m *Manager) ensureListOption(ctx context.Context, option string, token string) {
+	output, err := m.Runner.Output(ctx, "", "tmux", "show-option", "-gqv", option)
+	if err != nil {
+		_ = m.Runner.Run(ctx, "", "tmux", "set-option", "-agq", option, ","+token)
+		return
+	}
+	current := strings.TrimSpace(string(output))
+	if tmuxListOptionHas(current, token) {
+		return
+	}
+	next := token
+	if current != "" {
+		next = current + "," + token
+	}
+	_ = m.Runner.Run(ctx, "", "tmux", "set-option", "-gq", option, next)
+}
+
+func tmuxListOptionHas(value string, token string) bool {
+	for _, part := range strings.Split(value, ",") {
+		if strings.TrimSpace(part) == token {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Manager) openTmuxSessionInTerminal(ctx context.Context, session string) error {
+	m.applyOptions(ctx)
 	if err := (terminal.Launcher{Runner: m.Runner, Preferred: m.terminalLauncherPreference()}).Open(ctx, "tmux", "attach", "-t", session); err != nil {
 		if os.Getenv("TMUX") != "" {
 			return m.Runner.Run(ctx, "", "tmux", "switch-client", "-t", session)
@@ -442,6 +542,7 @@ func tmuxHubShortcuts() []ui.FZFShortcut {
 		{Key: "alt-d", Label: "Alt+D", Description: "stop"},
 		{Key: "alt-a", Label: "Alt+A", Description: "restart API"},
 		{Key: "alt-w", Label: "Alt+W", Description: "restart Web"},
+		{Key: "alt-n", Label: "Alt+N", Description: "add API/Web target"},
 		{Label: "Esc", Description: "exit"},
 	}
 }
@@ -498,6 +599,31 @@ func findTarget(targets []Target, session string) (Target, bool) {
 		}
 	}
 	return Target{}, false
+}
+
+func uniqueTargets(targets []Target) []Target {
+	seen := map[string]bool{}
+	out := make([]Target, 0, len(targets))
+	for _, target := range targets {
+		key := strings.ToLower(strings.TrimSpace(target.Session))
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, target)
+	}
+	return out
+}
+
+func appendOrReplaceEnvironment(environments []config.TmuxEnvironmentConfig, next config.TmuxEnvironmentConfig) []config.TmuxEnvironmentConfig {
+	key := strings.ToLower(strings.TrimSpace(next.Name))
+	for index, environment := range environments {
+		if strings.ToLower(strings.TrimSpace(environment.Name)) == key {
+			environments[index] = next
+			return environments
+		}
+	}
+	return append(environments, next)
 }
 
 func firstSelected(selected []string) string {
@@ -603,5 +729,5 @@ func showTmuxHelp(cfg *config.Config) {
 	fmt.Println()
 	helpSection("Shell Shortcuts")
 	helpEntry(shortcutLabel(cfg.Project.Tmux.Session.Shortcut, "ctrl+f"), "Run dvv tmux:session")
-	helpEntry(shortcutLabel(cfg.Project.Tmux.Home.Shortcut, "ctrl+shift+f"), "Run dvv tmux:home without picker")
+	helpEntry(shortcutLabel(cfg.Project.Tmux.Home.Shortcut, "alt+f"), "Run dvv tmux:home without picker")
 }

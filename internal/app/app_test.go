@@ -44,6 +44,7 @@ func TestRunHelpRoutesForPublicCommands(t *testing.T) {
 		{"config", "help"},
 		{"db", "help"},
 		{"resources", "help"},
+		{"secrets", "help"},
 		{"ssh", "help"},
 		{"tmux", "help"},
 		{"tmux:session", "help"},

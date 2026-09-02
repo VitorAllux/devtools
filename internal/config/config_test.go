@@ -66,9 +66,19 @@ func TestLoadProjectConfigMergesResourcesDefaults(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "dvv.config.json")
 	content := []byte(`{
   "resources": {
+    "logs": {
+      "tail": 300
+    },
     "hub": {
       "shortcuts": {
         "restart": "shift+r"
+      }
+    }
+  },
+  "secrets": {
+    "hub": {
+      "shortcuts": {
+        "sync": "alt-y"
       }
     }
   }
@@ -90,6 +100,50 @@ func TestLoadProjectConfigMergesResourcesDefaults(t *testing.T) {
 	}
 	if cfg.Resources.Hub.Shortcuts.Stop != "alt+x" {
 		t.Fatalf("stop shortcut = %q", cfg.Resources.Hub.Shortcuts.Stop)
+	}
+	if cfg.Resources.Hub.Shortcuts.Logs != "shift+l" {
+		t.Fatalf("logs shortcut = %q", cfg.Resources.Hub.Shortcuts.Logs)
+	}
+	if cfg.Resources.Logs.Tail != 300 {
+		t.Fatalf("resource log tail = %d", cfg.Resources.Logs.Tail)
+	}
+	if cfg.Secrets.Hub.Shortcuts.Prepare != "shift+k" {
+		t.Fatalf("secrets prepare shortcut = %q", cfg.Secrets.Hub.Shortcuts.Prepare)
+	}
+	if cfg.Secrets.Hub.Shortcuts.Sync != "alt-y" {
+		t.Fatalf("secrets sync shortcut = %q", cfg.Secrets.Hub.Shortcuts.Sync)
+	}
+}
+
+func TestProfilesApplyActiveValuesWithoutOverridingExplicitEnv(t *testing.T) {
+	const profileKey = "DVV_TEST_PROFILE_VALUE"
+	const explicitKey = "DVV_TEST_EXPLICIT_VALUE"
+
+	os.Unsetenv(profileKey)
+	t.Cleanup(func() { os.Unsetenv(profileKey) })
+	t.Setenv(explicitKey, "explicit")
+
+	cfg := ProfilesConfig{
+		Active: "Work",
+		Items: []ProfileConfig{
+			{Name: "work", Values: map[string]string{
+				profileKey:  "from-profile",
+				explicitKey: "from-profile",
+			}},
+		},
+	}
+
+	resolved := resolveProfilesConfig(cfg)
+	applyActiveProfile(resolved)
+
+	if resolved.Active != "work" {
+		t.Fatalf("active profile = %q, want work", resolved.Active)
+	}
+	if got := os.Getenv(profileKey); got != "from-profile" {
+		t.Fatalf("%s = %q, want from-profile", profileKey, got)
+	}
+	if got := os.Getenv(explicitKey); got != "explicit" {
+		t.Fatalf("%s = %q, want explicit", explicitKey, got)
 	}
 }
 
@@ -120,15 +174,27 @@ func TestResolveShortcutConfigsUseEnvOverrides(t *testing.T) {
 	t.Setenv("DVV_RESOURCES_START_SHORTCUT", "shift+s")
 	t.Setenv("DVV_RESOURCES_RESTART_SHORTCUT", "shift+r")
 	t.Setenv("DVV_RESOURCES_STOP_SHORTCUT", "shift+x")
+	t.Setenv("DVV_RESOURCES_LOGS_SHORTCUT", "shift+l")
+	t.Setenv("DVV_RESOURCES_LOG_TAIL", "500")
+	t.Setenv("DVV_SECRETS_PREPARE_SHORTCUT", "alt-k")
+	t.Setenv("DVV_SECRETS_RESTORE_SHORTCUT", "alt-b")
+	t.Setenv("DVV_SECRETS_SYNC_SHORTCUT", "alt-y")
 
 	ssh := resolveSSHConfig(DefaultProjectConfig().SSH)
 	resources := resolveResourcesConfig(DefaultProjectConfig().Resources)
+	secrets := resolveSecretsConfig(DefaultProjectConfig().Secrets)
 
 	if ssh.Hub.Shortcuts.Add != "alt-a" || ssh.Hub.Shortcuts.Remove != "alt-r" || ssh.Hub.Shortcuts.NewTerminal != "alt-t" {
 		t.Fatalf("ssh shortcuts = %#v", ssh.Hub.Shortcuts)
 	}
-	if resources.Hub.Shortcuts.Start != "shift+s" || resources.Hub.Shortcuts.Restart != "shift+r" || resources.Hub.Shortcuts.Stop != "shift+x" {
+	if resources.Hub.Shortcuts.Start != "shift+s" || resources.Hub.Shortcuts.Restart != "shift+r" || resources.Hub.Shortcuts.Stop != "shift+x" || resources.Hub.Shortcuts.Logs != "shift+l" {
 		t.Fatalf("resource shortcuts = %#v", resources.Hub.Shortcuts)
+	}
+	if resources.Logs.Tail != 500 {
+		t.Fatalf("resource log tail = %d", resources.Logs.Tail)
+	}
+	if secrets.Hub.Shortcuts.Prepare != "alt-k" || secrets.Hub.Shortcuts.Restore != "alt-b" || secrets.Hub.Shortcuts.Sync != "alt-y" {
+		t.Fatalf("secrets shortcuts = %#v", secrets.Hub.Shortcuts)
 	}
 }
 
@@ -192,7 +258,7 @@ func TestLoadProjectConfigMergesWorkspaceDefaults(t *testing.T) {
 	if cfg.Tmux.Session.Shortcut != "ctrl+p" {
 		t.Fatalf("tmux shortcut = %q", cfg.Tmux.Session.Shortcut)
 	}
-	if cfg.Tmux.Home.Directory != "~" || cfg.Tmux.Home.SessionName != "home" || cfg.Tmux.Home.Shortcut != "ctrl+shift+f" {
+	if cfg.Tmux.Home.Directory != "~" || cfg.Tmux.Home.SessionName != "home" || cfg.Tmux.Home.Shortcut != "alt+f" {
 		t.Fatalf("tmux home defaults = %#v", cfg.Tmux.Home)
 	}
 	if cfg.Tmux.Session.SearchDepth != 3 {
@@ -290,6 +356,7 @@ func TestResolveTmuxConfigUsesEnvOverrides(t *testing.T) {
 	t.Setenv("DVV_TMUX_HOME_DIR", "~/terminal-home")
 	t.Setenv("DVV_TMUX_HOME_SESSION_NAME", "root")
 	t.Setenv("DVV_TMUX_HOME_SHORTCUT", "ctrl+shift+p")
+	t.Setenv("DVV_TMUX_ENVIRONMENTS", `[{"name":"local","apiDir":"~/api","webDir":"~/web"}]`)
 
 	cfg := resolveTmuxConfig(defaultTmuxConfig())
 
@@ -313,6 +380,9 @@ func TestResolveTmuxConfigUsesEnvOverrides(t *testing.T) {
 	}
 	if cfg.Home.Shortcut != "ctrl+shift+p" {
 		t.Fatalf("tmux home shortcut = %q", cfg.Home.Shortcut)
+	}
+	if len(cfg.Environments) != 1 || cfg.Environments[0].Name != "local" || cfg.Environments[0].APIDir != "/home/tester/api" || cfg.Environments[0].WebDir != "/home/tester/web" {
+		t.Fatalf("tmux environments = %#v", cfg.Environments)
 	}
 }
 

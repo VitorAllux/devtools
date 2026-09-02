@@ -44,6 +44,7 @@ run("tmux session help", bin, ["tmux:session", "help"]);
 run("tmux home help", bin, ["tmux:home", "help"]);
 run("db help", bin, ["db", "help"]);
 run("resources help", bin, ["resources", "help"]);
+run("secrets help", bin, ["secrets", "help"]);
 run("config help", bin, ["config", "help"]);
 run("bootstrap help", bin, ["bootstrap", "help"]);
 run("doctor", bin, ["doctor"]);
@@ -54,8 +55,8 @@ run("script-friendly workspace list", bin, ["workspace:list"]);
 assertFile(path.join(completionDir, "_dvv"), "zsh completion");
 const zshrc = readFile(path.join(home, ".zshrc"));
 assertIncludes(zshrc, "dvv tmux:session\\n", "managed Ctrl+F shortcut");
-assertIncludes(zshrc, "dvv tmux:home\\n", "managed Ctrl+Shift+F shortcut");
-assertIncludes(zshrc, "\\e[70;6u", "managed Ctrl+Shift+F sequence");
+assertIncludes(zshrc, "dvv tmux:home\\n", "managed Alt+F shortcut");
+assertIncludes(zshrc, "\\ef", "managed Alt+F sequence");
 assertIncludes(zshrc, "dvv ssh\\n", "managed Alt+S shortcut");
 assertExcludes(zshrc, "devv ", "legacy devv shortcut");
 

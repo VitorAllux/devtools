@@ -2,9 +2,12 @@ package tmux
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/VitorAllux/devtools/internal/config"
 )
 
 func TestTmuxPreviewPreservesCommandArgs(t *testing.T) {
@@ -99,6 +102,46 @@ func TestFZFEnvironmentHubRoutesStopShortcut(t *testing.T) {
 	}
 }
 
+func TestTargetsIncludeConfiguredTmuxEnvironments(t *testing.T) {
+	t.Setenv("DVV_NO_LOADER", "1")
+	root := t.TempDir()
+	apiDir := filepath.Join(root, "api")
+	webDir := filepath.Join(root, "web")
+	mustMkdir(t, apiDir)
+	mustMkdir(t, webDir)
+	if err := os.WriteFile(filepath.Join(apiDir, "artisan"), []byte("#!/usr/bin/env php\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile artisan failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(webDir, "package.json"), []byte(`{"scripts":{"serve":"vite"}}`), 0o644); err != nil {
+		t.Fatalf("WriteFile package.json failed: %v", err)
+	}
+
+	cfg := testConfig(root)
+	cfg.Project.Workspace.Root = filepath.Join(root, "workspaces")
+	cfg.Project.Tmux.Environments = []config.TmuxEnvironmentConfig{{
+		Name:   "On Premise",
+		APIDir: apiDir,
+		WebDir: webDir,
+	}}
+	runner := &fakeRunner{
+		paths:            map[string]bool{"tmux": true},
+		existingSessions: map[string]bool{"On_Premise": true},
+	}
+	manager := NewManager(cfg, runner)
+
+	targets, err := manager.Targets(context.Background())
+	if err != nil {
+		t.Fatalf("Targets returned error: %v", err)
+	}
+	target, ok := findTarget(targets, "On_Premise")
+	if !ok {
+		t.Fatalf("configured target missing: %#v", targets)
+	}
+	if target.Label != "On Premise" || target.Status != "running" || target.APIDir != apiDir || target.WebDir != webDir {
+		t.Fatalf("configured target = %#v", target)
+	}
+}
+
 func TestStartEnvironmentCreatesLayoutAndOpensTerminal(t *testing.T) {
 	t.Setenv("DVV_NO_LOADER", "1")
 	root := t.TempDir()
@@ -117,10 +160,25 @@ func TestStartEnvironmentCreatesLayoutAndOpensTerminal(t *testing.T) {
 	if !runner.hasRun("tmux new-session -d -s dev -c " + root) {
 		t.Fatalf("new session command missing: %#v", runner.runs)
 	}
+	if !runner.hasRun("tmux set-option -gq default-terminal tmux-256color") {
+		t.Fatalf("default terminal option missing: %#v", runner.runs)
+	}
+	if !runner.hasRun("tmux set-environment -g COLORTERM truecolor") {
+		t.Fatalf("COLORTERM tmux environment missing: %#v", runner.runs)
+	}
 	if !runner.hasRun("tmux send-keys -t dev:main.2 cd '" + webDir + "' && npm run serve Enter") {
 		t.Fatalf("web command missing: %#v", runner.runs)
 	}
-	if !runner.hasStart("x-terminal-emulator -e tmux attach -t dev") {
+	if !runner.hasStart("x-terminal-emulator -e env COLORTERM=truecolor tmux attach -t dev") {
 		t.Fatalf("terminal attach missing: %#v", runner.starts)
+	}
+}
+
+func TestTmuxListOptionHasToken(t *testing.T) {
+	if !tmuxListOptionHas("xterm-256color:RGB,*:RGB", "*:RGB") {
+		t.Fatal("expected tmux list option to detect exact token")
+	}
+	if tmuxListOptionHas("xterm-256color:RGB", "*:RGB") {
+		t.Fatal("expected tmux list option to avoid fuzzy token matches")
 	}
 }

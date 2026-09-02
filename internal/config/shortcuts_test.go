@@ -54,7 +54,19 @@ func TestResourcesHubKeysUseDefaults(t *testing.T) {
 	if keys.Start.FZFKey != "alt-s" || keys.Start.Label != "Alt+S" {
 		t.Fatalf("start key = %#v", keys.Start)
 	}
-	if keys.Restart.FZFKey != "alt-r" || keys.Stop.FZFKey != "alt-x" {
+	if keys.Restart.FZFKey != "alt-r" || keys.Stop.FZFKey != "alt-x" || keys.Logs.FZFKey != "L" {
 		t.Fatalf("resources keys = %#v", keys)
+	}
+}
+
+func TestSecretsHubKeysUseDefaults(t *testing.T) {
+	cfg := Config{Project: DefaultProjectConfig()}
+	keys := cfg.SecretsHubKeys()
+
+	if keys.Prepare.FZFKey != "K" || keys.Prepare.Label != "Shift+K" {
+		t.Fatalf("prepare key = %#v", keys.Prepare)
+	}
+	if keys.Restore.FZFKey != "R" || keys.Sync.FZFKey != "S" {
+		t.Fatalf("secrets keys = %#v", keys)
 	}
 }

@@ -128,7 +128,10 @@ func TestOpenSessionCreatesUniqueDetachedSessionAndAttaches(t *testing.T) {
 	if !runner.hasRun("tmux new-session -ds space_2 -n my_project -c " + selected) {
 		t.Fatalf("new-session was not executed as expected: %#v", runner.runs)
 	}
-	if !runner.hasStart("x-terminal-emulator -e tmux attach -t space_2") {
+	if !runner.hasRun("tmux set-option -gq default-terminal tmux-256color") {
+		t.Fatalf("default terminal option missing: %#v", runner.runs)
+	}
+	if !runner.hasStart("x-terminal-emulator -e env COLORTERM=truecolor tmux attach -t space_2") {
 		t.Fatalf("terminal attach was not executed as expected: %#v", runner.starts)
 	}
 }
@@ -152,7 +155,7 @@ func TestOpenHomeSessionUsesConfiguredDirectoryAndSessionName(t *testing.T) {
 	if !runner.hasRun("tmux new-session -ds home -n terminal_home -c " + selected) {
 		t.Fatalf("new-session was not executed as expected: %#v", runner.runs)
 	}
-	if !runner.hasStart("x-terminal-emulator -e tmux attach -t home") {
+	if !runner.hasStart("x-terminal-emulator -e env COLORTERM=truecolor tmux attach -t home") {
 		t.Fatalf("terminal attach was not executed as expected: %#v", runner.starts)
 	}
 }

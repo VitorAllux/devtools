@@ -27,6 +27,13 @@ type ResourcesHubKeyBindings struct {
 	Start   KeyBinding
 	Restart KeyBinding
 	Stop    KeyBinding
+	Logs    KeyBinding
+}
+
+type SecretsHubKeyBindings struct {
+	Prepare KeyBinding
+	Restore KeyBinding
+	Sync    KeyBinding
 }
 
 func (c *Config) SSHHubKeys() SSHHubKeyBindings {
@@ -53,6 +60,16 @@ func (c *Config) ResourcesHubKeys() ResourcesHubKeyBindings {
 		Start:   normalizeKeyOrDefault(c.Project.Resources.Hub.Shortcuts.Start, defaults.Start),
 		Restart: normalizeKeyOrDefault(c.Project.Resources.Hub.Shortcuts.Restart, defaults.Restart),
 		Stop:    normalizeKeyOrDefault(c.Project.Resources.Hub.Shortcuts.Stop, defaults.Stop),
+		Logs:    normalizeKeyOrDefault(c.Project.Resources.Hub.Shortcuts.Logs, defaults.Logs),
+	}
+}
+
+func (c *Config) SecretsHubKeys() SecretsHubKeyBindings {
+	defaults := DefaultProjectConfig().Secrets.Hub.Shortcuts
+	return SecretsHubKeyBindings{
+		Prepare: normalizeKeyOrDefault(c.Project.Secrets.Hub.Shortcuts.Prepare, defaults.Prepare),
+		Restore: normalizeKeyOrDefault(c.Project.Secrets.Hub.Shortcuts.Restore, defaults.Restore),
+		Sync:    normalizeKeyOrDefault(c.Project.Secrets.Hub.Shortcuts.Sync, defaults.Sync),
 	}
 }
 
