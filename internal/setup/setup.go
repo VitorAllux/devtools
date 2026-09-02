@@ -357,6 +357,7 @@ func zshShortcutsStale(content string, cfg *config.Config) bool {
 	}{
 		{firstNonEmpty(cfg.Project.Tmux.Session.Shortcut, "ctrl+f"), "dvv tmux:session"},
 		{firstNonEmpty(cfg.Project.Tmux.Home.Shortcut, "alt+f"), "dvv tmux:home"},
+		{firstNonEmpty(cfg.Project.Tmux.Reset.Shortcut, "alt+r"), "dvv tmux:reset-api"},
 		{"alt+s", "dvv ssh"},
 	}
 	for _, expectation := range expectations {
@@ -528,7 +529,7 @@ func showSetupHelp() {
 	fmt.Printf("  %s dvv setup\n\n", ui.Bold("Usage:"))
 	helpSection("Actions")
 	helpEntry("zsh completion", "Copy completions/_dvv to ~/.zfunc/_dvv when possible")
-	helpEntry("shell shortcuts", "Install managed Ctrl+F, Alt+F, and Alt+S zsh shortcuts")
+	helpEntry("shell shortcuts", "Install managed Ctrl+F, Alt+F, Alt+R fallback, and Alt+S zsh shortcuts")
 	helpEntry("tmux shortcuts", "Install managed Alt+R tmux reset shortcut")
 }
 

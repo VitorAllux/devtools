@@ -17,7 +17,7 @@ dvv check
 | Build | `scripts/build.js` and `dvv build` from a non-repository directory. |
 | Help | Root help and hub help for `ssh`, `workspace`, `tmux`, `db`, `resources`, `secrets`, `config`, `bootstrap`, and `check`. |
 | Doctor | `dvv doctor` exits cleanly in a temporary home directory. |
-| Setup | `dvv setup` writes completion, managed zsh shortcuts, and managed tmux shortcuts to temporary files only. |
+| Setup | `dvv setup` writes completion, managed zsh shortcuts including the `Alt+R` fallback, and managed tmux shortcuts to temporary files only. |
 | Compatibility | Script-friendly `ssh:list` and `workspace:list` still run without being advertised as primary UX. |
 | Completion | Static zsh completion keeps public hubs visible and gates compatibility completions behind `DVV_COMPLETE_COMPAT`. |
 
@@ -40,6 +40,7 @@ Run these checks on the machine that will use the CLI daily:
 | Workspace | `dvv workspace` | Hub opens even when empty, existing `workspace-*` dirs are adopted, create/manage/delete/template flows show loaders. |
 | Tmux | `dvv tmux` | Environment hub opens; selected actions route to tmux commands; `Alt+N` can select API/Web projects and save a custom target. |
 | Tmux reset | `Alt+R` inside a dvv tmux environment | API pane receives Laravel cache/config reset commands, Horizon restarts when present, and Web is untouched. |
+| Tmux reset fallback | `Alt+R` outside tmux | A normal `dvv tmux:reset-api` error is printed instead of a terminal bell. |
 | Directory picker | `Ctrl+F` or `dvv tmux:session` | Directory picker lists current directory, configured roots, and child directories. |
 | Home tmux tab | `Alt+F` or `dvv tmux:home` | New terminal tab opens in WSL/macOS/Linux terminal and attaches to a tmux session in `~`. |
 | Database | `dvv db` | Create/import/truncate/drop/clean actions show confirmation and loader/progress states. |

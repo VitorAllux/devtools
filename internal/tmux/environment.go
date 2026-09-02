@@ -565,7 +565,7 @@ func (m *Manager) resetAPIPanes(ctx context.Context, session string, window stri
 func (m *Manager) currentTmuxWindow(ctx context.Context) (string, string, error) {
 	output, err := m.Runner.Output(ctx, "", "tmux", "display-message", "-p", "#{session_name}\t#{window_name}")
 	if err != nil {
-		return "", "", fmt.Errorf("tmux reset must run inside tmux or receive --session and --window: %w", err)
+		return "", "", fmt.Errorf("tmux reset must run inside tmux; open a dvv tmux tab and press Alt+R there, or run dvv tmux:reset-api --session <name> --window <name>")
 	}
 	parts := strings.SplitN(strings.TrimSpace(string(output)), "\t", 2)
 	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {

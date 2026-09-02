@@ -339,6 +339,23 @@ func TestResetCurrentAPIShowsSpecificTmuxFailure(t *testing.T) {
 	}
 }
 
+func TestResetCurrentAPIOutsideTmuxShowsActionableError(t *testing.T) {
+	root := t.TempDir()
+	runner := &fakeRunner{
+		paths:            map[string]bool{"tmux": true},
+		currentWindowErr: true,
+	}
+	manager := NewManager(testConfig(root), runner)
+
+	err := manager.ResetCurrentAPI(context.Background(), "", "")
+	if err == nil {
+		t.Fatal("expected reset to fail outside tmux")
+	}
+	if !strings.Contains(err.Error(), "open a dvv tmux tab and press Alt+R there") {
+		t.Fatalf("error = %q, want actionable tmux guidance", err.Error())
+	}
+}
+
 func TestTmuxListOptionHasToken(t *testing.T) {
 	if !tmuxListOptionHas("xterm-256color:RGB,*:RGB", "*:RGB") {
 		t.Fatal("expected tmux list option to detect exact token")

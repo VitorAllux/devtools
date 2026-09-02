@@ -66,6 +66,7 @@ func TestZshShortcutsStaleDetectsOldHomeBinding(t *testing.T) {
 		`# >>> dvv shell shortcuts >>>`,
 		`bindkey -s "^F" "dvv tmux:session\n"`,
 		`bindkey -s "\ef" "dvv tmux:home\n"`,
+		`bindkey -s "\er" "dvv tmux:reset-api\n"`,
 		`bindkey -s "\es" "dvv ssh\n"`,
 		`# <<< dvv shell shortcuts <<<`,
 	}, "\n")

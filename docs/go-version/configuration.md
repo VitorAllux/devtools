@@ -272,7 +272,7 @@ The `tmux.reset` section contains the tmux-level reset shortcut used inside runn
 
 - `shortcut`: tmux keybinding installed in `~/.tmux.conf`. Defaults to `alt+r`. Set to `none` to skip the managed tmux binding.
 
-`dvv tmux:reset-api` is the command behind this binding. Setup prefers the absolute built binary from `dist/dvv` so the shortcut does not depend on the tmux server's `PATH`. It resets pane `0` as the Laravel API pane, runs cache/config reset commands, restarts `php artisan serve`, and restarts Horizon only when pane `1` points at the same API project. The Web pane is intentionally skipped.
+`dvv tmux:reset-api` is the command behind this binding. Setup prefers the absolute built binary from `dist/dvv` so the shortcut does not depend on the tmux server's `PATH`. It finds a pane inside a Laravel API project, runs cache/config reset commands, restarts `php artisan serve`, and restarts Horizon only when another pane points at the same API project. The Web pane is intentionally skipped.
 
 Shortcut changes are applied by running `dvv setup`; `dvv build` and `npm run build` do not edit shell or tmux files.
 
@@ -331,7 +331,7 @@ esc
 
 For letter keys, `shift+a` maps to the uppercase key `A` in fzf. That is how most terminals expose Shift+letter.
 
-The shell integration writes `alt+letter` as an escaped zsh binding, such as `\ef` for `Alt+F`. It can also write `ctrl+shift+letter` as a CSI-u binding, but terminal applications may reserve those chords for their own UI. Windows Terminal reserves `Ctrl+Shift+F` for Find, so `Alt+F` is the default direct home shortcut.
+The shell integration writes `alt+letter` as an escaped zsh binding, such as `\ef` for `Alt+F` and `\er` for the `Alt+R` reset fallback. It can also write `ctrl+shift+letter` as a CSI-u binding, but terminal applications may reserve those chords for their own UI. Windows Terminal reserves `Ctrl+Shift+F` for Find, so `Alt+F` is the default direct home shortcut.
 
 Tmux shortcut integration writes `alt+letter` as `M-letter`, such as `M-r` for `Alt+R`, in the managed `~/.tmux.conf` block.
 Set `DVV_SKIP_TMUX_INTEGRATION=1` before `dvv setup` to skip `.tmux.conf` changes.

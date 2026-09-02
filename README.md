@@ -135,9 +135,10 @@ Compatibility routes such as `dvv ssh:list`, `dvv workspace:list`, `dvv db impor
 | --- | --- |
 | `Ctrl+F` | `dvv tmux:session` |
 | `Alt+F` | `dvv tmux:home` |
+| `Alt+R` | `dvv tmux:reset-api` fallback outside tmux |
 | `Alt+S` | `dvv ssh` |
 
-The managed block is written to `~/.zshrc`. Set `DVV_SKIP_SHELL_INTEGRATION=1` before setup to skip shortcut installation. Windows Terminal reserves `Ctrl+Shift+F` for Find, so the default direct home shortcut is `Alt+F`.
+The managed block is written to `~/.zshrc`. The `Alt+R` zsh binding is a fallback: inside tmux, the tmux binding handles the reset; outside tmux, it runs the command and prints a normal error instead of a terminal bell. Set `DVV_SKIP_SHELL_INTEGRATION=1` before setup to skip shortcut installation. Windows Terminal reserves `Ctrl+Shift+F` for Find, so the default direct home shortcut is `Alt+F`.
 
 ## Tmux Shortcuts
 
@@ -149,7 +150,7 @@ The managed block is written to `~/.zshrc`. Set `DVV_SKIP_SHELL_INTEGRATION=1` b
 
 `Alt+R` resets the current tmux window's API/Horizon panes. It looks for a pane inside a Laravel project, sends `Ctrl+C` to that API pane, runs Laravel cache/config reset commands, starts `php artisan serve`, and restarts Horizon only when another pane points at the same API project. It does not touch the Web pane. If the current tmux window has no Laravel API pane, it fails with a short status message.
 
-Set `tmux.reset.shortcut` or `DVV_TMUX_RESET_SHORTCUT` to change it. Use `none` to disable the managed tmux shortcut. `dvv setup` writes the config, prefers the absolute built binary when available, and attempts to reload it in any running tmux server. Reset shortcut output is written to `~/.cache/devv/tmux-reset.log` so failures do not print command text into the active pane. Set `DVV_SKIP_TMUX_INTEGRATION=1` before setup to skip `.tmux.conf` changes.
+Set `tmux.reset.shortcut` or `DVV_TMUX_RESET_SHORTCUT` to change it. Use `none` to disable the managed tmux shortcut and the zsh fallback. `dvv setup` writes the config, prefers the absolute built binary when available, and attempts to reload it in any running tmux server. Reset shortcut output is written to `~/.cache/devv/tmux-reset.log` so failures do not print command text into the active pane. Set `DVV_SKIP_TMUX_INTEGRATION=1` before setup to skip `.tmux.conf` changes.
 
 ## SSH Hub
 
@@ -268,7 +269,7 @@ The current tmux window can be reset with:
 dvv tmux:reset-api
 ```
 
-This command is mainly the backend for the managed `Alt+R` tmux shortcut. It targets the current tmux session/window, validates pane `0` as a Laravel API project, restarts API cache/config state, and restarts Horizon when the Horizon pane exists. Web is intentionally skipped.
+This command is mainly the backend for the managed `Alt+R` tmux shortcut. It targets the current tmux session/window, finds a pane inside a Laravel API project, restarts API cache/config state, and restarts Horizon when another pane points at the same API project. Web is intentionally skipped.
 
 ## Database
 
@@ -507,7 +508,7 @@ Common cases:
 | `zsh: command not found: devv` | Use `dvv`. Run `dvv setup` if an old shortcut still calls `devv`. |
 | `npm ERR! path /root/package.json` | You ran an npm script outside the repo. Use `dvv build` or `dvv check`. |
 | `Ctrl+Shift+F` opens terminal Find | This is a Windows Terminal shortcut. Use `Alt+F` after `dvv setup`, or run `dvv tmux:home`. |
-| `Alt+R` does nothing in tmux | Run `dvv build`, then `dvv setup`. If a tmux server was already open, run `tmux source-file ~/.tmux.conf` or open the environment again with `dvv tmux`. |
+| `Alt+R` beeps or does nothing | Press it inside a tmux tab created/opened by `dvv tmux`, then run `dvv build` and `dvv setup`. If a tmux server was already open, run `tmux source-file ~/.tmux.conf` or open the environment again with `dvv tmux`. |
 | Autocomplete did not update | Run `dvv setup`, then open a new terminal or run `exec zsh`. |
 | Theme colors look different inside tmux | Rebuild with `dvv build` and open a new tmux tab. `dvv` configures tmux truecolor for sessions it creates; old sessions may need to be recreated. |
 | Workspace opens as missing in VS Code | Run `dvv doctor` and check for invalid workspace names or stale VS Code recent entries. |

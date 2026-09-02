@@ -197,6 +197,7 @@ type fakeRunner struct {
 	existingSessions map[string]bool
 	currentSession   string
 	currentWindow    string
+	currentWindowErr bool
 	activePanes      map[string]string
 	paneIndexes      map[string][]string
 	panePaths        map[string]string
@@ -223,6 +224,9 @@ func (r *fakeRunner) Output(_ context.Context, _ string, name string, args ...st
 		return nil, errors.New("session not found")
 	}
 	if name == "tmux" && len(args) == 3 && args[0] == "display-message" && args[1] == "-p" && args[2] == "#{session_name}\t#{window_name}" {
+		if r.currentWindowErr {
+			return nil, errors.New("not in tmux")
+		}
 		session := r.currentSession
 		if session == "" {
 			session = "dev"

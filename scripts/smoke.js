@@ -59,6 +59,8 @@ const zshrc = readFile(path.join(home, ".zshrc"));
 assertIncludes(zshrc, "dvv tmux:session\\n", "managed Ctrl+F shortcut");
 assertIncludes(zshrc, "dvv tmux:home\\n", "managed Alt+F shortcut");
 assertIncludes(zshrc, "\\ef", "managed Alt+F sequence");
+assertIncludes(zshrc, "dvv tmux:reset-api\\n", "managed Alt+R shell fallback");
+assertIncludes(zshrc, "\\er", "managed Alt+R sequence");
 assertIncludes(zshrc, "dvv ssh\\n", "managed Alt+S shortcut");
 assertExcludes(zshrc, "devv ", "legacy devv shortcut");
 
