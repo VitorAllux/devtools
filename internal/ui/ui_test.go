@@ -2,6 +2,7 @@ package ui
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -225,4 +226,25 @@ func TestRunWithRoyalLoaderReturnsFunctionResultWhenDisabled(t *testing.T) {
 	if !errors.Is(got, want) {
 		t.Fatalf("RunWithRoyalLoader error = %v, want %v", got, want)
 	}
+}
+
+func TestRunWithRoyalLoaderDoesNotHangOnPanic(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	t.Setenv("DVV_NO_LOADER", "")
+	originalTerminalCheck := terminalCheck
+	terminalCheck = func(*os.File) bool { return true }
+	t.Cleanup(func() {
+		terminalCheck = originalTerminalCheck
+	})
+
+	defer func() {
+		recovered := recover()
+		if recovered != "boom" {
+			t.Fatalf("panic = %#v, want boom", recovered)
+		}
+	}()
+
+	_ = RunWithRoyalLoader(LoaderOptions{Action: "testing", ShowResult: true}, func() error {
+		panic("boom")
+	})
 }

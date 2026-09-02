@@ -111,7 +111,7 @@ func (m *Manager) CommandDrop(ctx context.Context) error {
 		return nil
 	}
 	for _, name := range selected {
-		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "dropping", Subject: "database", Detail: name, ShowResult: true, SuccessAction: "dropped"}, func() error {
+		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "dropping", Subject: "database", Detail: name}, func() error {
 			return m.mysql(ctx, "-e", "DROP DATABASE "+identifier(name)+";")
 		}); err != nil {
 			return err
@@ -133,7 +133,7 @@ func (m *Manager) CommandTruncate(ctx context.Context) error {
 		return nil
 	}
 	for _, name := range selected {
-		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "truncating", Subject: "database", Detail: name, ShowResult: true, SuccessAction: "truncated"}, func() error {
+		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "truncating", Subject: "database", Detail: name}, func() error {
 			return m.truncate(ctx, name)
 		}); err != nil {
 			return err
@@ -162,7 +162,7 @@ func (m *Manager) CommandClean(ctx context.Context) error {
 	if !ui.Confirm(fmt.Sprintf("Delete %d dump file(s)?", len(selected))) {
 		return nil
 	}
-	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "deleting", Subject: fmt.Sprintf("%d dump file(s)", len(selected)), ShowResult: true, SuccessAction: "deleted"}, func() error {
+	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "deleting", Subject: fmt.Sprintf("%d dump file(s)", len(selected))}, func() error {
 		for _, file := range selected {
 			if err := os.Remove(filepath.Join(m.Config.Project.DB.DumpsDir, file)); err != nil {
 				return err
@@ -535,11 +535,16 @@ func (m *Manager) importDump(ctx context.Context, dump string, dbName string) er
 	cmd.Stderr = &stderr
 
 	progress.Start()
+	importOK := false
+	defer func() {
+		progress.Finish(importOK)
+	}()
 	err = cmd.Run()
-	progress.Finish(err == nil)
 	if err != nil {
 		return fmt.Errorf("import failed: %s", summarizeCommandError(err, stderr.String()))
 	}
+	importOK = true
+	progress.Finish(true)
 	if removed := removedInvalidLines(); removed > 0 {
 		ui.Warn("Removed %d invalid SQL line(s)", removed)
 	}
