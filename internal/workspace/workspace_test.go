@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/VitorAllux/devtools/internal/config"
 	"github.com/VitorAllux/devtools/internal/discovery"
@@ -843,6 +844,51 @@ func TestRemoveWorkspaceRequiresExplicitMetadataRemoval(t *testing.T) {
 	}
 }
 
+func TestDeleteWorkspacesInteractiveReusesBatchSafetyConfirmations(t *testing.T) {
+	t.Setenv("DVV_NO_LOADER", "1")
+	ctx := context.Background()
+	root := t.TempDir()
+	workspacesRoot := filepath.Join(root, "workspaces")
+	cfg := testWorkspaceConfig(workspacesRoot)
+	cfg.Project.Workspace.Safety.RequireConfirmation = false
+	cfg.Project.Workspace.Safety.AllowForceRemove = true
+	runner := newWorkspaceRunner()
+	manager := NewManager(cfg, runner)
+
+	workspacePaths := []string{}
+	for _, name := range []string{"alpha", "beta"} {
+		workspacePath := filepath.Join(workspacesRoot, "workspace-"+name)
+		worktreePath := filepath.Join(workspacePath, "api")
+		source := filepath.Join(root, "repos", name, "api")
+		mustMkdir(t, source)
+		mustMkdir(t, worktreePath)
+		runner.linked[worktreePath] = source
+		runner.status[worktreePath] = " M file.go"
+		if err := metadata.Write(workspacePath, metadata.Workspace{
+			Version:       1,
+			WorkspaceName: name,
+			WorkspaceDir:  "workspace-" + name,
+			WorkBranch:    name,
+			Projects: []metadata.Project{
+				{Name: "api", Source: source, Path: worktreePath},
+			},
+		}); err != nil {
+			t.Fatalf("metadata write failed: %v", err)
+		}
+		workspacePaths = append(workspacePaths, workspacePath)
+	}
+	withPromptInput(t, "y\n", "y\n")
+
+	if err := manager.deleteWorkspacesInteractive(ctx, workspacePaths); err != nil {
+		t.Fatalf("deleteWorkspacesInteractive returned error: %v", err)
+	}
+	for _, path := range workspacePaths {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("workspace should be removed after shared confirmations: %s stat err=%v", path, err)
+		}
+	}
+}
+
 func testWorkspaceConfig(workspacesRoot string) *config.Config {
 	project := config.DefaultProjectConfig()
 	project.Workspace.Root = workspacesRoot
@@ -858,6 +904,30 @@ func mustMkdir(t *testing.T, path string) {
 	if err := os.MkdirAll(path, 0o755); err != nil {
 		t.Fatalf("MkdirAll %s failed: %v", path, err)
 	}
+}
+
+func withPromptInput(t *testing.T, lines ...string) {
+	t.Helper()
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Pipe stdin failed: %v", err)
+	}
+	original := os.Stdin
+	os.Stdin = reader
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for _, line := range lines {
+			_, _ = writer.WriteString(line)
+			time.Sleep(20 * time.Millisecond)
+		}
+		_ = writer.Close()
+	}()
+	t.Cleanup(func() {
+		os.Stdin = original
+		<-done
+		_ = reader.Close()
+	})
 }
 
 type workspaceRunner struct {

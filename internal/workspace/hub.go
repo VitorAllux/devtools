@@ -388,24 +388,27 @@ func (m *Manager) deleteWorkspacesInteractive(ctx context.Context, paths []strin
 	if m.Config.Project.Workspace.Safety.RequireConfirmation && !ui.Confirm(fmt.Sprintf("Delete %d workspace(s)?", len(paths))) {
 		return nil
 	}
+	options := RemoveWorkspaceOptions{}
 	for _, path := range paths {
 		ws, err := m.Resolve(path)
 		if err != nil {
 			return err
 		}
-		if err := m.deleteWorkspaceInteractive(ctx, ws); err != nil {
+		if err := m.deleteWorkspaceInteractive(ctx, ws, &options); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (m *Manager) deleteWorkspaceInteractive(ctx context.Context, ws Workspace) error {
-	options := RemoveWorkspaceOptions{}
+func (m *Manager) deleteWorkspaceInteractive(ctx context.Context, ws Workspace, options *RemoveWorkspaceOptions) error {
+	if options == nil {
+		options = &RemoveWorkspaceOptions{}
+	}
 	for {
 		var result RemoveWorkspaceResult
 		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "deleting", Subject: ws.DirName}, func() error {
-			result = m.RemoveWorkspace(ctx, ws, options)
+			result = m.RemoveWorkspace(ctx, ws, *options)
 			return nil
 		}); err != nil {
 			return err
@@ -423,7 +426,7 @@ func (m *Manager) deleteWorkspaceInteractive(ctx context.Context, ws Workspace) 
 			}
 			options.ForceDirty = true
 		case RemoveBlockedMetadata:
-			if !ui.Confirm("Remove workspace metadata and delete the workspace directory completely?") {
+			if !ui.Confirm("Remove workspace metadata and delete workspace directories completely?") {
 				return nil
 			}
 			options.RemoveMetadata = true
