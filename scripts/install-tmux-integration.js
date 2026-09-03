@@ -105,7 +105,7 @@ function shortcutToTmuxKey(value) {
 
 function resetCommand(root) {
   const binary = dvvCommand(root);
-  return `${shellWord(binary)} tmux:reset-api --session "#{session_name}" --window "#{window_name}" || tmux display-message -t "#{session_name}:#{window_name}" "dvv reset failed"`;
+  return `${shellWord(binary)} tmux:reset-api --session "#{session_name}" --window "#{window_name}"; status=$?; if [ "$status" -eq 126 ] || [ "$status" -eq 127 ]; then tmux display-message -t "#{session_name}:#{window_name}" "dvv reset command unavailable"; fi; exit "$status"`;
 }
 
 function dvvCommand(root) {
