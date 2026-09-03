@@ -140,6 +140,13 @@ The file is versioned because it defines project behavior, theme identity, and d
         "delete": "shift+d",
         "template": "shift+t"
       }
+    },
+    "templateHub": {
+      "shortcuts": {
+        "create": "shift+c",
+        "edit": "shift+e",
+        "delete": "shift+d"
+      }
     }
   }
 }
@@ -265,7 +272,7 @@ The `tmux.reset` section contains the tmux-level reset shortcut used inside runn
 
 - `shortcut`: tmux keybinding installed in `~/.tmux.conf`. Defaults to `alt+r`. Set to `none` to skip the managed tmux binding.
 
-`dvv tmux:reset-api` is the command behind this binding. Setup prefers the absolute built binary from `dist/dvv` so the shortcut does not depend on the tmux server's `PATH`. It looks for a Laravel API project in the current tmux window, prefers pane `0` when possible, runs cache/config reset commands, restarts `php artisan serve`, and restarts Horizon only when another pane points at the same API project. The Web pane is intentionally skipped.
+`dvv tmux:reset-api` is the command behind this binding. Setup prefers the absolute built binary from `dist/dvv` so the shortcut does not depend on the tmux server's `PATH`. It finds a Laravel API pane in the current tmux window first, preferring pane `0`, then the active pane, then any pane with an `artisan` file. If the current window is not an API target, it falls back to the last target opened or manually selected through `dvv tmux`, then to a single detected Laravel API window when the shortcut is used elsewhere. Running the command manually opens a selector if several API windows are available. It runs cache/config reset commands, restarts `php artisan serve`, and restarts Horizon only when another pane points at the same API project. The Web pane is intentionally skipped.
 
 Shortcut changes are applied by running `dvv setup`; `dvv build` and `npm run build` do not edit shell or tmux files.
 
@@ -290,6 +297,7 @@ The `workspace` section contains these groups:
 - `projectSearchDepth`: discovery depth below each project search root.
 - `git`: remote name, base branch priority, branch reuse/creation rules, branch name template, and base branch by workspace type.
 - `interactive`: selector, opener, and configurable hub shortcuts.
+- `templateHub`: configurable shortcuts for creating, editing, and deleting workspace templates.
 - `bootstrap`: copy rules and conditional commands.
 - `workspaceHarness`: generated workspace `AGENTS.md` behavior.
 - `hooks`: commands for workspace and project lifecycle events.
@@ -303,7 +311,7 @@ Workspace metadata is stored inside each workspace:
 
 Existing `workspace-*` directories are adopted when the hub opens if this metadata is missing. Adoption is additive only: it writes `.workspace/config.json` from detected worktrees and leaves all existing files in place.
 
-Workspace templates can be defined in `workspace.templates` or persisted through `DVV_WORKSPACE_TEMPLATES`. The workspace hub saves templates with `Shift+T`: the flow asks for a template name, base selection, optional source branch, and projects. During `Shift+C` workspace creation, the base selector also lists saved templates, so selecting a template reuses its project list and base branch rule.
+Workspace templates can be defined in `workspace.templates` or persisted through `DVV_WORKSPACE_TEMPLATES`. The workspace hub opens template management with `Shift+T`, and the template hub can create, edit, or delete templates with its own configurable shortcuts. During `Shift+C` workspace creation, the base selector also lists saved templates, so selecting a template reuses its project list and base branch rule.
 
 Supported lifecycle hook events are `workspace.creating`, `workspace.created`, `workspace.opened`, `workspace.removing`, `workspace.removed`, `project.adding`, `project.added`, `project.bootstrap`, `project.removing`, and `project.removed`.
 
@@ -323,7 +331,7 @@ esc
 
 For letter keys, `shift+a` maps to the uppercase key `A` in fzf. That is how most terminals expose Shift+letter.
 
-The shell integration writes `alt+letter` as an escaped zsh binding, such as `\ef` for `Alt+F`. It can also write `ctrl+shift+letter` as a CSI-u binding, but terminal applications may reserve those chords for their own UI. Windows Terminal reserves `Ctrl+Shift+F` for Find, so `Alt+F` is the default direct home shortcut.
+The shell integration writes `alt+letter` as an escaped zsh binding, such as `\ef` for `Alt+F` and `\er` for the `Alt+R` reset fallback. It can also write `ctrl+shift+letter` as a CSI-u binding, but terminal applications may reserve those chords for their own UI. Windows Terminal reserves `Ctrl+Shift+F` for Find, so `Alt+F` is the default direct home shortcut.
 
 Tmux shortcut integration writes `alt+letter` as `M-letter`, such as `M-r` for `Alt+R`, in the managed `~/.tmux.conf` block.
 Set `DVV_SKIP_TMUX_INTEGRATION=1` before `dvv setup` to skip `.tmux.conf` changes.

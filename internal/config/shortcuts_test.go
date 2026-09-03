@@ -47,6 +47,18 @@ func TestWorkspaceHubKeysUseDefaults(t *testing.T) {
 	}
 }
 
+func TestWorkspaceTemplateHubKeysUseDefaults(t *testing.T) {
+	cfg := Config{Project: DefaultProjectConfig()}
+	keys := cfg.WorkspaceTemplateHubKeys()
+
+	if keys.Create.FZFKey != "C" || keys.Create.Label != "Shift+C" {
+		t.Fatalf("create key = %#v", keys.Create)
+	}
+	if keys.Edit.FZFKey != "E" || keys.Delete.FZFKey != "D" {
+		t.Fatalf("template hub keys = %#v", keys)
+	}
+}
+
 func TestResourcesHubKeysUseDefaults(t *testing.T) {
 	cfg := Config{Project: DefaultProjectConfig()}
 	keys := cfg.ResourcesHubKeys()

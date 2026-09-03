@@ -28,6 +28,22 @@ func TestBuildRunsScriptFromProjectRoot(t *testing.T) {
 	}
 }
 
+func TestCheckRunsNpmFromProjectRoot(t *testing.T) {
+	runner := &fakeRunner{}
+	cfg := &config.Config{RootDir: "/repo/devtools"}
+
+	err := (Manager{Config: cfg, Runner: runner}).Check(context.Background())
+	if err != nil {
+		t.Fatalf("Check returned error: %v", err)
+	}
+	if runner.dir != "/repo/devtools" {
+		t.Fatalf("dir = %q, want project root", runner.dir)
+	}
+	if runner.command != "npm run check" {
+		t.Fatalf("command = %q", runner.command)
+	}
+}
+
 func TestSetupRunsScriptFromProjectRoot(t *testing.T) {
 	runner := &fakeRunner{}
 	cfg := &config.Config{RootDir: "/repo/devtools"}
@@ -50,6 +66,7 @@ func TestZshShortcutsStaleDetectsOldHomeBinding(t *testing.T) {
 		`# >>> dvv shell shortcuts >>>`,
 		`bindkey -s "^F" "dvv tmux:session\n"`,
 		`bindkey -s "\ef" "dvv tmux:home\n"`,
+		`bindkey -s "\er" "dvv tmux:reset-api\n"`,
 		`bindkey -s "\es" "dvv ssh\n"`,
 		`# <<< dvv shell shortcuts <<<`,
 	}, "\n")
@@ -123,6 +140,24 @@ func TestTmuxResetShortcutPrefersBuiltBinary(t *testing.T) {
 	if !strings.Contains(line, "tmux display-message") {
 		t.Fatalf("tmux shortcut line = %q, want visible failure fallback", line)
 	}
+	if !strings.Contains(line, "tmux-reset.log") || !strings.Contains(line, `>"$log_file" 2>&1`) {
+		t.Fatalf("tmux shortcut line = %q, want silent log redirection", line)
+	}
+	if !strings.Contains(line, "NO_COLOR=1") || !strings.Contains(line, "tail -n 1") {
+		t.Fatalf("tmux shortcut line = %q, want readable log tail fallback", line)
+	}
+	if !strings.Contains(line, "display-message -d 5000") {
+		t.Fatalf("tmux shortcut line = %q, want visible message duration", line)
+	}
+	if !strings.Contains(line, "--fallback-global") {
+		t.Fatalf("tmux shortcut line = %q, want global fallback flag", line)
+	}
+	if strings.Contains(line, `exit "$status"`) {
+		t.Fatalf("tmux shortcut line should not bubble failures to the key binding: %q", line)
+	}
+	if strings.Contains(line, "command unavailable") {
+		t.Fatalf("tmux shortcut line should not use the old command-unavailable block: %q", line)
+	}
 }
 
 func TestShortcutToTmuxKey(t *testing.T) {
@@ -146,6 +181,13 @@ func TestShortcutToTmuxKey(t *testing.T) {
 
 func TestRunBuildRejectsArguments(t *testing.T) {
 	err := RunBuild(context.Background(), &config.Config{}, &fakeRunner{}, []string{"extra"})
+	if err == nil || !strings.Contains(err.Error(), "does not accept arguments") {
+		t.Fatalf("expected argument error, got %v", err)
+	}
+}
+
+func TestRunCheckRejectsArguments(t *testing.T) {
+	err := RunCheck(context.Background(), &config.Config{}, &fakeRunner{}, []string{"extra"})
 	if err == nil || !strings.Contains(err.Error(), "does not accept arguments") {
 		t.Fatalf("expected argument error, got %v", err)
 	}
@@ -215,6 +257,7 @@ func TestZshCompletionKeepsHubFirstSurface(t *testing.T) {
 		"resources:Open the local resources hub",
 		"secrets:Open the local secrets hub",
 		"config:Open the configuration hub",
+		"check:Run build, tests, vet, and smoke from the project root",
 	} {
 		if !strings.Contains(text, command) {
 			t.Fatalf("completion missing public command %q", command)
@@ -229,7 +272,7 @@ func TestZshCompletionKeepsHubFirstSurface(t *testing.T) {
 	if !strings.Contains(text, "tmux:home:Open the configured home tmux tab used by Alt+F") {
 		t.Fatal("completion should keep the Alt+F shortcut command documented")
 	}
-	if !strings.Contains(text, "tmux:reset-api:Reset API and Horizon panes in the current tmux window") {
+	if !strings.Contains(text, "tmux:reset-api:Reset or select API/Horizon tmux target") {
 		t.Fatal("completion should keep the tmux reset shortcut command documented")
 	}
 	if !strings.Contains(text, "--fix:Create safe runtime files, rebuild, and reinstall shell/tmux integration") {

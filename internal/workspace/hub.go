@@ -156,7 +156,7 @@ func (m *Manager) fzfHub(ctx context.Context, details []Details, hubError string
 		}
 		return false, "", nil
 	case keys.Template.FZFKey:
-		if err := m.createTemplateInteractive(ctx); err != nil {
+		if err := m.templatesHub(ctx); err != nil {
 			return true, err.Error(), nil
 		}
 		return true, "", nil
@@ -199,7 +199,7 @@ func (m *Manager) basicHub(ctx context.Context, details []Details, hubError stri
 	}
 	printWorkspaceList(details)
 	fmt.Println()
-	fmt.Printf("Commands: number opens | %s creates | %s saves template | %s number manages | %s number deletes | q exits\n", keys.Create.Label, keys.Template.Label, keys.Manage.Label, keys.Delete.Label)
+	fmt.Printf("Commands: number opens | %s creates | %s templates | %s number manages | %s number deletes | q exits\n", keys.Create.Label, keys.Template.Label, keys.Manage.Label, keys.Delete.Label)
 	value, err := ui.Prompt("Workspace")
 	if err != nil {
 		return false, "", err
@@ -219,7 +219,7 @@ func (m *Manager) basicHub(ctx context.Context, details []Details, hubError stri
 		return false, "", nil
 	}
 	if matchesShortcut(value, keys.Template.FZFKey) {
-		if err := m.createTemplateInteractive(ctx); err != nil {
+		if err := m.templatesHub(ctx); err != nil {
 			return true, err.Error(), nil
 		}
 		return true, "", nil
@@ -388,24 +388,27 @@ func (m *Manager) deleteWorkspacesInteractive(ctx context.Context, paths []strin
 	if m.Config.Project.Workspace.Safety.RequireConfirmation && !ui.Confirm(fmt.Sprintf("Delete %d workspace(s)?", len(paths))) {
 		return nil
 	}
+	options := RemoveWorkspaceOptions{}
 	for _, path := range paths {
 		ws, err := m.Resolve(path)
 		if err != nil {
 			return err
 		}
-		if err := m.deleteWorkspaceInteractive(ctx, ws); err != nil {
+		if err := m.deleteWorkspaceInteractive(ctx, ws, &options); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (m *Manager) deleteWorkspaceInteractive(ctx context.Context, ws Workspace) error {
-	options := RemoveWorkspaceOptions{}
+func (m *Manager) deleteWorkspaceInteractive(ctx context.Context, ws Workspace, options *RemoveWorkspaceOptions) error {
+	if options == nil {
+		options = &RemoveWorkspaceOptions{}
+	}
 	for {
 		var result RemoveWorkspaceResult
 		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "deleting", Subject: ws.DirName}, func() error {
-			result = m.RemoveWorkspace(ctx, ws, options)
+			result = m.RemoveWorkspace(ctx, ws, *options)
 			return nil
 		}); err != nil {
 			return err
@@ -423,7 +426,7 @@ func (m *Manager) deleteWorkspaceInteractive(ctx context.Context, ws Workspace) 
 			}
 			options.ForceDirty = true
 		case RemoveBlockedMetadata:
-			if !ui.Confirm("Remove workspace metadata and delete the workspace directory completely?") {
+			if !ui.Confirm("Remove workspace metadata and delete workspace directories completely?") {
 				return nil
 			}
 			options.RemoveMetadata = true
@@ -809,7 +812,7 @@ func workspaceHubShortcuts(keys config.WorkspaceHubKeyBindings) []ui.FZFShortcut
 		{Label: "Enter", Description: "open"},
 		{Label: "Tab", Description: "mark delete"},
 		{Key: keys.Create.FZFKey, Label: keys.Create.Label, Description: "create workspace"},
-		{Key: keys.Template.FZFKey, Label: keys.Template.Label, Description: "save workspace template"},
+		{Key: keys.Template.FZFKey, Label: keys.Template.Label, Description: "manage templates"},
 		{Key: keys.Manage.FZFKey, Label: keys.Manage.Label, Description: "manage projects"},
 		{Key: keys.Delete.FZFKey, Label: keys.Delete.Label, Description: "delete selected"},
 		{Label: "Esc", Description: "exit hub"},

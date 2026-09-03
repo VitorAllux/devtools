@@ -18,7 +18,8 @@ This document maps the operational details that are easy to forget while using o
 | Source install | Symlink `bin/dvv` from the checkout into a directory on `PATH`. | Re-run `dvv build` after pulling source changes. |
 | Local rebuild | `dvv build` rebuilds from any working directory. | Use this after source changes. |
 | Repository build | `npm run build` works only from this repo root. | Do not run it from `~`; npm will search for `/root/package.json`. |
-| Validation | `npm run check` runs build, tests, vet, and non-destructive smoke. | Use it before pushing behavior changes. |
+| Validation | `dvv check` runs build, tests, vet, and non-destructive smoke from the project root. | Use it before pushing behavior changes. |
+| Repository validation | `npm run check` works only from this repo root. | Prefer `dvv check` when the terminal may be in `~`, a tmux home tab, or another project. |
 | Versioned launcher | `bin/dvv` is committed as the source-checkout launcher and rebuild helper. | Keep it small and source-controlled. |
 | Compiled binary | `dist/dvv` is a build artifact. | Do not commit it. |
 | Shell integration | `dvv setup` installs completion and managed zsh shortcuts. | Run only when setup, completion, or shortcut behavior changes. |
@@ -72,7 +73,8 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | Workspace templates | `workspace.templates` or `DVV_WORKSPACE_TEMPLATES` adds reusable creation presets. | Use `Shift+T` in `dvv workspace` to save project/base selections and `Shift+C` to reuse them. |
 | Target validation | API dir must contain `artisan`; Web dir must contain `package.json`. | Keep invalid targets visible as missing/invalid, but block start actions. |
 | Tmux truecolor | Sessions created by `dvv` set `default-terminal=tmux-256color`, `COLORTERM=truecolor`, `terminal-features=*:RGB`, and `terminal-overrides=*:Tc`. | Keep color options runtime-applied; `.tmux.conf` is only managed for the explicit shortcut block. |
-| API reset shortcut | `Alt+R` inside tmux runs `dvv tmux:reset-api` against the current session/window. | Reset API/Horizon only; do not send commands to Web panes. |
+| API reset shortcut | `Alt+R` runs `dvv tmux:reset-api` against the current tmux window, the last target opened or selected by `dvv tmux`, then a single detected Laravel API window. | Reset API/Horizon only; do not send commands to Web panes, and refuse multiple API candidates without a cached target. Manual runs may select a target. |
+| Reset target cache | Last opened reset target is stored in `~/.cache/devv/tmux-reset-target.json`. | Treat it as runtime state, not project config. |
 
 ## Hubs And Shortcuts
 
@@ -81,7 +83,7 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | Hub-first UX | Public commands should open hubs: `dvv ssh`, `dvv workspace`, `dvv tmux`, `dvv db`, `dvv resources`, `dvv secrets`, `dvv config`. | Keep mutation flows inside hubs where possible. |
 | Shortcut config | Hub action keys are configurable in `dvv.config.json`. | Read from config, do not hard-code feature shortcuts in command handlers. |
 | fzf previews | Detailed shortcut decks belong in the side preview panel. | Use shared `internal/ui.FZFHub` and `FZFPreviewCommandDeck`. |
-| Global shortcuts | Project-managed zsh shortcuts are `Ctrl+F`, `Alt+F`, and `Alt+S`; project-managed tmux shortcut is `Alt+R`. | Avoid adding more global `Ctrl-*` bindings without explicit need. |
+| Global shortcuts | Project-managed zsh shortcuts are `Ctrl+F`, `Alt+F`, `Alt+R` fallback, and `Alt+S`; project-managed tmux shortcut is `Alt+R`. | Avoid adding more global `Ctrl-*` bindings without explicit need. |
 | Home tmux tab | `Alt+F` runs `dvv tmux:home`, opening `tmux.home.directory` without fzf. | `Ctrl+Shift+F` is avoided because Windows Terminal captures it for Find. |
 | Completion | Root completion lists public hubs by default. Compatibility routes are shown only when `DVV_COMPLETE_COMPAT=1`. | Keep root help, completion, and README aligned. |
 

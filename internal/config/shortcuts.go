@@ -24,6 +24,12 @@ type WorkspaceHubKeyBindings struct {
 	Template KeyBinding
 }
 
+type WorkspaceTemplateHubKeyBindings struct {
+	Create KeyBinding
+	Edit   KeyBinding
+	Delete KeyBinding
+}
+
 type ResourcesHubKeyBindings struct {
 	Start   KeyBinding
 	Restart KeyBinding
@@ -53,6 +59,15 @@ func (c *Config) WorkspaceHubKeys() WorkspaceHubKeyBindings {
 		Manage:   normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Manage, defaults.Manage),
 		Delete:   normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Delete, defaults.Delete),
 		Template: normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Template, defaults.Template),
+	}
+}
+
+func (c *Config) WorkspaceTemplateHubKeys() WorkspaceTemplateHubKeyBindings {
+	defaults := DefaultProjectConfig().Workspace.TemplateHub.Shortcuts
+	return WorkspaceTemplateHubKeyBindings{
+		Create: normalizeKeyOrDefault(c.Project.Workspace.TemplateHub.Shortcuts.Create, defaults.Create),
+		Edit:   normalizeKeyOrDefault(c.Project.Workspace.TemplateHub.Shortcuts.Edit, defaults.Edit),
+		Delete: normalizeKeyOrDefault(c.Project.Workspace.TemplateHub.Shortcuts.Delete, defaults.Delete),
 	}
 }
 
