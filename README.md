@@ -113,7 +113,7 @@ dvv check
 | `dvv tmux` | Open the tmux environment hub. |
 | `dvv tmux:session` | Open the directory picker used by `Ctrl+F`. |
 | `dvv tmux:home` | Open the configured home tmux tab used by `Alt+F`. |
-| `dvv tmux:reset-api` | Reset current or uniquely detected API/Horizon tmux target. |
+| `dvv tmux:reset-api` | Reset or select API/Horizon tmux target. |
 | `dvv db` | Open the database hub. |
 | `dvv resources` | Open the local resources hub. |
 | `dvv secrets` | Open the local secrets hub. |
@@ -146,9 +146,11 @@ The managed block is written to `~/.zshrc`. The `Alt+R` zsh binding is a fallbac
 
 | Shortcut | Command |
 | --- | --- |
-| `Alt+R` | `dist/dvv tmux:reset-api --session "#{session_name}" --window "#{window_name}"` |
+| `Alt+R` | `dist/dvv tmux:reset-api --session "#{session_name}" --window "#{window_name}" --fallback-global` |
 
-`Alt+R` resets API/Horizon panes globally in a safe order. It first tries the current tmux window. If that window has no Laravel API pane, it uses the last target opened through `dvv tmux`. If there is no cached target, it searches running tmux windows and resets the only detected Laravel API target. If multiple API windows are running, it refuses and lists the candidates instead of guessing. It does not touch the Web pane.
+`Alt+R` resets API/Horizon panes globally in a safe order. It first tries the current tmux window. If that window has no Laravel API pane, it uses the last target opened through `dvv tmux` or manually selected through `dvv tmux:reset-api`. If there is no cached target, it searches running tmux windows and resets the only detected Laravel API target. If multiple API windows are running from the non-interactive shortcut, it refuses and lists the candidates instead of guessing. It does not touch the Web pane.
+
+Running `dvv tmux:reset-api` manually opens a reset target selector when several Laravel API windows are running. The selected target is cached, so the next `Alt+R` can reuse it from another tmux tab.
 
 Running `dvv tmux:reset-api --session <name> --window <name>` keeps the target explicit and does not fall back to another window.
 
@@ -271,7 +273,7 @@ The current tmux window can be reset with:
 dvv tmux:reset-api
 ```
 
-This command is mainly the backend for the managed `Alt+R` shortcut. It targets the current tmux session/window first, then falls back to a single detected Laravel API window when the shortcut is used from another tmux tab. It restarts API cache/config state and restarts Horizon when another pane points at the same API project. Web is intentionally skipped.
+This command is mainly the backend for the managed `Alt+R` shortcut. It targets the current tmux session/window first, then falls back to the last selected target, then to a single detected Laravel API window when the shortcut is used from another tmux tab. When run manually and several API windows are available, it opens a selector. It restarts API cache/config state and restarts Horizon when another pane points at the same API project. Web is intentionally skipped.
 
 ## Database
 
@@ -473,7 +475,7 @@ DVV_RESOURCES_LOG_TAIL=200
 | No workspace found | The workspace hub still opens and offers create inside the hub. |
 | Deletion safety | Dirty worktrees and leftover content require explicit confirmation. |
 | Tmux custom environments | `dvv tmux` can store named API/Web targets for projects outside workspace metadata. |
-| Tmux reset target | `dvv tmux` stores the last opened reset target in `~/.cache/devv/tmux-reset-target.json` for the global `Alt+R` fallback. |
+| Tmux reset target | `dvv tmux` stores the last opened or manually selected reset target in `~/.cache/devv/tmux-reset-target.json` for the global `Alt+R` fallback. |
 | Resource logs | `dvv resources` opens service, Docker, or Compose logs in a new terminal tab. |
 | Secrets | `dvv secrets` manages local AGE/SSH backup state; `dvv bootstrap` restores AGE/Bitwarden-backed SSH data without committing private files. |
 | Doctor fix | `dvv doctor --fix` creates safe local runtime files, rebuilds, and reinstalls managed shell/tmux integration. |

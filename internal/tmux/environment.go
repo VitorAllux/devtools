@@ -39,6 +39,7 @@ type ResetAPIOptions struct {
 	Session        string
 	Window         string
 	FallbackGlobal bool
+	Select         bool
 }
 
 type resetAPICandidate struct {
@@ -59,6 +60,18 @@ type noLaravelAPIPaneError struct {
 
 func (e noLaravelAPIPaneError) Error() string {
 	return fmt.Sprintf("current tmux window %s has no Laravel API pane; move to a dvv tmux target window with an API pane, or open one with dvv tmux", e.Target)
+}
+
+type multipleLaravelAPIWindowsError struct {
+	Candidates []resetAPICandidate
+	Session    string
+}
+
+func (e multipleLaravelAPIWindowsError) Error() string {
+	if strings.TrimSpace(e.Session) != "" {
+		return fmt.Sprintf("multiple Laravel API windows found in session %s: %s; select a target or run dvv tmux:reset-api --session <name> --window <name>", e.Session, resetCandidateSummary(e.Candidates))
+	}
+	return fmt.Sprintf("multiple Laravel API windows found: %s; select a target or run dvv tmux:reset-api --session <name> --window <name>", resetCandidateSummary(e.Candidates))
 }
 
 const resetAPIShortcutArgs = `tmux:reset-api --session "#{session_name}" --window "#{window_name}" --fallback-global`
@@ -93,6 +106,27 @@ func RunResetAPI(ctx context.Context, cfg *config.Config, runner run.Runner, arg
 	options, err := parseResetAPIArgs(args)
 	if err != nil {
 		return err
+	}
+	if len(args) == 0 && ui.InteractiveTerminal() {
+		options.Select = true
+	}
+	if options.Select && manager.shouldUseFZF() {
+		candidate, ok, err := manager.resolveResetCandidateForSelection(ctx, options)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil
+		}
+		return ui.RunWithRoyalLoader(ui.LoaderOptions{
+			Action:        "resetting",
+			Subject:       candidate.Session,
+			Detail:        "api/horizon",
+			ShowResult:    true,
+			SuccessAction: "reset",
+		}, func() error {
+			return manager.resetAPICandidate(ctx, candidate)
+		})
 	}
 	subject := firstNonEmpty(options.Session, "tmux API")
 	return ui.RunWithRoyalLoader(ui.LoaderOptions{
@@ -545,19 +579,27 @@ func (m *Manager) ResetAPI(ctx context.Context, options ResetAPIOptions) error {
 }
 
 func (m *Manager) resetAPIWindow(ctx context.Context, session string, window string) error {
-	if !m.hasSession(ctx, session) {
-		return fmt.Errorf("tmux session is not running: %s", session)
-	}
-	apiPane, apiDir, err := m.apiPaneForCurrentWindow(ctx, session, window)
+	candidate, err := m.resetCandidateForWindow(ctx, session, window)
 	if err != nil {
 		return err
 	}
-	return m.resetAPICandidate(ctx, resetAPICandidate{
+	return m.resetAPICandidate(ctx, candidate)
+}
+
+func (m *Manager) resetCandidateForWindow(ctx context.Context, session string, window string) (resetAPICandidate, error) {
+	if !m.hasSession(ctx, session) {
+		return resetAPICandidate{}, fmt.Errorf("tmux session is not running: %s", session)
+	}
+	apiPane, apiDir, err := m.apiPaneForCurrentWindow(ctx, session, window)
+	if err != nil {
+		return resetAPICandidate{}, err
+	}
+	return resetAPICandidate{
 		Session: session,
 		Window:  window,
 		Pane:    apiPane,
 		APIDir:  apiDir,
-	})
+	}, nil
 }
 
 func (m *Manager) resetGlobalAPI(ctx context.Context, preferredSession string, preferredWindow string) error {
@@ -601,6 +643,55 @@ func (m *Manager) resetGlobalAPI(ctx context.Context, preferredSession string, p
 		}
 	}
 	return err
+}
+
+func (m *Manager) resolveResetCandidateForSelection(ctx context.Context, options ResetAPIOptions) (resetAPICandidate, bool, error) {
+	session := strings.TrimSpace(options.Session)
+	window := strings.TrimSpace(options.Window)
+	explicitTarget := session != "" || window != ""
+	if session == "" || window == "" {
+		currentSession, currentWindow, err := m.currentTmuxWindow(ctx)
+		if err == nil {
+			session = firstNonEmpty(session, currentSession)
+			window = firstNonEmpty(window, currentWindow)
+		} else if explicitTarget {
+			return resetAPICandidate{}, false, err
+		}
+	}
+
+	if session != "" && window != "" {
+		candidate, err := m.resetCandidateForWindow(ctx, session, window)
+		if err == nil {
+			return candidate, true, nil
+		}
+		if explicitTarget && !options.FallbackGlobal {
+			return resetAPICandidate{}, false, err
+		}
+		var noPane noLaravelAPIPaneError
+		if !errors.As(err, &noPane) {
+			return resetAPICandidate{}, false, err
+		}
+	}
+
+	if explicitTarget && !options.FallbackGlobal {
+		return resetAPICandidate{}, false, fmt.Errorf("tmux reset requires a session and window")
+	}
+	if candidate, ok := m.cachedResetCandidate(ctx, session, window); ok {
+		return candidate, true, nil
+	}
+	candidates, err := m.runningAPICandidates(ctx)
+	if err != nil {
+		return resetAPICandidate{}, false, err
+	}
+	candidate, err := selectGlobalResetCandidate(candidates, session, window)
+	if err == nil {
+		return candidate, true, nil
+	}
+	var multiple multipleLaravelAPIWindowsError
+	if errors.As(err, &multiple) {
+		return m.fzfSelectResetCandidate(ctx, multiple.Candidates)
+	}
+	return resetAPICandidate{}, false, err
 }
 
 func (m *Manager) rememberResetTarget(target Target) {
@@ -653,6 +744,7 @@ func (m *Manager) resetAPICandidate(ctx context.Context, candidate resetAPICandi
 		m.displayTmuxMessage(ctx, candidate.Session, candidate.Window, "dvv reset failed: "+shortTmuxMessage(err.Error()))
 		return err
 	}
+	m.rememberResetTarget(Target{Session: candidate.Session, Window: candidate.Window, APIDir: candidate.APIDir})
 	m.displayTmuxMessage(ctx, candidate.Session, candidate.Window, "dvv API/Horizon reset")
 	return nil
 }
@@ -864,6 +956,42 @@ func (m *Manager) runningAPICandidates(ctx context.Context) ([]resetAPICandidate
 	return candidates, nil
 }
 
+func (m *Manager) fzfSelectResetCandidate(ctx context.Context, candidates []resetAPICandidate) (resetAPICandidate, bool, error) {
+	args := ui.FZFHub{
+		Prompt:        ui.Crown("reset") + ui.Muted("> "),
+		BorderLabel:   "dvv tmux / reset target",
+		Height:        "42%",
+		MinHeight:     "16",
+		Preview:       resetCandidatePreviewCommand(),
+		PreviewLabel:  "reset panel",
+		PreviewWindow: "right,40%,border-rounded,wrap",
+		Shortcuts: []ui.FZFShortcut{
+			{Label: "Enter", Description: "reset selected API/Horizon"},
+			{Label: "Esc", Description: "cancel"},
+		},
+		ExtraArgs: append(ui.FZFHiddenRowArgs(),
+			"--header-lines=1",
+		),
+	}.Args()
+	output, err := m.Runner.OutputWithInput(ctx, "", []byte(resetCandidateRows(candidates)), "fzf", args...)
+	if err != nil && len(output) == 0 {
+		return resetAPICandidate{}, false, nil
+	}
+	if err != nil {
+		return resetAPICandidate{}, false, err
+	}
+	raw := ui.FZFSelectedRaw(strings.TrimSpace(string(output)))
+	if raw == "" {
+		return resetAPICandidate{}, false, nil
+	}
+	for _, candidate := range candidates {
+		if resetCandidateRaw(candidate) == raw {
+			return candidate, true, nil
+		}
+	}
+	return resetAPICandidate{}, false, fmt.Errorf("selected tmux reset target no longer exists")
+}
+
 func selectGlobalResetCandidate(candidates []resetAPICandidate, preferredSession string, preferredWindow string) (resetAPICandidate, error) {
 	preferredSession = strings.TrimSpace(preferredSession)
 	preferredWindow = strings.TrimSpace(preferredWindow)
@@ -882,13 +1010,13 @@ func selectGlobalResetCandidate(candidates []resetAPICandidate, preferredSession
 			return sameSession[0], nil
 		}
 		if len(sameSession) > 1 {
-			return resetAPICandidate{}, fmt.Errorf("multiple Laravel API windows found in session %s: %s; move to the target window or run dvv tmux:reset-api --session <name> --window <name>", preferredSession, resetCandidateSummary(sameSession))
+			return resetAPICandidate{}, multipleLaravelAPIWindowsError{Candidates: sameSession, Session: preferredSession}
 		}
 	}
 	if len(candidates) == 1 {
 		return candidates[0], nil
 	}
-	return resetAPICandidate{}, fmt.Errorf("multiple Laravel API windows found: %s; move to the target window or run dvv tmux:reset-api --session <name> --window <name>", resetCandidateSummary(candidates))
+	return resetAPICandidate{}, multipleLaravelAPIWindowsError{Candidates: candidates}
 }
 
 func resetCandidateSummary(candidates []resetAPICandidate) string {
@@ -1175,6 +1303,64 @@ func cleanFZFField(value string) string {
 	return value
 }
 
+func resetCandidateRows(candidates []resetAPICandidate) string {
+	var builder strings.Builder
+	builder.WriteString(ui.FZFHiddenHeader(resetCandidateTableHeader()))
+	builder.WriteByte('\n')
+	for index, candidate := range candidates {
+		builder.WriteString(ui.FZFHiddenRow(resetCandidateRaw(candidate), resetCandidateRow(index, candidate)))
+		builder.WriteByte('\n')
+	}
+	return builder.String()
+}
+
+func resetCandidateRaw(candidate resetAPICandidate) string {
+	return strings.Join([]string{
+		cleanFZFField(candidate.Session),
+		cleanFZFField(candidate.Window),
+		cleanFZFField(candidate.Pane),
+		cleanFZFField(candidate.APIDir),
+	}, "\x1f")
+}
+
+func resetCandidateRow(index int, candidate resetAPICandidate) string {
+	return fmt.Sprintf("%s  %s  %s  %s",
+		ui.Muted(fmt.Sprintf("%02d", index+1)),
+		ui.Accent(fixedWidth(candidate.Session, 24)),
+		ui.Gold(fixedWidth(candidate.Window, 18)),
+		ui.Muted(candidate.APIDir),
+	)
+}
+
+func resetCandidateTableHeader() string {
+	return fmt.Sprintf(" %s  %s  %s  %s",
+		ui.Crown("NO"),
+		ui.Crown(fixedWidth("SESSION", 24)),
+		ui.Crown(fixedWidth("WINDOW", 18)),
+		ui.Crown("API PATH"),
+	)
+}
+
+func resetCandidatePreviewCommand() string {
+	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
+raw=$(printf "%s" "$line" | cut -f1)
+session=$(printf "%s" "$raw" | awk -F "\037" "{print \$1}")
+window=$(printf "%s" "$raw" | awk -F "\037" "{print \$2}")
+pane=$(printf "%s" "$raw" | awk -F "\037" "{print \$3}")
+api_dir=$(printf "%s" "$raw" | awk -F "\037" "{print \$4}")
+printf "%sReset target%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Session" "$dvv_reset" "$session"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Window" "$dvv_reset" "$window"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Pane" "$dvv_reset" "$pane"
+printf "  %s%-8s%s %s\n" "$dvv_label" "API" "$dvv_reset" "$api_dir"
+printf "\n%sCommands%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %sphp artisan optimize:clear%s\n" "$dvv_muted" "$dvv_reset"
+printf "  %sphp artisan cache:clear%s\n" "$dvv_muted" "$dvv_reset"
+printf "  %sphp artisan config:cache%s\n" "$dvv_muted" "$dvv_reset"
+printf "  %sphp artisan horizon%s\n" "$dvv_muted" "$dvv_reset"
+' sh {}`
+}
+
 func tmuxHubShortcuts() []ui.FZFShortcut {
 	return []ui.FZFShortcut{
 		{Label: "Enter", Description: "start/open"},
@@ -1427,6 +1613,8 @@ func parseResetAPIArgs(args []string) (ResetAPIOptions, error) {
 			options.Window = strings.TrimPrefix(arg, "--window=")
 		case arg == "--fallback-global":
 			options.FallbackGlobal = true
+		case arg == "--select":
+			options.Select = true
 		default:
 			return ResetAPIOptions{}, fmt.Errorf("unknown tmux reset option: %s", arg)
 		}
@@ -1460,7 +1648,7 @@ func showTmuxHelp(cfg *config.Config) {
 	helpEntry(shortcutLabel(cfg.Project.Tmux.Home.Shortcut, "alt+f"), "Run dvv tmux:home without picker")
 	fmt.Println()
 	helpSection("Tmux Shortcut")
-	helpEntry(shortcutLabel(cfg.Project.Tmux.Reset.Shortcut, "alt+r"), "Reset current or uniquely detected API/Horizon tmux target")
+	helpEntry(shortcutLabel(cfg.Project.Tmux.Reset.Shortcut, "alt+r"), "Reset or select API/Horizon tmux target")
 }
 
 func showResetAPIHelp(cfg *config.Config) {
@@ -1469,6 +1657,7 @@ func showResetAPIHelp(cfg *config.Config) {
 	helpSection("Command")
 	helpEntry("dvv tmux:reset-api", "Reset the current tmux window, or the only detected Laravel API window")
 	helpEntry("dvv tmux:reset-api --session <name> --window <name>", "Reset an explicit tmux window")
+	helpEntry("dvv tmux:reset-api --select", "Choose a running Laravel API window when several are available")
 	helpEntry("global fallback", "Uses the last dvv tmux target before falling back to a single detected API window")
 	fmt.Println()
 	helpSection("Tmux Shortcut")

@@ -81,7 +81,7 @@ dvv resources
 dvv config
 ```
 
-`dvv tmux:session` exists as the command behind the managed `Ctrl+F` shell shortcut. `dvv tmux:home` exists as the command behind the managed `Alt+F` shortcut and opens the configured home tmux tab without a picker. `dvv tmux:reset-api` exists as the command behind the managed `Alt+R` shortcut; it tries the current tmux window first, then a single detected Laravel API window. `dvv env:bootstrap` is kept as a compatibility route for the previous bootstrap command.
+`dvv tmux:session` exists as the command behind the managed `Ctrl+F` shell shortcut. `dvv tmux:home` exists as the command behind the managed `Alt+F` shortcut and opens the configured home tmux tab without a picker. `dvv tmux:reset-api` exists as the command behind the managed `Alt+R` shortcut; it tries the current tmux window first, then the last opened or selected reset target, then a single detected Laravel API window. Manual runs can select from multiple API windows. `dvv env:bootstrap` is kept as a compatibility route for the previous bootstrap command.
 
 Compatibility routes used by tests or scripts may exist during migration, but root help and autocomplete should stay hub-first unless a script command is intentionally promoted.
 

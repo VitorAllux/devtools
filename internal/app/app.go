@@ -259,7 +259,7 @@ func showHelp() {
 	helpEntry("Alt+S", ">", "Open the SSH hub")
 	fmt.Println()
 	helpSection("Tmux Shortcuts")
-	helpEntry("Alt+R", ">", "Reset current or uniquely detected API/Horizon tmux target")
+	helpEntry("Alt+R", ">", "Reset or select API/Horizon tmux target")
 	fmt.Println()
 	fmt.Println("  Use `dvv <command> help` for hub details.")
 }

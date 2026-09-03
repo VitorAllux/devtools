@@ -131,7 +131,7 @@ dvv secrets
 
 - `dvv tmux:session` is kept for the managed `Ctrl+F` shortcut.
 - `dvv tmux:home` is kept for the managed `Alt+F` shortcut and should open the configured home directory without fzf selection.
-- `dvv tmux:reset-api` is kept for the managed `Alt+R` tmux shortcut. It should reset the current tmux window first, fall back to a single detected Laravel API window, and refuse ambiguous multiple-window matches.
+- `dvv tmux:reset-api` is kept for the managed `Alt+R` tmux shortcut. It should reset the current tmux window first, fall back to the last opened or manually selected target, then fall back to a single detected Laravel API window, and refuse ambiguous multiple-window matches from non-interactive shortcuts.
 - The zsh `Alt+R` fallback must only call `dvv tmux:reset-api`; do not reset arbitrary tmux windows when multiple API candidates are running.
 - API reset must find a Laravel API pane by walking from pane paths to an `artisan` file; another pane is restarted as Horizon only when it points to the same API directory. Do not touch Web panes.
 - Script-friendly compatibility routes may exist, but should not make root help noisy:

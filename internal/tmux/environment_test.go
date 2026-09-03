@@ -462,6 +462,47 @@ func TestResetCurrentAPIRefusesAmbiguousGlobalWindows(t *testing.T) {
 	}
 }
 
+func TestRunResetAPISelectsAmbiguousGlobalWindow(t *testing.T) {
+	t.Setenv("DVV_NO_LOADER", "1")
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	root := t.TempDir()
+	apiOne := filepath.Join(root, "api-one")
+	apiTwo := filepath.Join(root, "api-two")
+	mustMkdir(t, apiOne)
+	mustMkdir(t, apiTwo)
+	for _, path := range []string{apiOne, apiTwo} {
+		if err := os.WriteFile(filepath.Join(path, "artisan"), []byte("#!/usr/bin/env php\n"), 0o755); err != nil {
+			t.Fatalf("WriteFile artisan failed: %v", err)
+		}
+	}
+
+	selected := resetAPICandidate{Session: "space", Window: "api-two", Pane: "0", APIDir: apiTwo}
+	runner := &fakeRunner{
+		paths:            map[string]bool{"tmux": true, "fzf": true},
+		currentWindowErr: true,
+		existingSessions: map[string]bool{"space": true},
+		paneIndexes: map[string][]string{
+			"space:api-one": {"0"},
+			"space:api-two": {"0"},
+		},
+		panePaths: map[string]string{
+			"space:api-one.0": apiOne,
+			"space:api-two.0": apiTwo,
+		},
+		fzfOutput: []byte(resetCandidateRaw(selected) + "\tselected\n"),
+	}
+
+	if err := RunResetAPI(context.Background(), testConfig(root), runner, []string{"--select"}); err != nil {
+		t.Fatalf("RunResetAPI returned error: %v", err)
+	}
+	if len(runner.fzfInputs) != 1 || !strings.Contains(runner.fzfInputs[0], apiOne) || !strings.Contains(runner.fzfInputs[0], apiTwo) {
+		t.Fatalf("fzf input should include every reset candidate: %#v", runner.fzfInputs)
+	}
+	if !runner.hasRun("tmux send-keys -t space:api-two.0 cd '" + apiTwo + "' && php artisan config:cache Enter") {
+		t.Fatalf("selected API window should be reset: %#v", runner.runs)
+	}
+}
+
 func TestResetCurrentAPIOutsideTmuxFallsBackToSingleLaravelWindow(t *testing.T) {
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	root := t.TempDir()

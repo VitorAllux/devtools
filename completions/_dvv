@@ -39,7 +39,7 @@ _dvv() {
           "ssh:list:List SSH entries"
           "tmux:session:Open the directory picker used by Ctrl+F"
           "tmux:home:Open the configured home tmux tab used by Alt+F"
-          "tmux:reset-api:Reset current or uniquely detected API/Horizon tmux target"
+          "tmux:reset-api:Reset or select API/Horizon tmux target"
           "workspace:list:List worktree workspaces"
         )
       fi
@@ -114,7 +114,7 @@ _dvv() {
               "down:Stop the selected environment"
               "api-restart:Restart API and Horizon panes"
               "web-restart:Restart Web pane"
-              "reset-api:Reset current or uniquely detected API/Horizon tmux target"
+              "reset-api:Reset or select API/Horizon tmux target"
             )
           fi
           _describe -t tmux-actions 'tmux actions' tmux_actions
