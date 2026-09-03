@@ -13,6 +13,7 @@ _dvv() {
       commands=(
         "bootstrap:Restore AGE/Bitwarden secrets and SSH backup"
         "build:Rebuild the local dvv binary"
+        "check:Run build, tests, vet, and smoke from the project root"
         "config:Open the configuration hub"
         "db:Open the database hub"
         "doctor:Check local dependencies and integration"
@@ -38,7 +39,7 @@ _dvv() {
           "ssh:list:List SSH entries"
           "tmux:session:Open the directory picker used by Ctrl+F"
           "tmux:home:Open the configured home tmux tab used by Alt+F"
-          "tmux:reset-api:Reset API and Horizon panes in the current tmux window"
+          "tmux:reset-api:Reset or select API/Horizon tmux target"
           "workspace:list:List worktree workspaces"
         )
       fi
@@ -87,6 +88,11 @@ _dvv() {
           )
           _describe -t doctor-flags 'doctor flags' doctor_flags
           ;;
+        check)
+          local -a check_flags
+          check_flags=("help:Show check help")
+          _describe -t check-flags 'check flags' check_flags
+          ;;
         ssh)
           local -a ssh_flags
           ssh_flags=("help:Show SSH hub help")
@@ -108,7 +114,7 @@ _dvv() {
               "down:Stop the selected environment"
               "api-restart:Restart API and Horizon panes"
               "web-restart:Restart Web pane"
-              "reset-api:Reset API and Horizon panes in the current tmux window"
+              "reset-api:Reset or select API/Horizon tmux target"
             )
           fi
           _describe -t tmux-actions 'tmux actions' tmux_actions

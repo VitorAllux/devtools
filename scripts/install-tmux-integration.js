@@ -52,6 +52,7 @@ if (!resetKey) {
 const block = [
   begin,
   "# Managed by dvv. Edit dvv.config.json or set DVV_SKIP_TMUX_INTEGRATION=1 before setup.",
+  `unbind-key -n ${resetKey}`,
   `bind-key -n ${resetKey} run-shell -b ${tmuxQuote(resetCommand(root))}`,
   end,
 ].join("\n");
@@ -105,7 +106,8 @@ function shortcutToTmuxKey(value) {
 
 function resetCommand(root) {
   const binary = dvvCommand(root);
-  return `${shellWord(binary)} tmux:reset-api --session "#{session_name}" --window "#{window_name}" || tmux display-message -t "#{session_name}:#{window_name}" "dvv reset failed"`;
+  const command = `NO_COLOR=1 ${shellWord(binary)} tmux:reset-api --session "#{session_name}" --window "#{window_name}" --fallback-global`;
+  return `log_dir="\${XDG_CACHE_HOME:-$HOME/.cache}/devv"; log_file="$log_dir/tmux-reset.log"; mkdir -p "$log_dir"; ${command} >"$log_file" 2>&1; status=$?; if [ "$status" -ne 0 ]; then message="$(tail -n 1 "$log_file" 2>/dev/null)"; [ -n "$message" ] || message="dvv reset failed; see $log_file"; tmux display-message -d 5000 -t "#{session_name}:#{window_name}" "$message"; fi`;
 }
 
 function dvvCommand(root) {

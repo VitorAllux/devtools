@@ -61,6 +61,24 @@ func TestFZFHubKeepsShortcutsOutOfHeaderByDefault(t *testing.T) {
 	}
 }
 
+func TestFZFHubCanOverrideHeight(t *testing.T) {
+	hub := FZFHub{
+		Prompt:    "templates> ",
+		Height:    "42%",
+		MinHeight: "22",
+	}
+
+	args := strings.Join(hub.Args(), "\n")
+	if strings.Contains(args, "--height=~85%") || strings.Contains(args, "--min-height=18") {
+		t.Fatalf("FZFHub should replace default height args: %s", args)
+	}
+	for _, want := range []string{"--height=42%", "--min-height=22"} {
+		if !strings.Contains(args, want) {
+			t.Fatalf("FZFHub Args missing %q in %s", want, args)
+		}
+	}
+}
+
 func TestFZFPreviewCommandDeckPrintsEveryShortcut(t *testing.T) {
 	deck := FZFPreviewCommandDeck([]FZFShortcut{
 		{Label: "Enter", Description: "open"},

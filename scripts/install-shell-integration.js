@@ -29,10 +29,17 @@ const tmuxHomeShortcut = shortcutToZshSequences(
     config?.tmux?.home?.shortcut ||
     "alt+f",
 );
+const tmuxResetShortcut = shortcutToZshSequences(
+  process.env.DVV_TMUX_RESET_SHORTCUT ||
+    process.env.DEVT_TMUX_RESET_SHORTCUT ||
+    config?.tmux?.reset?.shortcut ||
+    "alt+r",
+);
 
 const bindings = [];
 addBindings(bindings, tmuxShortcut, "dvv tmux:session");
 addBindings(bindings, tmuxHomeShortcut, "dvv tmux:home");
+addBindings(bindings, tmuxResetShortcut, "dvv tmux:reset-api");
 bindings.push(`bindkey -s "\\es" "dvv ssh\\n"`);
 
 if (bindings.length === 0) {

@@ -25,7 +25,7 @@ For workspace changes, also read `internal/workspace`, `internal/git`, `internal
 | `dvv tmux` | `internal/tmux`, `internal/terminal`, `internal/ui` | `tmux`, `shortcuts`, `terminal`, `theme` | tmux sessions, configured environment roots, custom API/Web targets, terminal tabs | `internal/tmux`, `internal/terminal`, operational map |
 | `dvv tmux:session` | `internal/tmux`, `internal/setup`, `internal/terminal` | `tmux`, `shortcuts`, `terminal` | `Ctrl+F` zsh binding, tmux sessions, directory picker roots | `internal/tmux`, `internal/setup`, completion checks |
 | `dvv tmux:home` | `internal/tmux`, `internal/setup`, `internal/terminal` | `tmux`, `shortcuts`, `terminal` | `Alt+F` zsh binding, configured home tmux session, terminal tabs | `internal/tmux`, `internal/setup`, completion checks |
-| `dvv tmux:reset-api` | `internal/tmux`, `internal/setup` | `tmux`, `shortcuts` | `Alt+R` tmux binding, current tmux API/Horizon panes | `internal/tmux`, `internal/setup`, smoke checklist |
+| `dvv tmux:reset-api` | `internal/tmux`, `internal/setup` | `tmux`, `shortcuts` | `Alt+R` tmux binding, zsh fallback, current tmux API/Horizon panes | `internal/tmux`, `internal/setup`, smoke checklist |
 | `dvv db` | `internal/db`, `internal/config`, `internal/ui` | `database`, `paths`, `integrations`, `safety`, `theme` | dumps directory, rclone, Google Drive links, MySQL client, local databases | `internal/db`, README, operational map |
 | `dvv resources` | `internal/resources`, `internal/terminal`, `internal/ui` | `resources`, `integrations`, `terminal`, `theme` | system services, Docker, containers, Compose projects, platform service managers, log terminal handoff | `internal/resources`, `internal/terminal`, operational map |
 | `dvv config` | `internal/systemconfig`, `internal/config`, `internal/ui` | all runtime config categories | `~/.config/devv/config.env`, environment overrides | `internal/systemconfig`, `internal/config`, README, configuration |
@@ -34,6 +34,7 @@ For workspace changes, also read `internal/workspace`, `internal/git`, `internal
 | `dvv setup` | `internal/setup`, `completions/_dvv`, `scripts/setup.js` | `shortcuts`, `paths` | zsh completion, managed zsh shortcut block, managed tmux shortcut block | `internal/setup`, completion checks, README |
 | `dvv doctor` | `internal/setup`, feature dependency checks | `paths`, `integrations`, `terminal` | local binaries, shell/tmux integration, workspace names, runtime directories, safe fixes | `internal/setup`, smoke script, README |
 | `dvv build` | `internal/setup`, `scripts/build.js`, `bin/dvv` | none | `dist/dvv`, Go toolchain, source checkout | smoke script, merge readiness |
+| `dvv check` | `internal/setup`, `package.json`, `scripts/smoke.js` | none | project validation suite from the source checkout | `internal/setup`, `internal/app`, smoke script, README |
 
 Compatibility routes may exist for scripts, tests, and old migration entrypoints. Public help and default autocomplete should stay hub-first.
 

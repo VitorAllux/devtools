@@ -36,13 +36,14 @@ func showHelp(cfg *config.Config) {
 	helpEntry("Enter", "Open selected workspace")
 	helpEntry("Tab", "Mark workspaces for delete")
 	helpEntry(keys.Create.Label, "Create workspace")
-	helpEntry(keys.Template.Label, "Save workspace template")
+	helpEntry(keys.Template.Label, "Manage workspace templates")
 	helpEntry(keys.Manage.Label, "Manage selected workspace projects")
 	helpEntry(keys.Delete.Label, "Delete selected workspace(s)")
 	helpEntry("Esc", "Exit")
 	fmt.Println()
 	helpSection("Shortcut Config")
 	helpEntry("dvv.config.json", "Edit workspace.interactive.shortcuts to change hub keys")
+	helpEntry("dvv.config.json", "Edit workspace.templateHub.shortcuts to change template hub keys")
 }
 
 func helpSection(title string) {

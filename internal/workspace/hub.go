@@ -156,7 +156,7 @@ func (m *Manager) fzfHub(ctx context.Context, details []Details, hubError string
 		}
 		return false, "", nil
 	case keys.Template.FZFKey:
-		if err := m.createTemplateInteractive(ctx); err != nil {
+		if err := m.templatesHub(ctx); err != nil {
 			return true, err.Error(), nil
 		}
 		return true, "", nil
@@ -199,7 +199,7 @@ func (m *Manager) basicHub(ctx context.Context, details []Details, hubError stri
 	}
 	printWorkspaceList(details)
 	fmt.Println()
-	fmt.Printf("Commands: number opens | %s creates | %s saves template | %s number manages | %s number deletes | q exits\n", keys.Create.Label, keys.Template.Label, keys.Manage.Label, keys.Delete.Label)
+	fmt.Printf("Commands: number opens | %s creates | %s templates | %s number manages | %s number deletes | q exits\n", keys.Create.Label, keys.Template.Label, keys.Manage.Label, keys.Delete.Label)
 	value, err := ui.Prompt("Workspace")
 	if err != nil {
 		return false, "", err
@@ -219,7 +219,7 @@ func (m *Manager) basicHub(ctx context.Context, details []Details, hubError stri
 		return false, "", nil
 	}
 	if matchesShortcut(value, keys.Template.FZFKey) {
-		if err := m.createTemplateInteractive(ctx); err != nil {
+		if err := m.templatesHub(ctx); err != nil {
 			return true, err.Error(), nil
 		}
 		return true, "", nil
@@ -809,7 +809,7 @@ func workspaceHubShortcuts(keys config.WorkspaceHubKeyBindings) []ui.FZFShortcut
 		{Label: "Enter", Description: "open"},
 		{Label: "Tab", Description: "mark delete"},
 		{Key: keys.Create.FZFKey, Label: keys.Create.Label, Description: "create workspace"},
-		{Key: keys.Template.FZFKey, Label: keys.Template.Label, Description: "save workspace template"},
+		{Key: keys.Template.FZFKey, Label: keys.Template.Label, Description: "manage templates"},
 		{Key: keys.Manage.FZFKey, Label: keys.Manage.Label, Description: "manage projects"},
 		{Key: keys.Delete.FZFKey, Label: keys.Delete.Label, Description: "delete selected"},
 		{Label: "Esc", Description: "exit hub"},

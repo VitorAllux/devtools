@@ -222,6 +222,10 @@ func RunWithRoyalLoader(options LoaderOptions, fn func() error) error {
 
 var terminalCheck = isTerminal
 
+func InteractiveTerminal() bool {
+	return terminalCheck(os.Stdin) && terminalCheck(os.Stderr)
+}
+
 func LoaderEnabled() bool {
 	return os.Getenv("DVV_NO_LOADER") != "1" && terminalCheck(os.Stderr)
 }

@@ -914,6 +914,12 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.Workspace.Interactive.Shortcuts.Delete = value
 	case "DVV_WORKSPACE_TEMPLATE_SHORTCUT":
 		m.Config.Project.Workspace.Interactive.Shortcuts.Template = value
+	case "DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT":
+		m.Config.Project.Workspace.TemplateHub.Shortcuts.Create = value
+	case "DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT":
+		m.Config.Project.Workspace.TemplateHub.Shortcuts.Edit = value
+	case "DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT":
+		m.Config.Project.Workspace.TemplateHub.Shortcuts.Delete = value
 	case "DVV_WORKSPACE_TEMPLATES":
 		m.Config.Project.Workspace.Templates = parseRuntimeWorkspaceTemplates(value)
 	case "DVV_DB_HOST":
@@ -1191,7 +1197,10 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Shortcuts", "DVV_WORKSPACE_CREATE_SHORTCUT", "Sets the workspace hub shortcut for creating a workspace.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Create, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_MANAGE_SHORTCUT", "Sets the workspace hub shortcut for managing projects.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Manage, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_DELETE_SHORTCUT", "Sets the workspace hub shortcut for deleting workspaces.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Delete, "", false},
-		{"Shortcuts", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "Sets the workspace hub shortcut for saving templates.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Template, "", false},
+		{"Shortcuts", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "Sets the workspace hub shortcut for opening template management.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Template, "", false},
+		{"Shortcuts", "DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT", "Sets the template hub shortcut for creating templates.", "shortcut", cfg.Project.Workspace.TemplateHub.Shortcuts.Create, "", false},
+		{"Shortcuts", "DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT", "Sets the template hub shortcut for editing templates.", "shortcut", cfg.Project.Workspace.TemplateHub.Shortcuts.Edit, "", false},
+		{"Shortcuts", "DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT", "Sets the template hub shortcut for deleting templates.", "shortcut", cfg.Project.Workspace.TemplateHub.Shortcuts.Delete, "", false},
 		{"Workspace", "DVV_WORKSPACES_DIR", "Sets where workspace-* folders are created.", "path", cfg.Project.Workspace.Root, "", false},
 		{"Workspace", "DVV_WORKSPACE_PROJECT_ROOTS", "Sets roots scanned for base git repositories.", "path-list", strings.Join(cfg.Project.Workspace.ProjectSearchRoots, string(os.PathListSeparator)), "", false},
 		{"Workspace", "DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "Limits repository discovery depth.", "number", fmt.Sprintf("%d", cfg.Project.Workspace.ProjectSearchDepth), "", false},

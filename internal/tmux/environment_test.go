@@ -211,8 +211,21 @@ func TestApplyOptionsInstallsResetShortcut(t *testing.T) {
 
 	manager.applyOptions(context.Background())
 
+	if !runner.hasRun("tmux unbind-key -n M-r") {
+		t.Fatalf("reset shortcut unbind missing: %#v", runner.runs)
+	}
 	if !runner.hasRun("tmux bind-key -n M-r run-shell -b " + manager.resetAPIShortcutCommand()) {
 		t.Fatalf("reset shortcut binding missing: %#v", runner.runs)
+	}
+	command := manager.resetAPIShortcutCommand()
+	if !strings.Contains(command, "tmux-reset.log") || !strings.Contains(command, "display-message -d 5000") {
+		t.Fatalf("reset shortcut should write failures to a log and show a visible message: %s", command)
+	}
+	if !strings.Contains(command, "--fallback-global") {
+		t.Fatalf("reset shortcut should allow global fallback: %s", command)
+	}
+	if strings.Contains(command, `exit "$status"`) {
+		t.Fatalf("reset shortcut should not bubble failures to the key binding: %s", command)
 	}
 }
 
@@ -253,6 +266,265 @@ func TestResetCurrentAPIUsesCurrentTmuxWindowAndSkipsWeb(t *testing.T) {
 		if strings.Contains(run, "workspace-task:dev.2") {
 			t.Fatalf("reset should not touch the Web pane: %#v", runner.runs)
 		}
+	}
+}
+
+func TestResetCurrentAPIFindsLaravelPaneOutsidePaneZero(t *testing.T) {
+	root := t.TempDir()
+	apiDir := filepath.Join(root, "api")
+	webDir := filepath.Join(root, "web")
+	apiSubdir := filepath.Join(apiDir, "app")
+	mustMkdir(t, apiSubdir)
+	mustMkdir(t, webDir)
+	if err := os.WriteFile(filepath.Join(apiDir, "artisan"), []byte("#!/usr/bin/env php\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile artisan failed: %v", err)
+	}
+
+	runner := &fakeRunner{
+		paths:            map[string]bool{"tmux": true},
+		existingSessions: map[string]bool{"workspace-task": true},
+		currentSession:   "workspace-task",
+		currentWindow:    "dev",
+		activePanes:      map[string]string{"workspace-task:dev": "0"},
+		paneIndexes:      map[string][]string{"workspace-task:dev": {"0", "1", "2"}},
+		panePaths: map[string]string{
+			"workspace-task:dev.0": webDir,
+			"workspace-task:dev.1": apiSubdir,
+			"workspace-task:dev.2": apiDir,
+		},
+	}
+	manager := NewManager(testConfig(root), runner)
+
+	if err := manager.ResetCurrentAPI(context.Background(), "", ""); err != nil {
+		t.Fatalf("ResetCurrentAPI returned error: %v", err)
+	}
+	if !runner.hasRun("tmux send-keys -t workspace-task:dev.1 cd '" + apiDir + "' && php artisan config:cache Enter") {
+		t.Fatalf("config cache command should target detected API pane: %#v", runner.runs)
+	}
+	if !runner.hasRun("tmux send-keys -t workspace-task:dev.2 cd '" + apiDir + "' && php artisan horizon Enter") {
+		t.Fatalf("horizon command should target the second API pane: %#v", runner.runs)
+	}
+	for _, run := range runner.runs {
+		if strings.Contains(run, "workspace-task:dev.0") {
+			t.Fatalf("reset should not send commands to the Web pane: %#v", runner.runs)
+		}
+	}
+}
+
+func TestResetCurrentAPIShowsSpecificTmuxFailure(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	root := t.TempDir()
+	webDir := filepath.Join(root, "web")
+	mustMkdir(t, webDir)
+
+	runner := &fakeRunner{
+		paths:            map[string]bool{"tmux": true},
+		existingSessions: map[string]bool{"home": true},
+		currentSession:   "home",
+		currentWindow:    "root",
+		paneIndexes:      map[string][]string{"home:root": {"0"}},
+		panePaths:        map[string]string{"home:root.0": webDir},
+	}
+	manager := NewManager(testConfig(root), runner)
+
+	err := manager.ResetCurrentAPI(context.Background(), "", "")
+	if err == nil {
+		t.Fatal("expected reset to fail without a Laravel pane")
+	}
+	found := false
+	for _, run := range runner.runs {
+		if strings.Contains(run, "tmux display-message -t home:root dvv reset failed: no running tmux window has a Laravel API pane") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("specific failure message missing: %#v", runner.runs)
+	}
+}
+
+func TestResetCurrentAPIFallsBackToSingleLaravelWindow(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	root := t.TempDir()
+	apiDir := filepath.Join(root, "api")
+	webDir := filepath.Join(root, "web")
+	mustMkdir(t, apiDir)
+	mustMkdir(t, webDir)
+	if err := os.WriteFile(filepath.Join(apiDir, "artisan"), []byte("#!/usr/bin/env php\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile artisan failed: %v", err)
+	}
+
+	runner := &fakeRunner{
+		paths:            map[string]bool{"tmux": true},
+		existingSessions: map[string]bool{"space": true},
+		currentSession:   "space",
+		currentWindow:    "devtools",
+		paneIndexes: map[string][]string{
+			"space:devtools": {"0"},
+			"space:api":      {"0", "1"},
+		},
+		panePaths: map[string]string{
+			"space:devtools.0": webDir,
+			"space:api.0":      apiDir,
+			"space:api.1":      apiDir,
+		},
+	}
+	manager := NewManager(testConfig(root), runner)
+
+	if err := manager.ResetAPI(context.Background(), ResetAPIOptions{Session: "space", Window: "devtools", FallbackGlobal: true}); err != nil {
+		t.Fatalf("ResetAPI returned error: %v", err)
+	}
+	if !runner.hasRun("tmux send-keys -t space:api.0 cd '" + apiDir + "' && php artisan config:cache Enter") {
+		t.Fatalf("global reset should target the API window: %#v", runner.runs)
+	}
+	if !runner.hasRun("tmux display-message -t space:devtools dvv reset space:api API/Horizon") {
+		t.Fatalf("origin window should receive reset completion message: %#v", runner.runs)
+	}
+}
+
+func TestResetCurrentAPIUsesCachedTargetBeforeAmbiguousGlobalWindows(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	root := t.TempDir()
+	apiOne := filepath.Join(root, "api-one")
+	apiTwo := filepath.Join(root, "api-two")
+	mustMkdir(t, apiOne)
+	mustMkdir(t, apiTwo)
+	for _, path := range []string{apiOne, apiTwo} {
+		if err := os.WriteFile(filepath.Join(path, "artisan"), []byte("#!/usr/bin/env php\n"), 0o755); err != nil {
+			t.Fatalf("WriteFile artisan failed: %v", err)
+		}
+	}
+
+	runner := &fakeRunner{
+		paths:            map[string]bool{"tmux": true},
+		existingSessions: map[string]bool{"space": true},
+		currentSession:   "space",
+		currentWindow:    "devtools",
+		paneIndexes: map[string][]string{
+			"space:devtools": {"0"},
+			"space:api-one":  {"0"},
+			"space:api-two":  {"0"},
+		},
+		panePaths: map[string]string{
+			"space:devtools.0": root,
+			"space:api-one.0":  apiOne,
+			"space:api-two.0":  apiTwo,
+		},
+	}
+	manager := NewManager(testConfig(root), runner)
+	manager.rememberResetTarget(Target{Session: "space", Window: "api-two", APIDir: apiTwo})
+
+	if err := manager.ResetAPI(context.Background(), ResetAPIOptions{Session: "space", Window: "devtools", FallbackGlobal: true}); err != nil {
+		t.Fatalf("ResetAPI returned error: %v", err)
+	}
+	if !runner.hasRun("tmux send-keys -t space:api-two.0 cd '" + apiTwo + "' && php artisan config:cache Enter") {
+		t.Fatalf("cached target should be reset before ambiguous global candidates: %#v", runner.runs)
+	}
+}
+
+func TestResetCurrentAPIRefusesAmbiguousGlobalWindows(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	root := t.TempDir()
+	apiOne := filepath.Join(root, "api-one")
+	apiTwo := filepath.Join(root, "api-two")
+	mustMkdir(t, apiOne)
+	mustMkdir(t, apiTwo)
+	for _, path := range []string{apiOne, apiTwo} {
+		if err := os.WriteFile(filepath.Join(path, "artisan"), []byte("#!/usr/bin/env php\n"), 0o755); err != nil {
+			t.Fatalf("WriteFile artisan failed: %v", err)
+		}
+	}
+
+	runner := &fakeRunner{
+		paths:            map[string]bool{"tmux": true},
+		existingSessions: map[string]bool{"space": true},
+		currentSession:   "space",
+		currentWindow:    "devtools",
+		paneIndexes: map[string][]string{
+			"space:devtools": {"0"},
+			"space:api-one":  {"0"},
+			"space:api-two":  {"0"},
+		},
+		panePaths: map[string]string{
+			"space:devtools.0": root,
+			"space:api-one.0":  apiOne,
+			"space:api-two.0":  apiTwo,
+		},
+	}
+	manager := NewManager(testConfig(root), runner)
+
+	err := manager.ResetAPI(context.Background(), ResetAPIOptions{Session: "space", Window: "devtools", FallbackGlobal: true})
+	if err == nil {
+		t.Fatal("expected ambiguous reset to fail")
+	}
+	if !strings.Contains(err.Error(), "multiple Laravel API windows found in session space") {
+		t.Fatalf("error = %q, want ambiguous window guidance", err.Error())
+	}
+}
+
+func TestRunResetAPISelectsAmbiguousGlobalWindow(t *testing.T) {
+	t.Setenv("DVV_NO_LOADER", "1")
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	root := t.TempDir()
+	apiOne := filepath.Join(root, "api-one")
+	apiTwo := filepath.Join(root, "api-two")
+	mustMkdir(t, apiOne)
+	mustMkdir(t, apiTwo)
+	for _, path := range []string{apiOne, apiTwo} {
+		if err := os.WriteFile(filepath.Join(path, "artisan"), []byte("#!/usr/bin/env php\n"), 0o755); err != nil {
+			t.Fatalf("WriteFile artisan failed: %v", err)
+		}
+	}
+
+	selected := resetAPICandidate{Session: "space", Window: "api-two", Pane: "0", APIDir: apiTwo}
+	runner := &fakeRunner{
+		paths:            map[string]bool{"tmux": true, "fzf": true},
+		currentWindowErr: true,
+		existingSessions: map[string]bool{"space": true},
+		paneIndexes: map[string][]string{
+			"space:api-one": {"0"},
+			"space:api-two": {"0"},
+		},
+		panePaths: map[string]string{
+			"space:api-one.0": apiOne,
+			"space:api-two.0": apiTwo,
+		},
+		fzfOutput: []byte(resetCandidateRaw(selected) + "\tselected\n"),
+	}
+
+	if err := RunResetAPI(context.Background(), testConfig(root), runner, []string{"--select"}); err != nil {
+		t.Fatalf("RunResetAPI returned error: %v", err)
+	}
+	if len(runner.fzfInputs) != 1 || !strings.Contains(runner.fzfInputs[0], apiOne) || !strings.Contains(runner.fzfInputs[0], apiTwo) {
+		t.Fatalf("fzf input should include every reset candidate: %#v", runner.fzfInputs)
+	}
+	if !runner.hasRun("tmux send-keys -t space:api-two.0 cd '" + apiTwo + "' && php artisan config:cache Enter") {
+		t.Fatalf("selected API window should be reset: %#v", runner.runs)
+	}
+}
+
+func TestResetCurrentAPIOutsideTmuxFallsBackToSingleLaravelWindow(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	root := t.TempDir()
+	apiDir := filepath.Join(root, "api")
+	mustMkdir(t, apiDir)
+	if err := os.WriteFile(filepath.Join(apiDir, "artisan"), []byte("#!/usr/bin/env php\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile artisan failed: %v", err)
+	}
+	runner := &fakeRunner{
+		paths:            map[string]bool{"tmux": true},
+		currentWindowErr: true,
+		existingSessions: map[string]bool{"workspace": true},
+		paneIndexes:      map[string][]string{"workspace:dev": {"0"}},
+		panePaths:        map[string]string{"workspace:dev.0": apiDir},
+	}
+	manager := NewManager(testConfig(root), runner)
+
+	if err := manager.ResetCurrentAPI(context.Background(), "", ""); err != nil {
+		t.Fatalf("ResetCurrentAPI returned error: %v", err)
+	}
+	if !runner.hasRun("tmux send-keys -t workspace:dev.0 cd '" + apiDir + "' && php artisan config:cache Enter") {
+		t.Fatalf("outside tmux fallback should target the only API window: %#v", runner.runs)
 	}
 }
 

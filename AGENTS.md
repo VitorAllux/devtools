@@ -15,14 +15,16 @@ These rules document the local conventions for future agents and maintainers wor
 - For interactive processes such as SSH, show loaders before terminal handoff and stop them before the child process owns the terminal.
 - Avoid global shell keybindings unless the project explicitly defines one. They can conflict with terminals, shells, editors, and IDEs.
 - Prefer explicit `dvv ...` commands. Personal shell shortcuts belong in the user's own shell config.
-- Project-managed zsh shortcuts are `Ctrl+F` for `dvv tmux:session`, `Alt+F` for `dvv tmux:home`, and `Alt+S` for `dvv ssh`.
-- Project-managed tmux shortcut is `Alt+R` for `dvv tmux:reset-api` in the current tmux window.
+- Project-managed zsh shortcuts are `Ctrl+F` for `dvv tmux:session`, `Alt+F` for `dvv tmux:home`, `Alt+R` as a `dvv tmux:reset-api` fallback, and `Alt+S` for `dvv ssh`.
+- Project-managed tmux shortcut is `Alt+R` for `dvv tmux:reset-api` with safe global fallback.
 
 ## Help And Command Lists
 
 - Main help for the Go rewrite lives in `cmd/dvv` and the `bin/dvv` launcher.
 - `dvv build` is the developer-facing rebuild command and must work from any working directory.
+- `dvv check` is the developer-facing validation command and must run the full suite from the project root, regardless of the current working directory.
 - `npm run build` should only rebuild project artifacts inside the repository.
+- `npm run check` is a repo-local script; prefer `dvv check` in user-facing workflow docs.
 - `dvv setup` is the explicit command for shell and tmux integration. It may update zsh completion, managed shell shortcuts, and managed tmux shortcuts.
 - `dvv doctor` checks local dependencies and integration state without changing files.
 - Use shared help helpers so command names and descriptions stay aligned.
@@ -43,7 +45,7 @@ These rules document the local conventions for future agents and maintainers wor
 - `Ctrl+F` is approved for the tmux directory session picker, preserved from the previous Bash implementation.
 - `Alt+F` is approved for opening a configured home tmux tab without the directory picker.
 - Root help should present the tmux hub as `dvv tmux`, the directory picker as the `Ctrl+F` shortcut, and the home tmux tab as the `Alt+F` shortcut.
-- Root help may present `Alt+R` as a tmux shortcut, not as a shell shortcut.
+- Root help may present `Alt+R` as a tmux shortcut with safe global fallback.
 - Do not use `Ctrl+Shift+F` as a managed default because Windows Terminal captures it for Find before zsh receives it.
 - Do not use `Ctrl+S`; many terminals treat it as XOFF flow control and appear frozen.
 - Interactive hubs should use local `Shift+letter` shortcuts for hub actions by default.
@@ -103,13 +105,13 @@ dvv workspace
 - `Enter` in the workspace hub should use `DVV_WORKSPACE_OPENER` when configured, with `DEVT_WORKSPACE_OPENER` as compatibility fallback.
 - When no workspace opener is configured, `Enter` should list openers detected on the system and let the user choose.
 - Supported opener values are `cursor`, `code`, `vscode`, `opencode`, `codex`, and `shell`.
-- Workspace templates are created from the hub with the configured template shortcut and reused from the workspace creation base/template selector.
+- Workspace templates are managed from the template hub opened by the configured template shortcut and reused from the workspace creation base/template selector.
 
 ## Worktree Workspace Rules
 
 - Workspaces are directories named `workspace-<name>`.
 - Workspaces should contain only git worktrees for selected project directories.
-- Workspace templates store reusable project selections and base branch rules; save personal templates in runtime config unless a shared template is intentionally added to `dvv.config.json`.
+- Workspace templates store reusable project selections and base branch rules; create, edit, or delete them through the template hub, and save personal templates in runtime config unless a shared template is intentionally added to `dvv.config.json`.
 - Never move or copy the real repositories when creating or managing a workspace.
 - Adopting an existing workspace may only write missing `.workspace/config.json` metadata. It must not move, rename, clean, or remove existing workspace files.
 - Deleting a workspace must not remove non-worktree content without a separate explicit confirmation.
@@ -129,8 +131,9 @@ dvv secrets
 
 - `dvv tmux:session` is kept for the managed `Ctrl+F` shortcut.
 - `dvv tmux:home` is kept for the managed `Alt+F` shortcut and should open the configured home directory without fzf selection.
-- `dvv tmux:reset-api` is kept for the managed `Alt+R` tmux shortcut and should reset only API/Horizon panes in the current tmux window.
-- API reset must validate pane `0` as a Laravel API directory with `artisan`; pane `1` is restarted as Horizon only when it points to the same API directory. Do not touch Web panes.
+- `dvv tmux:reset-api` is kept for the managed `Alt+R` tmux shortcut. It should reset the current tmux window first, fall back to the last opened or manually selected target, then fall back to a single detected Laravel API window, and refuse ambiguous multiple-window matches from non-interactive shortcuts.
+- The zsh `Alt+R` fallback must only call `dvv tmux:reset-api`; do not reset arbitrary tmux windows when multiple API candidates are running.
+- API reset must find a Laravel API pane by walking from pane paths to an `artisan` file; another pane is restarted as Horizon only when it points to the same API directory. Do not touch Web panes.
 - Script-friendly compatibility routes may exist, but should not make root help noisy:
 
 ```text

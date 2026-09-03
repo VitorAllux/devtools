@@ -105,7 +105,7 @@ func TestCategoryRowsKeepRawIDHidden(t *testing.T) {
 	if raw != "theme" {
 		t.Fatalf("first category raw id = %q, want theme", raw)
 	}
-	if !strings.Contains(rows[2], "All Keys") || !strings.Contains(rows[2], "19 key(s)") {
+	if !strings.Contains(rows[2], "All Keys") || !strings.Contains(rows[2], "22 key(s)") {
 		t.Fatalf("All Keys row should include label and count: %q", rows[2])
 	}
 	fields := strings.Split(rows[2], "\t")
@@ -151,9 +151,9 @@ func TestEntriesForCategoryFiltersExpectedGroups(t *testing.T) {
 		category string
 		keys     []string
 	}{
-		{category: "keys", keys: []string{"DVV_THEME", "DVV_PROFILE", "DVV_TERMINAL_LAUNCHER", "API_DIR", "DVV_DB_HOST", "DVV_TMUX_SESSION_SHORTCUT", "DVV_TMUX_HOME_DIR", "DVV_TMUX_HOME_SHORTCUT", "DVV_TMUX_RESET_SHORTCUT", "DVV_TMUX_ENVIRONMENTS", "DVV_WORKSPACES_DIR", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATES", "DVV_RCLONE_REMOTE", "DVV_RESOURCES_START_SHORTCUT", "DVV_RESOURCES_LOGS_SHORTCUT", "DVV_RESOURCES_LOG_TAIL", "DVV_DB_SAFETY_CONFIRM", "DVV_SECRETS_SYNC_SHORTCUT"}},
+		{category: "keys", keys: []string{"DVV_THEME", "DVV_PROFILE", "DVV_TERMINAL_LAUNCHER", "API_DIR", "DVV_DB_HOST", "DVV_TMUX_SESSION_SHORTCUT", "DVV_TMUX_HOME_DIR", "DVV_TMUX_HOME_SHORTCUT", "DVV_TMUX_RESET_SHORTCUT", "DVV_TMUX_ENVIRONMENTS", "DVV_WORKSPACES_DIR", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT", "DVV_WORKSPACE_TEMPLATES", "DVV_RCLONE_REMOTE", "DVV_RESOURCES_START_SHORTCUT", "DVV_RESOURCES_LOGS_SHORTCUT", "DVV_RESOURCES_LOG_TAIL", "DVV_DB_SAFETY_CONFIRM", "DVV_SECRETS_SYNC_SHORTCUT"}},
 		{category: "paths", keys: []string{"API_DIR", "DVV_TMUX_HOME_DIR", "DVV_WORKSPACES_DIR"}},
-		{category: "shortcuts", keys: []string{"DVV_TMUX_SESSION_SHORTCUT", "DVV_TMUX_HOME_SHORTCUT", "DVV_TMUX_RESET_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "DVV_RESOURCES_START_SHORTCUT", "DVV_RESOURCES_LOGS_SHORTCUT", "DVV_SECRETS_SYNC_SHORTCUT"}},
+		{category: "shortcuts", keys: []string{"DVV_TMUX_SESSION_SHORTCUT", "DVV_TMUX_HOME_SHORTCUT", "DVV_TMUX_RESET_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT", "DVV_RESOURCES_START_SHORTCUT", "DVV_RESOURCES_LOGS_SHORTCUT", "DVV_SECRETS_SYNC_SHORTCUT"}},
 		{category: "tmux", keys: []string{"DVV_TMUX_HOME_DIR", "DVV_TMUX_ENVIRONMENTS"}},
 		{category: "database", keys: []string{"DVV_DB_HOST", "DVV_RCLONE_REMOTE"}},
 		{category: "workspace", keys: []string{"DVV_WORKSPACES_DIR", "DVV_WORKSPACE_TEMPLATES"}},
@@ -236,6 +236,15 @@ func TestKnownEntriesIncludesRuntimeShortcutKey(t *testing.T) {
 	}
 	if _, ok := findEntry(entries, "DVV_WORKSPACE_TEMPLATE_SHORTCUT"); !ok {
 		t.Fatalf("knownEntries should include DVV_WORKSPACE_TEMPLATE_SHORTCUT")
+	}
+	if _, ok := findEntry(entries, "DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT"); !ok {
+		t.Fatalf("knownEntries should include DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT")
+	}
+	if _, ok := findEntry(entries, "DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT"); !ok {
+		t.Fatalf("knownEntries should include DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT")
+	}
+	if _, ok := findEntry(entries, "DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT"); !ok {
+		t.Fatalf("knownEntries should include DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT")
 	}
 	if _, ok := findEntry(entries, "DVV_WORKSPACE_TEMPLATES"); !ok {
 		t.Fatalf("knownEntries should include DVV_WORKSPACE_TEMPLATES")
@@ -431,7 +440,10 @@ func testEntries() []Entry {
 		{Category: "Shortcuts", Key: "DVV_TMUX_RESET_SHORTCUT", Description: "Sets the tmux reset shortcut.", Kind: "shortcut"},
 		{Category: "Tmux", Key: "DVV_TMUX_ENVIRONMENTS", Description: "Stores custom tmux environments.", Kind: "json"},
 		{Category: "Workspace", Key: "DVV_WORKSPACES_DIR", Description: "Sets where workspace folders are created.", Kind: "path"},
-		{Category: "Shortcuts", Key: "DVV_WORKSPACE_TEMPLATE_SHORTCUT", Description: "Sets the workspace template shortcut.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_WORKSPACE_TEMPLATE_SHORTCUT", Description: "Opens workspace template management.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT", Description: "Creates workspace templates from template management.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT", Description: "Edits workspace templates from template management.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT", Description: "Deletes workspace templates from template management.", Kind: "shortcut"},
 		{Category: "Workspace", Key: "DVV_WORKSPACE_TEMPLATES", Description: "Stores workspace templates.", Kind: "json"},
 		{Category: "Database", Key: "DVV_RCLONE_REMOTE", Description: "Sets the rclone remote.", Kind: "text"},
 		{Category: "Resources", Key: "DVV_RESOURCES_START_SHORTCUT", Description: "Sets the resource start shortcut.", Kind: "shortcut"},

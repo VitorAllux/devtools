@@ -20,6 +20,8 @@ type FZFHub struct {
 	HeaderLines       []string
 	BorderLabel       string
 	BorderTag         string
+	Height            string
+	MinHeight         string
 	Preview           string
 	PreviewLabel      string
 	PreviewWindow     string
@@ -35,6 +37,9 @@ func (h FZFHub) Args() []string {
 	}
 
 	args := FZFThemeArgs(prompt)
+	if strings.TrimSpace(h.Height) != "" || strings.TrimSpace(h.MinHeight) != "" {
+		args = replaceFZFHeightArgs(args, h.Height, h.MinHeight)
+	}
 	if strings.TrimSpace(h.BorderLabel) != "" {
 		label := Crown(" " + strings.TrimSpace(h.BorderLabel) + " ")
 		if tag := strings.TrimSpace(h.BorderTag); tag != "" {
@@ -107,6 +112,23 @@ func (h FZFHub) ExpectKeys() string {
 		}
 	}
 	return strings.Join(keys, ",")
+}
+
+func replaceFZFHeightArgs(args []string, height string, minHeight string) []string {
+	filtered := make([]string, 0, len(args)+2)
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--height=") || strings.HasPrefix(arg, "--min-height=") {
+			continue
+		}
+		filtered = append(filtered, arg)
+	}
+	if strings.TrimSpace(height) != "" {
+		filtered = append(filtered, "--height="+strings.TrimSpace(height))
+	}
+	if strings.TrimSpace(minHeight) != "" {
+		filtered = append(filtered, "--min-height="+strings.TrimSpace(minHeight))
+	}
+	return filtered
 }
 
 func ShortcutLine(shortcuts []FZFShortcut) string {
