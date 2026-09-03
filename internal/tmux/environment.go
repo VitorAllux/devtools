@@ -107,7 +107,7 @@ func RunResetAPI(ctx context.Context, cfg *config.Config, runner run.Runner, arg
 	if err != nil {
 		return err
 	}
-	if len(args) == 0 && ui.InteractiveTerminal() {
+	if len(args) == 0 {
 		options.Select = true
 	}
 	if options.Select && manager.shouldUseFZF() {

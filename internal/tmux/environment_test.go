@@ -492,7 +492,7 @@ func TestRunResetAPISelectsAmbiguousGlobalWindow(t *testing.T) {
 		fzfOutput: []byte(resetCandidateRaw(selected) + "\tselected\n"),
 	}
 
-	if err := RunResetAPI(context.Background(), testConfig(root), runner, []string{"--select"}); err != nil {
+	if err := RunResetAPI(context.Background(), testConfig(root), runner, nil); err != nil {
 		t.Fatalf("RunResetAPI returned error: %v", err)
 	}
 	if len(runner.fzfInputs) != 1 || !strings.Contains(runner.fzfInputs[0], apiOne) || !strings.Contains(runner.fzfInputs[0], apiTwo) {
