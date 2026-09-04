@@ -39,7 +39,7 @@ func TestWorkspaceHubKeysUseDefaults(t *testing.T) {
 	cfg := Config{Project: DefaultProjectConfig()}
 	keys := cfg.WorkspaceHubKeys()
 
-	if keys.Create.FZFKey != "C" || keys.Create.Label != "Shift+C" {
+	if keys.Create.FZFKey != "N" || keys.Create.Label != "Shift+N" {
 		t.Fatalf("create key = %#v", keys.Create)
 	}
 	if keys.Manage.FZFKey != "M" || keys.Delete.FZFKey != "D" || keys.Template.FZFKey != "T" {
@@ -51,7 +51,7 @@ func TestWorkspaceTemplateHubKeysUseDefaults(t *testing.T) {
 	cfg := Config{Project: DefaultProjectConfig()}
 	keys := cfg.WorkspaceTemplateHubKeys()
 
-	if keys.Create.FZFKey != "C" || keys.Create.Label != "Shift+C" {
+	if keys.Create.FZFKey != "N" || keys.Create.Label != "Shift+N" {
 		t.Fatalf("create key = %#v", keys.Create)
 	}
 	if keys.Edit.FZFKey != "E" || keys.Delete.FZFKey != "D" {
@@ -63,11 +63,38 @@ func TestResourcesHubKeysUseDefaults(t *testing.T) {
 	cfg := Config{Project: DefaultProjectConfig()}
 	keys := cfg.ResourcesHubKeys()
 
-	if keys.Start.FZFKey != "alt-s" || keys.Start.Label != "Alt+S" {
+	if keys.Start.FZFKey != "S" || keys.Start.Label != "Shift+S" {
 		t.Fatalf("start key = %#v", keys.Start)
 	}
-	if keys.Restart.FZFKey != "alt-r" || keys.Stop.FZFKey != "alt-x" || keys.Logs.FZFKey != "L" {
+	if keys.Restart.FZFKey != "R" || keys.Stop.FZFKey != "X" || keys.Logs.FZFKey != "L" {
 		t.Fatalf("resources keys = %#v", keys)
+	}
+}
+
+func TestShellShortcutKeysUseDefaults(t *testing.T) {
+	cfg := Config{Project: DefaultProjectConfig()}
+	keys := cfg.ShellShortcutKeys()
+
+	if keys.MainHub.FZFKey != "alt-g" || keys.Workspace.FZFKey != "alt-w" || keys.Tmux.FZFKey != "alt-t" || keys.SSH.FZFKey != "alt-s" {
+		t.Fatalf("shell keys = %#v", keys)
+	}
+}
+
+func TestTmuxHubKeysUseDefaults(t *testing.T) {
+	cfg := Config{Project: DefaultProjectConfig()}
+	keys := cfg.TmuxHubKeys()
+
+	if keys.Start.FZFKey != "S" || keys.Stop.FZFKey != "X" || keys.RestartAPI.FZFKey != "A" || keys.RestartWeb.FZFKey != "W" || keys.Create.FZFKey != "N" {
+		t.Fatalf("tmux hub keys = %#v", keys)
+	}
+}
+
+func TestSystemConfigHubKeysUseDefaults(t *testing.T) {
+	cfg := Config{Project: DefaultProjectConfig()}
+	keys := cfg.SystemConfigHubKeys()
+
+	if keys.Add.FZFKey != "N" || keys.Clear.FZFKey != "D" || keys.Validate.FZFKey != "V" || keys.Secrets.FZFKey != "S" {
+		t.Fatalf("system config keys = %#v", keys)
 	}
 }
 

@@ -12,7 +12,8 @@ import (
 )
 
 func TestTmuxPreviewPreservesCommandArgs(t *testing.T) {
-	preview := tmuxPreviewCommand(tmuxHubShortcuts())
+	keys := (&config.Config{Project: config.DefaultProjectConfig()}).TmuxHubKeys()
+	preview := tmuxPreviewCommand(tmuxHubShortcuts(keys))
 
 	if strings.Contains(preview, "set -- $display") {
 		t.Fatalf("preview should not replace shortcut args with display columns: %s", preview)
@@ -20,7 +21,7 @@ func TestTmuxPreviewPreservesCommandArgs(t *testing.T) {
 	if strings.Contains(preview, "DVV_FZF_COMMANDS") {
 		t.Fatalf("preview should render shortcut commands directly: %s", preview)
 	}
-	for _, want := range []string{"Alt+U", "start/open", "Alt+D", "stop", "Alt+A", "restart API", "Alt+W", "restart Web", "Alt+N", "save custom API/Web tmux target"} {
+	for _, want := range []string{"Shift+S", "start/open", "Shift+X", "stop", "Shift+A", "restart API", "Shift+W", "restart Web", "Shift+N", "save tmux target"} {
 		if !strings.Contains(preview, want) {
 			t.Fatalf("preview missing %q: %s", want, preview)
 		}
@@ -52,15 +53,16 @@ func TestTmuxRowsKeepDetailsInPreviewFields(t *testing.T) {
 }
 
 func TestTmuxActionFromKeyUsesFallbackForEnter(t *testing.T) {
+	keys := (&config.Config{Project: config.DefaultProjectConfig()}).TmuxHubKeys()
 	tests := map[string]string{
-		"alt-u": "up",
-		"alt-d": "down",
-		"alt-a": "api-restart",
-		"alt-w": "web-restart",
-		"":      "up",
+		"S": "up",
+		"X": "down",
+		"A": "api-restart",
+		"W": "web-restart",
+		"":  "up",
 	}
 	for key, want := range tests {
-		if got := tmuxActionFromKey(key, "up"); got != want {
+		if got := tmuxActionFromKey(keys, key, "up"); got != want {
 			t.Fatalf("tmuxActionFromKey(%q) = %q, want %q", key, got, want)
 		}
 	}
@@ -117,7 +119,7 @@ func TestFZFEnvironmentHubRoutesStopShortcut(t *testing.T) {
 	runner := &fakeRunner{
 		paths:            map[string]bool{"fzf": true, "tmux": true},
 		existingSessions: map[string]bool{"dev": true},
-		fzfOutput:        []byte("alt-d\n" + tmuxLine(target.Session, target.Label, target.Status, target.Details, tmuxRow(0, target)) + "\n"),
+		fzfOutput:        []byte("X\n" + tmuxLine(target.Session, target.Label, target.Status, target.Details, tmuxRow(0, target)) + "\n"),
 	}
 	manager := NewManager(testConfig(t.TempDir()), runner)
 

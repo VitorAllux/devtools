@@ -17,6 +17,28 @@ type SSHHubKeyBindings struct {
 	NewTerminal KeyBinding
 }
 
+type ShellShortcutBindings struct {
+	MainHub   KeyBinding
+	Workspace KeyBinding
+	Tmux      KeyBinding
+	SSH       KeyBinding
+}
+
+type TmuxHubKeyBindings struct {
+	Start      KeyBinding
+	Stop       KeyBinding
+	RestartAPI KeyBinding
+	RestartWeb KeyBinding
+	Create     KeyBinding
+}
+
+type SystemConfigHubKeyBindings struct {
+	Add      KeyBinding
+	Clear    KeyBinding
+	Validate KeyBinding
+	Secrets  KeyBinding
+}
+
 type WorkspaceHubKeyBindings struct {
 	Create   KeyBinding
 	Manage   KeyBinding
@@ -49,6 +71,37 @@ func (c *Config) SSHHubKeys() SSHHubKeyBindings {
 		Add:         normalizeKeyOrDefault(c.Project.SSH.Hub.Shortcuts.Add, defaults.Add),
 		Remove:      normalizeKeyOrDefault(c.Project.SSH.Hub.Shortcuts.Remove, defaults.Remove),
 		NewTerminal: normalizeKeyOrDefault(c.Project.SSH.Hub.Shortcuts.NewTerminal, defaults.NewTerminal),
+	}
+}
+
+func (c *Config) ShellShortcutKeys() ShellShortcutBindings {
+	defaults := DefaultProjectConfig().Shell.Shortcuts
+	return ShellShortcutBindings{
+		MainHub:   normalizeKeyOrDefault(c.Project.Shell.Shortcuts.MainHub, defaults.MainHub),
+		Workspace: normalizeKeyOrDefault(c.Project.Shell.Shortcuts.Workspace, defaults.Workspace),
+		Tmux:      normalizeKeyOrDefault(c.Project.Shell.Shortcuts.Tmux, defaults.Tmux),
+		SSH:       normalizeKeyOrDefault(c.Project.Shell.Shortcuts.SSH, defaults.SSH),
+	}
+}
+
+func (c *Config) TmuxHubKeys() TmuxHubKeyBindings {
+	defaults := DefaultProjectConfig().Tmux.Hub.Shortcuts
+	return TmuxHubKeyBindings{
+		Start:      normalizeKeyOrDefault(c.Project.Tmux.Hub.Shortcuts.Start, defaults.Start),
+		Stop:       normalizeKeyOrDefault(c.Project.Tmux.Hub.Shortcuts.Stop, defaults.Stop),
+		RestartAPI: normalizeKeyOrDefault(c.Project.Tmux.Hub.Shortcuts.RestartAPI, defaults.RestartAPI),
+		RestartWeb: normalizeKeyOrDefault(c.Project.Tmux.Hub.Shortcuts.RestartWeb, defaults.RestartWeb),
+		Create:     normalizeKeyOrDefault(c.Project.Tmux.Hub.Shortcuts.Create, defaults.Create),
+	}
+}
+
+func (c *Config) SystemConfigHubKeys() SystemConfigHubKeyBindings {
+	defaults := DefaultProjectConfig().System.ConfigHub.Shortcuts
+	return SystemConfigHubKeyBindings{
+		Add:      normalizeKeyOrDefault(c.Project.System.ConfigHub.Shortcuts.Add, defaults.Add),
+		Clear:    normalizeKeyOrDefault(c.Project.System.ConfigHub.Shortcuts.Clear, defaults.Clear),
+		Validate: normalizeKeyOrDefault(c.Project.System.ConfigHub.Shortcuts.Validate, defaults.Validate),
+		Secrets:  normalizeKeyOrDefault(c.Project.System.ConfigHub.Shortcuts.Secrets, defaults.Secrets),
 	}
 }
 

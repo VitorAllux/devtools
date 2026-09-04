@@ -105,7 +105,7 @@ func TestCategoryRowsKeepRawIDHidden(t *testing.T) {
 	if raw != "theme" {
 		t.Fatalf("first category raw id = %q, want theme", raw)
 	}
-	if !strings.Contains(rows[2], "All Keys") || !strings.Contains(rows[2], "22 key(s)") {
+	if !strings.Contains(rows[2], "All Keys") || !strings.Contains(rows[2], "35 key(s)") {
 		t.Fatalf("All Keys row should include label and count: %q", rows[2])
 	}
 	fields := strings.Split(rows[2], "\t")
@@ -136,11 +136,21 @@ func TestConfigRowsKeepDescriptionsForPreviewAndSearch(t *testing.T) {
 }
 
 func TestConfigPreviewExplainsSelectedKey(t *testing.T) {
-	preview := configPreviewCommand()
+	keys := (&config.Config{Project: config.DefaultProjectConfig()}).SystemConfigHubKeys()
+	preview := configPreviewCommand([]ui.FZFShortcut{
+		{Label: "Enter", Description: "edit"},
+		{Key: keys.Add.FZFKey, Label: keys.Add.Label, Description: "add custom key"},
+		{Key: keys.Clear.FZFKey, Label: keys.Clear.Label, Description: "clear persisted value"},
+		{Key: keys.Validate.FZFKey, Label: keys.Validate.Label, Description: "validate value"},
+		{Key: keys.Secrets.FZFKey, Label: keys.Secrets.Label, Description: "show secrets status"},
+	})
 	for _, want := range []string{"What it does", "description=", "kind=", "source=", "default_value="} {
 		if !strings.Contains(preview, want) {
 			t.Fatalf("config preview missing %q: %s", want, preview)
 		}
+	}
+	if !strings.Contains(preview, "Shift+N") || !strings.Contains(preview, "add custom key") {
+		t.Fatalf("config preview should render configured shortcuts: %s", preview)
 	}
 }
 
@@ -151,9 +161,9 @@ func TestEntriesForCategoryFiltersExpectedGroups(t *testing.T) {
 		category string
 		keys     []string
 	}{
-		{category: "keys", keys: []string{"DVV_THEME", "DVV_PROFILE", "DVV_TERMINAL_LAUNCHER", "API_DIR", "DVV_DB_HOST", "DVV_TMUX_SESSION_SHORTCUT", "DVV_TMUX_HOME_DIR", "DVV_TMUX_HOME_SHORTCUT", "DVV_TMUX_RESET_SHORTCUT", "DVV_TMUX_ENVIRONMENTS", "DVV_WORKSPACES_DIR", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT", "DVV_WORKSPACE_TEMPLATES", "DVV_RCLONE_REMOTE", "DVV_RESOURCES_START_SHORTCUT", "DVV_RESOURCES_LOGS_SHORTCUT", "DVV_RESOURCES_LOG_TAIL", "DVV_DB_SAFETY_CONFIRM", "DVV_SECRETS_SYNC_SHORTCUT"}},
+		{category: "keys", keys: []string{"DVV_THEME", "DVV_PROFILE", "DVV_TERMINAL_LAUNCHER", "API_DIR", "DVV_DB_HOST", "DVV_TMUX_SESSION_SHORTCUT", "DVV_TMUX_HOME_DIR", "DVV_TMUX_HOME_SHORTCUT", "DVV_TMUX_RESET_SHORTCUT", "DVV_SHELL_MAIN_SHORTCUT", "DVV_SHELL_WORKSPACE_SHORTCUT", "DVV_SHELL_TMUX_SHORTCUT", "DVV_SHELL_SSH_SHORTCUT", "DVV_CONFIG_ADD_SHORTCUT", "DVV_CONFIG_CLEAR_SHORTCUT", "DVV_CONFIG_VALIDATE_SHORTCUT", "DVV_CONFIG_SECRETS_SHORTCUT", "DVV_TMUX_HUB_START_SHORTCUT", "DVV_TMUX_HUB_STOP_SHORTCUT", "DVV_TMUX_HUB_RESTART_API_SHORTCUT", "DVV_TMUX_HUB_RESTART_WEB_SHORTCUT", "DVV_TMUX_HUB_CREATE_SHORTCUT", "DVV_TMUX_ENVIRONMENTS", "DVV_WORKSPACES_DIR", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT", "DVV_WORKSPACE_TEMPLATES", "DVV_RCLONE_REMOTE", "DVV_RESOURCES_START_SHORTCUT", "DVV_RESOURCES_LOGS_SHORTCUT", "DVV_RESOURCES_LOG_TAIL", "DVV_DB_SAFETY_CONFIRM", "DVV_SECRETS_SYNC_SHORTCUT"}},
 		{category: "paths", keys: []string{"API_DIR", "DVV_TMUX_HOME_DIR", "DVV_WORKSPACES_DIR"}},
-		{category: "shortcuts", keys: []string{"DVV_TMUX_SESSION_SHORTCUT", "DVV_TMUX_HOME_SHORTCUT", "DVV_TMUX_RESET_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT", "DVV_RESOURCES_START_SHORTCUT", "DVV_RESOURCES_LOGS_SHORTCUT", "DVV_SECRETS_SYNC_SHORTCUT"}},
+		{category: "shortcuts", keys: []string{"DVV_TMUX_SESSION_SHORTCUT", "DVV_TMUX_HOME_SHORTCUT", "DVV_TMUX_RESET_SHORTCUT", "DVV_SHELL_MAIN_SHORTCUT", "DVV_SHELL_WORKSPACE_SHORTCUT", "DVV_SHELL_TMUX_SHORTCUT", "DVV_SHELL_SSH_SHORTCUT", "DVV_CONFIG_ADD_SHORTCUT", "DVV_CONFIG_CLEAR_SHORTCUT", "DVV_CONFIG_VALIDATE_SHORTCUT", "DVV_CONFIG_SECRETS_SHORTCUT", "DVV_TMUX_HUB_START_SHORTCUT", "DVV_TMUX_HUB_STOP_SHORTCUT", "DVV_TMUX_HUB_RESTART_API_SHORTCUT", "DVV_TMUX_HUB_RESTART_WEB_SHORTCUT", "DVV_TMUX_HUB_CREATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT", "DVV_RESOURCES_START_SHORTCUT", "DVV_RESOURCES_LOGS_SHORTCUT", "DVV_SECRETS_SYNC_SHORTCUT"}},
 		{category: "tmux", keys: []string{"DVV_TMUX_HOME_DIR", "DVV_TMUX_ENVIRONMENTS"}},
 		{category: "database", keys: []string{"DVV_DB_HOST", "DVV_RCLONE_REMOTE"}},
 		{category: "workspace", keys: []string{"DVV_WORKSPACES_DIR", "DVV_WORKSPACE_TEMPLATES"}},
@@ -332,6 +342,18 @@ func TestWriteValueAppliesRuntimeConfig(t *testing.T) {
 	if cfg.Project.Profiles.Active != "work" {
 		t.Fatalf("active profile = %q, want work", cfg.Project.Profiles.Active)
 	}
+	if err := manager.writeValue("DVV_SHELL_WORKSPACE_SHORTCUT", "alt-w"); err != nil {
+		t.Fatalf("writeValue shell shortcut returned error: %v", err)
+	}
+	if cfg.Project.Shell.Shortcuts.Workspace != "alt-w" {
+		t.Fatalf("shell workspace shortcut = %q", cfg.Project.Shell.Shortcuts.Workspace)
+	}
+	if err := manager.writeValue("DVV_CONFIG_ADD_SHORTCUT", "shift+n"); err != nil {
+		t.Fatalf("writeValue config shortcut returned error: %v", err)
+	}
+	if cfg.Project.System.ConfigHub.Shortcuts.Add != "shift+n" {
+		t.Fatalf("config add shortcut = %q", cfg.Project.System.ConfigHub.Shortcuts.Add)
+	}
 	if err := manager.writeValue("DVV_SECRETS_SYNC_SHORTCUT", "alt-y"); err != nil {
 		t.Fatalf("writeValue secrets shortcut returned error: %v", err)
 	}
@@ -371,6 +393,12 @@ func TestWriteValueAppliesRuntimeConfig(t *testing.T) {
 	}
 	if cfg.Project.Tmux.Reset.Shortcut != "alt-r" {
 		t.Fatalf("tmux reset shortcut = %q", cfg.Project.Tmux.Reset.Shortcut)
+	}
+	if err := manager.writeValue("DVV_TMUX_HUB_CREATE_SHORTCUT", "shift+n"); err != nil {
+		t.Fatalf("writeValue tmux hub shortcut returned error: %v", err)
+	}
+	if cfg.Project.Tmux.Hub.Shortcuts.Create != "shift+n" {
+		t.Fatalf("tmux hub create shortcut = %q", cfg.Project.Tmux.Hub.Shortcuts.Create)
 	}
 
 	if err := manager.writeValue("DVV_WORKSPACE_PROJECT_ROOTS", "~/one:/opt/two"); err != nil {
@@ -438,6 +466,19 @@ func testEntries() []Entry {
 		{Category: "Tmux", Key: "DVV_TMUX_HOME_DIR", Description: "Sets the direct tmux home directory.", Kind: "path"},
 		{Category: "Shortcuts", Key: "DVV_TMUX_HOME_SHORTCUT", Description: "Sets the direct tmux home shortcut.", Kind: "shortcut"},
 		{Category: "Shortcuts", Key: "DVV_TMUX_RESET_SHORTCUT", Description: "Sets the tmux reset shortcut.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_SHELL_MAIN_SHORTCUT", Description: "Opens the main hub.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_SHELL_WORKSPACE_SHORTCUT", Description: "Opens the workspace hub.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_SHELL_TMUX_SHORTCUT", Description: "Opens the tmux hub.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_SHELL_SSH_SHORTCUT", Description: "Opens the SSH hub.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_CONFIG_ADD_SHORTCUT", Description: "Adds custom config keys.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_CONFIG_CLEAR_SHORTCUT", Description: "Clears config values.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_CONFIG_VALIDATE_SHORTCUT", Description: "Validates config values.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_CONFIG_SECRETS_SHORTCUT", Description: "Shows secret status.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_TMUX_HUB_START_SHORTCUT", Description: "Starts tmux targets.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_TMUX_HUB_STOP_SHORTCUT", Description: "Stops tmux targets.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_TMUX_HUB_RESTART_API_SHORTCUT", Description: "Restarts API panes.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_TMUX_HUB_RESTART_WEB_SHORTCUT", Description: "Restarts Web panes.", Kind: "shortcut"},
+		{Category: "Shortcuts", Key: "DVV_TMUX_HUB_CREATE_SHORTCUT", Description: "Creates tmux targets.", Kind: "shortcut"},
 		{Category: "Tmux", Key: "DVV_TMUX_ENVIRONMENTS", Description: "Stores custom tmux environments.", Kind: "json"},
 		{Category: "Workspace", Key: "DVV_WORKSPACES_DIR", Description: "Sets where workspace folders are created.", Kind: "path"},
 		{Category: "Shortcuts", Key: "DVV_WORKSPACE_TEMPLATE_SHORTCUT", Description: "Opens workspace template management.", Kind: "shortcut"},

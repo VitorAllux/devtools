@@ -34,8 +34,19 @@ func Run(args []string) int {
 	ui.SetTheme(cfg.Project.Theme.Name)
 
 	runner := run.ExecRunner{}
-	if len(args) == 0 || isHelpArg(args[0]) {
-		showHelp()
+	if len(args) == 0 {
+		if shouldOpenMainHub(runner) {
+			if err := runMainHub(ctx, cfg, runner); err != nil {
+				ui.Error("%v", err)
+				return 1
+			}
+			return 0
+		}
+		showHelp(cfg)
+		return 0
+	}
+	if isHelpArg(args[0]) {
+		showHelp(cfg)
 		return 0
 	}
 
@@ -168,7 +179,7 @@ func Run(args []string) int {
 	}
 
 	ui.Error("Unknown command: %s", command)
-	showHelp()
+	showHelp(cfg)
 	return 1
 }
 
@@ -199,6 +210,12 @@ func runCommand(ctx context.Context, cfg *config.Config, runner run.Runner, comm
 		err = resourcescmd.Run(ctx, cfg, runner, args)
 	case "setup":
 		err = setupcmd.RunSetup(ctx, cfg, runner, args)
+	case "build":
+		err = setupcmd.RunBuild(ctx, cfg, runner, args)
+	case "bootstrap":
+		err = secretscmd.RunBootstrap(ctx, cfg, runner, args)
+	case "doctor":
+		err = setupcmd.RunDoctor(ctx, cfg, runner, args)
 	case "check":
 		err = setupcmd.RunCheck(ctx, cfg, runner, args)
 	case "secrets":
@@ -225,9 +242,19 @@ func runCommand(ctx context.Context, cfg *config.Config, runner run.Runner, comm
 	return 0
 }
 
-func showHelp() {
+func showHelp(cfg *config.Config) {
+	project := config.DefaultProjectConfig()
+	if cfg != nil {
+		project = cfg.Project
+	}
+	shellCfg := &config.Config{Project: project}
+	shellKeys := shellCfg.ShellShortcutKeys()
 	ui.Title("Developer Tools")
-	fmt.Printf("  %s dvv <command> [args]\n\n", ui.Bold("Usage:"))
+	fmt.Printf("  %s dvv [command] [args]\n\n", ui.Bold("Usage:"))
+	helpSection("Main")
+	helpEntry("dvv", ">", "Open the main hub")
+	helpEntry("dvv help", "?", "Show this help")
+	fmt.Println()
 
 	helpSection("Network And SSH")
 	helpEntry("ssh", ">", "Open the SSH hub")
@@ -254,14 +281,25 @@ func showHelp() {
 	helpEntry("workspace", ">", "Open the workspace hub")
 	fmt.Println()
 	helpSection("Shell Shortcuts")
-	helpEntry("Ctrl+F", ">", "Open the directory picker in tmux")
-	helpEntry("Alt+F", ">", "Open a home tmux tab")
-	helpEntry("Alt+S", ">", "Open the SSH hub")
+	helpEntry(shellKeys.MainHub.Label, ">", "Open the main hub")
+	helpEntry(shellKeys.Workspace.Label, ">", "Open the workspace hub")
+	helpEntry(shellKeys.Tmux.Label, ">", "Open the tmux hub")
+	helpEntry(shortcutLabel(project.Tmux.Session.Shortcut), ">", "Open the directory picker in tmux")
+	helpEntry(shortcutLabel(project.Tmux.Home.Shortcut), ">", "Open a home tmux tab")
+	helpEntry(shellKeys.SSH.Label, ">", "Open the SSH hub")
 	fmt.Println()
 	helpSection("Tmux Shortcuts")
-	helpEntry("Alt+R", ">", "Reset or select API/Horizon tmux target")
+	helpEntry(shortcutLabel(project.Tmux.Reset.Shortcut), ">", "Reset or select API/Horizon tmux target")
 	fmt.Println()
 	fmt.Println("  Use `dvv <command> help` for hub details.")
+}
+
+func shortcutLabel(value string) string {
+	key, err := config.NormalizeKey(value)
+	if err != nil {
+		return value
+	}
+	return key.Label
 }
 
 func helpSection(title string) {

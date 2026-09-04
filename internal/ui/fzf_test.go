@@ -82,11 +82,11 @@ func TestFZFHubCanOverrideHeight(t *testing.T) {
 func TestFZFPreviewCommandDeckPrintsEveryShortcut(t *testing.T) {
 	deck := FZFPreviewCommandDeck([]FZFShortcut{
 		{Label: "Enter", Description: "open"},
-		{Key: "C", Label: "Shift+C", Description: "create workspace"},
+		{Key: "N", Label: "Shift+N", Description: "create workspace"},
 		{Key: "D", Label: "Shift+D", Description: "delete selected"},
 	})
 
-	for _, want := range []string{"Enter", "open", "Shift+C", "create workspace", "Shift+D", "delete selected"} {
+	for _, want := range []string{"Enter", "open", "Shift+N", "create workspace", "Shift+D", "delete selected"} {
 		if !strings.Contains(deck, want) {
 			t.Fatalf("command deck missing %q: %s", want, deck)
 		}

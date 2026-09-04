@@ -351,16 +351,10 @@ func checkZshShortcutBlock(cfg *config.Config) {
 }
 
 func zshShortcutsStale(content string, cfg *config.Config) bool {
-	expectations := []struct {
-		shortcut string
-		command  string
-	}{
-		{firstNonEmpty(cfg.Project.Tmux.Session.Shortcut, "ctrl+f"), "dvv tmux:session"},
-		{firstNonEmpty(cfg.Project.Tmux.Home.Shortcut, "alt+f"), "dvv tmux:home"},
-		{firstNonEmpty(cfg.Project.Tmux.Reset.Shortcut, "alt+r"), "dvv tmux:reset-api"},
-		{"alt+s", "dvv ssh"},
-	}
-	for _, expectation := range expectations {
+	for _, expectation := range zshShortcutExpectations(cfg) {
+		if len(shortcutToZshSequences(expectation.shortcut)) == 0 {
+			continue
+		}
 		matches := false
 		for _, sequence := range shortcutToZshSequences(expectation.shortcut) {
 			line := fmt.Sprintf("bindkey -s \"%s\" \"%s\\n\"", sequence, expectation.command)
@@ -374,6 +368,27 @@ func zshShortcutsStale(content string, cfg *config.Config) bool {
 		}
 	}
 	return strings.Contains(content, "devv ")
+}
+
+type zshShortcutExpectation struct {
+	shortcut string
+	command  string
+}
+
+func zshShortcutExpectations(cfg *config.Config) []zshShortcutExpectation {
+	project := config.DefaultProjectConfig()
+	if cfg != nil {
+		project = cfg.Project
+	}
+	return []zshShortcutExpectation{
+		{firstNonEmpty(project.Shell.Shortcuts.MainHub, "alt+g"), "dvv"},
+		{firstNonEmpty(project.Shell.Shortcuts.Workspace, "alt+w"), "dvv workspace"},
+		{firstNonEmpty(project.Shell.Shortcuts.Tmux, "alt+t"), "dvv tmux"},
+		{firstNonEmpty(project.Shell.Shortcuts.SSH, "alt+s"), "dvv ssh"},
+		{firstNonEmpty(project.Tmux.Session.Shortcut, "alt+p"), "dvv tmux:session"},
+		{firstNonEmpty(project.Tmux.Home.Shortcut, "alt+f"), "dvv tmux:home"},
+		{firstNonEmpty(project.Tmux.Reset.Shortcut, "alt+r"), "dvv tmux:reset-api"},
+	}
 }
 
 func checkTmuxShortcutBlock(cfg *config.Config) {
@@ -529,7 +544,7 @@ func showSetupHelp() {
 	fmt.Printf("  %s dvv setup\n\n", ui.Bold("Usage:"))
 	helpSection("Actions")
 	helpEntry("zsh completion", "Copy completions/_dvv to ~/.zfunc/_dvv when possible")
-	helpEntry("shell shortcuts", "Install managed Ctrl+F, Alt+F, Alt+R fallback, and Alt+S zsh shortcuts")
+	helpEntry("shell shortcuts", "Install managed Alt shortcuts for main, workspace, tmux, SSH, picker, home, and reset fallback")
 	helpEntry("tmux shortcuts", "Install managed Alt+R tmux reset shortcut")
 }
 

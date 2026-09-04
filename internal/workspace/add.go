@@ -104,6 +104,10 @@ func BuildAddPlan(ctx context.Context, cfg config.WorkspaceConfig, git gitclient
 }
 
 func (m *Manager) ExecuteAddPlan(ctx context.Context, plan AddPlan) AddResult {
+	return m.executeAddPlan(ctx, plan, nil)
+}
+
+func (m *Manager) executeAddPlan(ctx context.Context, plan AddPlan, onItemDone func(AddPlanItem)) AddResult {
 	cfg := m.Config.Project.Workspace
 	result := AddResult{Plan: plan}
 	workspaceContext := addWorkspaceHookContext(plan)
@@ -112,17 +116,20 @@ func (m *Manager) ExecuteAddPlan(ctx context.Context, plan AddPlan) AddResult {
 		switch item.Action {
 		case SkipNoBaseAction, SkipDestExistsAction, SkipBranchExistsAction, SkipBranchMissingAction:
 			result.Skipped++
+			notifyAddProgress(onItemDone, item)
 			continue
 		}
 		projectContext := addProjectHookContext(plan, item)
 		if _, err := hooks.Run(ctx, m.Runner, cfg.Hooks, hooks.ProjectAdding, hooks.Context{Workspace: workspaceContext, Project: projectContext}, false); err != nil {
 			result.Failed++
 			result.Errors = append(result.Errors, err.Error())
+			notifyAddProgress(onItemDone, item)
 			continue
 		}
 		if err := m.executeAddWorktreeAction(ctx, item); err != nil {
 			result.Failed++
 			result.Errors = append(result.Errors, err.Error())
+			notifyAddProgress(onItemDone, item)
 			continue
 		}
 		result.Created++
@@ -144,12 +151,19 @@ func (m *Manager) ExecuteAddPlan(ctx context.Context, plan AddPlan) AddResult {
 			result.Failed += bootstrapResult.Failures
 			_, _ = hooks.Run(ctx, m.Runner, cfg.Hooks, hooks.ProjectBootstrap, hooks.Context{Workspace: workspaceContext, Project: projectContext}, false)
 		}
+		notifyAddProgress(onItemDone, item)
 	}
 	if err := updateAddMetadata(cfg, plan, result.AddedProjects); err != nil {
 		result.Failed++
 		result.Errors = append(result.Errors, err.Error())
 	}
 	return result
+}
+
+func notifyAddProgress(onItemDone func(AddPlanItem), item AddPlanItem) {
+	if onItemDone != nil {
+		onItemDone(item)
+	}
 }
 
 func (m *Manager) executeAddWorktreeAction(ctx context.Context, item AddPlanItem) error {

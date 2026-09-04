@@ -518,7 +518,7 @@ func isHelpArg(value string) bool {
 func showHelp(cfg *config.Config) {
 	shortcut := cfg.Project.Tmux.Session.Shortcut
 	if strings.TrimSpace(shortcut) == "" {
-		shortcut = "ctrl+f"
+		shortcut = "alt+p"
 	}
 	ui.Title("Tmux Session")
 	fmt.Printf("  %s dvv tmux:session [directory]\n\n", ui.Bold("Usage:"))
@@ -533,7 +533,7 @@ func showHelp(cfg *config.Config) {
 	helpEntry("Esc", "Exit")
 	fmt.Println()
 	helpSection("Shell Shortcut")
-	helpEntry(shortcutLabel(shortcut, "ctrl+f"), "Runs dvv tmux:session when shell integration is installed")
+	helpEntry(shortcutLabel(shortcut, "alt+p"), "Runs dvv tmux:session when shell integration is installed")
 }
 
 func showHomeHelp(cfg *config.Config) {

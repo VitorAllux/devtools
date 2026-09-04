@@ -345,7 +345,7 @@ func TestFZFHubKeepsEmptyWorkspaceHubOpen(t *testing.T) {
 	if !keepOpen {
 		t.Fatal("empty hub should stay open")
 	}
-	if !strings.Contains(message, "Use Shift+C to create one") {
+	if !strings.Contains(message, "Use Shift+N to create one") {
 		t.Fatalf("message = %q", message)
 	}
 	if !strings.Contains(runner.fzfInput, "__dvv_empty__") {
@@ -434,7 +434,7 @@ func TestWorkspacePreviewPreservesHubCommandArgs(t *testing.T) {
 	if strings.Contains(preview, "DVV_FZF_COMMANDS") {
 		t.Fatalf("preview should render shortcut commands directly: %s", preview)
 	}
-	for _, want := range []string{"Shift+C", "create workspace", "Shift+T", "manage templates", "Shift+M", "manage projects", "Shift+D", "delete selected"} {
+	for _, want := range []string{"Shift+N", "create workspace", "Shift+T", "manage templates", "Shift+M", "manage projects", "Shift+D", "delete selected"} {
 		if !strings.Contains(preview, want) {
 			t.Fatalf("preview missing %q: %s", want, preview)
 		}
@@ -690,6 +690,38 @@ func TestExecuteCreatePlanWritesMetadataAndAgentsFile(t *testing.T) {
 	}
 }
 
+func TestExecuteCreatePlanReportsProgressForEachProject(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	workspacesRoot := filepath.Join(root, "workspaces")
+	sourceAPI := filepath.Join(root, "repos", "api")
+	sourceWeb := filepath.Join(root, "repos", "web")
+	for _, path := range []string{sourceAPI, sourceWeb} {
+		mustMkdir(t, path)
+	}
+
+	runner := newWorkspaceRunner()
+	runner.refs[sourceAPI] = map[string]bool{"origin/prod": true}
+	runner.refs[sourceWeb] = map[string]bool{"origin/prod": true}
+	manager := NewManager(testWorkspaceConfig(workspacesRoot), runner)
+
+	plan, err := manager.BuildCreatePlan(ctx, "Bug 99", []discovery.Project{{Name: "api", Path: sourceAPI}, {Name: "web", Path: sourceWeb}}, "bug", "")
+	if err != nil {
+		t.Fatalf("BuildCreatePlan returned error: %v", err)
+	}
+	progress := []string{}
+	result := manager.executeCreatePlan(ctx, plan, func(item CreatePlanItem) {
+		progress = append(progress, item.Project.Name)
+	})
+
+	if result.Failed != 0 || result.Created != 2 {
+		t.Fatalf("result = %#v", result)
+	}
+	if strings.Join(progress, ",") != "api,web" {
+		t.Fatalf("progress = %#v, want api,web", progress)
+	}
+}
+
 func TestBuildAddPlanUsesWorkspaceMetadataBase(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
@@ -723,6 +755,52 @@ func TestBuildAddPlanUsesWorkspaceMetadataBase(t *testing.T) {
 	}
 	if plan.Items[0].BaseBranch != "master" || plan.Items[0].WorkBranch != "release" || plan.Items[0].Action != CreateBranchAction {
 		t.Fatalf("item = %#v", plan.Items[0])
+	}
+}
+
+func TestExecuteAddPlanReportsProgressForEachProject(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	workspacesRoot := filepath.Join(root, "workspaces")
+	workspacePath := filepath.Join(workspacesRoot, "workspace-release")
+	sourceAPI := filepath.Join(root, "repos", "api")
+	sourceWeb := filepath.Join(root, "repos", "web")
+	for _, path := range []string{workspacePath, sourceAPI, sourceWeb} {
+		mustMkdir(t, path)
+	}
+
+	base := "master"
+	if err := metadata.Write(workspacePath, metadata.Workspace{
+		Version:        1,
+		WorkspaceName:  "release",
+		WorkspaceDir:   "workspace-release",
+		WorkBranch:     "release",
+		BaseBranch:     &base,
+		BootstrapOnAdd: true,
+	}); err != nil {
+		t.Fatalf("metadata write failed: %v", err)
+	}
+
+	runner := newWorkspaceRunner()
+	runner.refs[sourceAPI] = map[string]bool{"origin/master": true}
+	runner.refs[sourceWeb] = map[string]bool{"origin/master": true}
+	manager := NewManager(testWorkspaceConfig(workspacesRoot), runner)
+	ws := Workspace{Name: "release", DirName: "workspace-release", Path: workspacePath}
+
+	plan, err := manager.BuildAddPlan(ctx, ws, []discovery.Project{{Name: "api", Path: sourceAPI}, {Name: "web", Path: sourceWeb}}, AddPlanOptions{Mode: AddBaseWorkspace})
+	if err != nil {
+		t.Fatalf("BuildAddPlan returned error: %v", err)
+	}
+	progress := []string{}
+	result := manager.executeAddPlan(ctx, plan, func(item AddPlanItem) {
+		progress = append(progress, item.Project.Name)
+	})
+
+	if result.Failed != 0 || result.Created != 2 {
+		t.Fatalf("result = %#v", result)
+	}
+	if strings.Join(progress, ",") != "api,web" {
+		t.Fatalf("progress = %#v, want api,web", progress)
 	}
 }
 

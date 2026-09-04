@@ -52,7 +52,7 @@ func (m *Manager) Hub(ctx context.Context) error {
 func (m *Manager) loadHubDetails(ctx context.Context, adopt bool) ([]Details, string, error) {
 	var details []Details
 	var loadMessage string
-	err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "loading", Subject: "workspaces"}, func() error {
+	err := ui.RunWithRoyalLoader(workspaceLoaderOptions("loading", "workspaces", "", "loaded", adopt), func() error {
 		var err error
 		details, err = m.ListFast(ctx)
 		if err != nil {
@@ -292,7 +292,7 @@ func (m *Manager) createInteractive(ctx context.Context) (Workspace, error) {
 	}
 
 	var plan CreatePlan
-	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "planning", Subject: Slug(name)}, func() error {
+	if err := ui.RunWithRoyalLoader(workspaceLoaderOptions("planning", "workspace", Slug(name), "planned", true), func() error {
 		var buildErr error
 		plan, buildErr = m.BuildCreatePlan(ctx, name, projects, source.BaseKind, source.BaseOverride)
 		return buildErr
@@ -304,22 +304,39 @@ func (m *Manager) createInteractive(ctx context.Context) (Workspace, error) {
 		return Workspace{}, fmt.Errorf("workspace creation cancelled")
 	}
 	var result CreateResult
-	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "creating", Subject: plan.WorkspaceDir}, func() error {
-		result = m.ExecuteCreatePlan(ctx, plan)
+	createErr := ui.RunWithRoyalProgress(ui.ProgressOptions{
+		Action:        "creating",
+		Subject:       "workspace",
+		Detail:        plan.WorkspaceDir,
+		Total:         workspaceProgressTotal(len(plan.Items)),
+		SuccessAction: "created",
+		FailureAction: "failed",
+	}, func(progress *ui.RoyalProgressLoader) error {
+		result = m.executeCreatePlan(ctx, plan, func(CreatePlanItem) {
+			progress.Add(1)
+		})
+		if len(plan.Items) == 0 {
+			progress.Set(1)
+		}
+		if result.Failed > 0 {
+			return fmt.Errorf("workspace created with %d failure(s)", result.Failed)
+		}
 		return nil
-	}); err != nil {
-		return Workspace{}, err
-	}
+	})
 	reportCreateResult(result)
-	if result.Failed > 0 {
-		return Workspace{}, fmt.Errorf("workspace created with %d failure(s)", result.Failed)
+	if createErr != nil {
+		return Workspace{}, createErr
 	}
 	return Workspace{Name: plan.WorkspaceName, DirName: plan.WorkspaceDir, Path: plan.WorkspacePath}, nil
 }
 
 func (m *Manager) manageInteractive(ctx context.Context, ws Workspace) error {
-	rows, err := m.ManageProjects(ctx, ws)
-	if err != nil {
+	var rows []ManageProject
+	if err := ui.RunWithRoyalLoader(workspaceLoaderOptions("scanning", "workspace projects", ws.DirName, "loaded", true), func() error {
+		var manageErr error
+		rows, manageErr = m.ManageProjects(ctx, ws)
+		return manageErr
+	}); err != nil {
 		return err
 	}
 	if len(rows) == 0 {
@@ -346,7 +363,7 @@ func (m *Manager) manageInteractive(ctx context.Context, ws Workspace) error {
 		return nil
 	}
 	for _, project := range toRemove {
-		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "removing", Subject: project.Name}, func() error {
+		if err := ui.RunWithRoyalLoader(workspaceLoaderOptions("removing", "project", project.Name, "removed", true), func() error {
 			return m.RemoveProject(ctx, ws, project, false)
 		}); err != nil {
 			return err
@@ -362,7 +379,7 @@ func (m *Manager) manageInteractive(ctx context.Context, ws Workspace) error {
 		return err
 	}
 	var plan AddPlan
-	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "planning", Subject: ws.DirName}, func() error {
+	if err := ui.RunWithRoyalLoader(workspaceLoaderOptions("planning", "workspace", ws.DirName, "planned", true), func() error {
 		var buildErr error
 		plan, buildErr = m.BuildAddPlan(ctx, ws, toAdd, options)
 		return buildErr
@@ -371,15 +388,28 @@ func (m *Manager) manageInteractive(ctx context.Context, ws Workspace) error {
 	}
 	printAddPlan(plan)
 	var result AddResult
-	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "adding", Subject: ws.DirName}, func() error {
-		result = m.ExecuteAddPlan(ctx, plan)
+	addErr := ui.RunWithRoyalProgress(ui.ProgressOptions{
+		Action:        "adding",
+		Subject:       "workspace",
+		Detail:        ws.DirName,
+		Total:         workspaceProgressTotal(len(plan.Items)),
+		SuccessAction: "added",
+		FailureAction: "failed",
+	}, func(progress *ui.RoyalProgressLoader) error {
+		result = m.executeAddPlan(ctx, plan, func(AddPlanItem) {
+			progress.Add(1)
+		})
+		if len(plan.Items) == 0 {
+			progress.Set(1)
+		}
+		if result.Failed > 0 {
+			return fmt.Errorf("project management completed with %d failure(s)", result.Failed)
+		}
 		return nil
-	}); err != nil {
-		return err
-	}
+	})
 	reportAddResult(result)
-	if result.Failed > 0 {
-		return fmt.Errorf("project management completed with %d failure(s)", result.Failed)
+	if addErr != nil {
+		return addErr
 	}
 	return nil
 }
@@ -407,7 +437,7 @@ func (m *Manager) deleteWorkspaceInteractive(ctx context.Context, ws Workspace, 
 	}
 	for {
 		var result RemoveWorkspaceResult
-		if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "deleting", Subject: ws.DirName}, func() error {
+		if err := ui.RunWithRoyalLoader(workspaceLoaderOptions("deleting", "workspace", ws.DirName, "processed", true), func() error {
 			result = m.RemoveWorkspace(ctx, ws, *options)
 			return nil
 		}); err != nil {
@@ -468,7 +498,7 @@ func (m *Manager) selectBaseKind(ctx context.Context) (string, error) {
 
 func (m *Manager) selectProjects(ctx context.Context, label string) ([]discovery.Project, error) {
 	var projects []discovery.Project
-	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "scanning", Subject: "projects"}, func() error {
+	if err := ui.RunWithRoyalLoader(workspaceLoaderOptions("scanning", "projects", label, "loaded", true), func() error {
 		var err error
 		projects, err = m.DiscoverProjects(ctx)
 		return err
@@ -1099,6 +1129,24 @@ func messageFromError(err error, fallback string) string {
 		return err.Error()
 	}
 	return fallback
+}
+
+func workspaceLoaderOptions(action string, subject string, detail string, successAction string, showResult bool) ui.LoaderOptions {
+	return ui.LoaderOptions{
+		Action:        action,
+		Subject:       subject,
+		Detail:        detail,
+		ShowResult:    showResult,
+		SuccessAction: successAction,
+		FailureAction: "failed",
+	}
+}
+
+func workspaceProgressTotal(items int) int64 {
+	if items <= 0 {
+		return 1
+	}
+	return int64(items)
 }
 
 func shellQuote(value string) string {

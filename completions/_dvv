@@ -37,7 +37,7 @@ _dvv() {
           "ssh:add:Add an SSH entry"
           "ssh:remove:Remove SSH entries"
           "ssh:list:List SSH entries"
-          "tmux:session:Open the directory picker used by Ctrl+F"
+          "tmux:session:Open the directory picker used by Alt+P"
           "tmux:home:Open the configured home tmux tab used by Alt+F"
           "tmux:reset-api:Reset or select API/Horizon tmux target"
           "workspace:list:List worktree workspaces"

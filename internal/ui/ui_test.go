@@ -208,6 +208,28 @@ func TestRoyalProgressLoaderTracksProgress(t *testing.T) {
 	loader.Finish(true)
 }
 
+func TestRunWithRoyalProgressReturnsFunctionResult(t *testing.T) {
+	t.Setenv("DVV_NO_LOADER", "1")
+	called := false
+	err := RunWithRoyalProgress(ProgressOptions{Action: "creating", Subject: "workspace", Total: 2}, func(progress *RoyalProgressLoader) error {
+		called = true
+		progress.Add(1)
+		return nil
+	})
+	if err != nil || !called {
+		t.Fatalf("RunWithRoyalProgress success err=%v called=%v", err, called)
+	}
+
+	want := errors.New("broken")
+	got := RunWithRoyalProgress(ProgressOptions{Action: "creating", Subject: "workspace", Total: 2}, func(progress *RoyalProgressLoader) error {
+		progress.Add(1)
+		return want
+	})
+	if !errors.Is(got, want) {
+		t.Fatalf("RunWithRoyalProgress error = %v, want %v", got, want)
+	}
+}
+
 func TestRunWithRoyalLoaderReturnsFunctionResultWhenDisabled(t *testing.T) {
 	t.Setenv("DVV_NO_LOADER", "1")
 	called := false

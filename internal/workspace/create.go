@@ -92,6 +92,10 @@ func BuildCreatePlan(ctx context.Context, cfg config.WorkspaceConfig, git gitcli
 }
 
 func (m *Manager) ExecuteCreatePlan(ctx context.Context, plan CreatePlan) CreateResult {
+	return m.executeCreatePlan(ctx, plan, nil)
+}
+
+func (m *Manager) executeCreatePlan(ctx context.Context, plan CreatePlan, onItemDone func(CreatePlanItem)) CreateResult {
 	cfg := m.Config.Project.Workspace
 	result := CreateResult{Plan: plan}
 	workspaceContext := plan.WorkspaceHookContext()
@@ -111,12 +115,14 @@ func (m *Manager) ExecuteCreatePlan(ctx context.Context, plan CreatePlan) Create
 		switch item.Action {
 		case SkipNoBaseAction, SkipDestExistsAction, SkipBranchExistsAction, SkipBranchMissingAction:
 			result.Skipped++
+			notifyCreateProgress(onItemDone, item)
 			continue
 		}
 		projectContext := item.ProjectHookContext(plan)
 		if _, err := hooks.Run(ctx, m.Runner, cfg.Hooks, hooks.ProjectAdding, hooks.Context{Workspace: workspaceContext, Project: projectContext}, false); err != nil {
 			result.Failed++
 			result.Errors = append(result.Errors, err.Error())
+			notifyCreateProgress(onItemDone, item)
 			continue
 		}
 
@@ -124,6 +130,7 @@ func (m *Manager) ExecuteCreatePlan(ctx context.Context, plan CreatePlan) Create
 		if err != nil {
 			result.Failed++
 			result.Errors = append(result.Errors, err.Error())
+			notifyCreateProgress(onItemDone, item)
 			continue
 		}
 		result.Created++
@@ -145,6 +152,7 @@ func (m *Manager) ExecuteCreatePlan(ctx context.Context, plan CreatePlan) Create
 			result.Failed += bootstrapResult.Failures
 			_, _ = hooks.Run(ctx, m.Runner, cfg.Hooks, hooks.ProjectBootstrap, hooks.Context{Workspace: workspaceContext, Project: projectContext}, false)
 		}
+		notifyCreateProgress(onItemDone, item)
 	}
 
 	if err := metadata.Write(plan.WorkspacePath, metadata.Workspace{
@@ -169,6 +177,12 @@ func (m *Manager) ExecuteCreatePlan(ctx context.Context, plan CreatePlan) Create
 		result.Errors = append(result.Errors, err.Error())
 	}
 	return result
+}
+
+func notifyCreateProgress(onItemDone func(CreatePlanItem), item CreatePlanItem) {
+	if onItemDone != nil {
+		onItemDone(item)
+	}
 }
 
 func (m *Manager) executeWorktreeAction(ctx context.Context, item CreatePlanItem) error {

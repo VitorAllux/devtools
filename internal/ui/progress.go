@@ -39,6 +39,23 @@ func NewRoyalProgressLoader(options ProgressOptions) *RoyalProgressLoader {
 	}
 }
 
+func RunWithRoyalProgress(options ProgressOptions, fn func(*RoyalProgressLoader) error) (err error) {
+	progress := NewRoyalProgressLoader(options)
+	progress.Start()
+	ok := false
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			progress.Finish(false)
+			panic(recovered)
+		}
+		progress.Finish(ok)
+	}()
+
+	err = fn(progress)
+	ok = err == nil
+	return err
+}
+
 func (p *RoyalProgressLoader) Add(n int) {
 	if n > 0 {
 		p.current.Add(int64(n))

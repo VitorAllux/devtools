@@ -64,10 +64,13 @@ func TestZshShortcutsStaleDetectsOldHomeBinding(t *testing.T) {
 	cfg := &config.Config{Project: config.DefaultProjectConfig()}
 	current := strings.Join([]string{
 		`# >>> dvv shell shortcuts >>>`,
-		`bindkey -s "^F" "dvv tmux:session\n"`,
+		`bindkey -s "\eg" "dvv\n"`,
+		`bindkey -s "\ew" "dvv workspace\n"`,
+		`bindkey -s "\et" "dvv tmux\n"`,
+		`bindkey -s "\es" "dvv ssh\n"`,
+		`bindkey -s "\ep" "dvv tmux:session\n"`,
 		`bindkey -s "\ef" "dvv tmux:home\n"`,
 		`bindkey -s "\er" "dvv tmux:reset-api\n"`,
-		`bindkey -s "\es" "dvv ssh\n"`,
 		`# <<< dvv shell shortcuts <<<`,
 	}, "\n")
 
@@ -87,6 +90,7 @@ func TestShortcutToZshSequences(t *testing.T) {
 		want  string
 	}{
 		{input: "ctrl+f", want: "^F"},
+		{input: "alt+p", want: `\ep`},
 		{input: "alt+f", want: `\ef`},
 		{input: "ctrl+shift+f", want: `\e[70;6u`},
 	}
@@ -266,8 +270,8 @@ func TestZshCompletionKeepsHubFirstSurface(t *testing.T) {
 	if !strings.Contains(text, "DVV_COMPLETE_COMPAT") {
 		t.Fatal("compatibility route completions should stay behind DVV_COMPLETE_COMPAT")
 	}
-	if !strings.Contains(text, "tmux:session:Open the directory picker used by Ctrl+F") {
-		t.Fatal("completion should keep the Ctrl+F compatibility command documented")
+	if !strings.Contains(text, "tmux:session:Open the directory picker used by Alt+P") {
+		t.Fatal("completion should keep the Alt+P compatibility command documented")
 	}
 	if !strings.Contains(text, "tmux:home:Open the configured home tmux tab used by Alt+F") {
 		t.Fatal("completion should keep the Alt+F shortcut command documented")

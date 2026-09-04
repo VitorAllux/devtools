@@ -17,30 +17,36 @@ if (!home) {
 
 const zshrc = path.join(home, ".zshrc");
 const config = readProjectConfig(path.join(root, "dvv.config.json"));
+const mainHubShortcut = shortcutToZshSequences(
+  shortcutValue("DVV_SHELL_MAIN_SHORTCUT", undefined, config?.shell?.shortcuts?.mainHub, "alt+g"),
+);
+const workspaceShortcut = shortcutToZshSequences(
+  shortcutValue("DVV_SHELL_WORKSPACE_SHORTCUT", undefined, config?.shell?.shortcuts?.workspace, "alt+w"),
+);
+const shellTmuxShortcut = shortcutToZshSequences(
+  shortcutValue("DVV_SHELL_TMUX_SHORTCUT", undefined, config?.shell?.shortcuts?.tmux, "alt+t"),
+);
+const sshShortcut = shortcutToZshSequences(
+  shortcutValue("DVV_SHELL_SSH_SHORTCUT", undefined, config?.shell?.shortcuts?.ssh, "alt+s"),
+);
 const tmuxShortcut = shortcutToZshSequences(
-  process.env.DVV_TMUX_SESSION_SHORTCUT ||
-    process.env.DEVT_TMUX_SESSION_SHORTCUT ||
-    config?.tmux?.session?.shortcut ||
-    "ctrl+f",
+  shortcutValue("DVV_TMUX_SESSION_SHORTCUT", "DEVT_TMUX_SESSION_SHORTCUT", config?.tmux?.session?.shortcut, "alt+p"),
 );
 const tmuxHomeShortcut = shortcutToZshSequences(
-  process.env.DVV_TMUX_HOME_SHORTCUT ||
-    process.env.DEVT_TMUX_HOME_SHORTCUT ||
-    config?.tmux?.home?.shortcut ||
-    "alt+f",
+  shortcutValue("DVV_TMUX_HOME_SHORTCUT", "DEVT_TMUX_HOME_SHORTCUT", config?.tmux?.home?.shortcut, "alt+f"),
 );
 const tmuxResetShortcut = shortcutToZshSequences(
-  process.env.DVV_TMUX_RESET_SHORTCUT ||
-    process.env.DEVT_TMUX_RESET_SHORTCUT ||
-    config?.tmux?.reset?.shortcut ||
-    "alt+r",
+  shortcutValue("DVV_TMUX_RESET_SHORTCUT", "DEVT_TMUX_RESET_SHORTCUT", config?.tmux?.reset?.shortcut, "alt+r"),
 );
 
 const bindings = [];
+addBindings(bindings, mainHubShortcut, "dvv");
+addBindings(bindings, workspaceShortcut, "dvv workspace");
+addBindings(bindings, shellTmuxShortcut, "dvv tmux");
+addBindings(bindings, sshShortcut, "dvv ssh");
 addBindings(bindings, tmuxShortcut, "dvv tmux:session");
 addBindings(bindings, tmuxHomeShortcut, "dvv tmux:home");
 addBindings(bindings, tmuxResetShortcut, "dvv tmux:reset-api");
-bindings.push(`bindkey -s "\\es" "dvv ssh\\n"`);
 
 if (bindings.length === 0) {
   process.exit(0);
@@ -87,6 +93,16 @@ function readProjectConfig(file) {
   } catch {
     return {};
   }
+}
+
+function shortcutValue(primaryEnv, legacyEnv, configured, fallback) {
+  if (process.env[primaryEnv]) {
+    return process.env[primaryEnv];
+  }
+  if (legacyEnv && process.env[legacyEnv]) {
+    return process.env[legacyEnv];
+  }
+  return configured || fallback;
 }
 
 function addBindings(bindings, sequences, command) {
@@ -147,6 +163,12 @@ function isLegacyShortcutLine(line) {
     'bindkey -s "^F" "devv tmux:session\\n"',
     'bindkey -s "^F" "dvv tmux:session\\n"',
     'bindkey -s "\\e[70;6u" "dvv tmux:home\\n"',
+    'bindkey -s "\\eg" "dvv\\n"',
+    'bindkey -s "\\ew" "dvv workspace\\n"',
+    'bindkey -s "\\et" "dvv tmux\\n"',
+    'bindkey -s "\\ep" "dvv tmux:session\\n"',
+    'bindkey -s "\\ef" "dvv tmux:home\\n"',
+    'bindkey -s "\\er" "dvv tmux:reset-api\\n"',
     'bindkey -s "\\es" "devv ssh\\n"',
     'bindkey -s "\\es" "dvv ssh\\n"',
     'bindkey -s "\\es" "devv ssh:connect\\n"',

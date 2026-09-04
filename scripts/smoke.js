@@ -56,7 +56,14 @@ run("script-friendly workspace list", bin, ["workspace:list"]);
 
 assertFile(path.join(completionDir, "_dvv"), "zsh completion");
 const zshrc = readFile(path.join(home, ".zshrc"));
-assertIncludes(zshrc, "dvv tmux:session\\n", "managed Ctrl+F shortcut");
+assertIncludes(zshrc, "dvv\\n", "managed Alt+G main hub shortcut");
+assertIncludes(zshrc, "\\eg", "managed Alt+G sequence");
+assertIncludes(zshrc, "dvv workspace\\n", "managed Alt+W workspace shortcut");
+assertIncludes(zshrc, "\\ew", "managed Alt+W sequence");
+assertIncludes(zshrc, "dvv tmux\\n", "managed Alt+T tmux shortcut");
+assertIncludes(zshrc, "\\et", "managed Alt+T sequence");
+assertIncludes(zshrc, "dvv tmux:session\\n", "managed Alt+P directory picker shortcut");
+assertIncludes(zshrc, "\\ep", "managed Alt+P sequence");
 assertIncludes(zshrc, "dvv tmux:home\\n", "managed Alt+F shortcut");
 assertIncludes(zshrc, "\\ef", "managed Alt+F sequence");
 assertIncludes(zshrc, "dvv tmux:reset-api\\n", "managed Alt+R shell fallback");

@@ -35,6 +35,24 @@
   "terminal": {
     "launcher": "auto"
   },
+  "shell": {
+    "shortcuts": {
+      "mainHub": "alt+g",
+      "workspace": "alt+w",
+      "tmux": "alt+t",
+      "ssh": "alt+s"
+    }
+  },
+  "system": {
+    "configHub": {
+      "shortcuts": {
+        "add": "shift+n",
+        "clear": "shift+d",
+        "validate": "shift+v",
+        "secrets": "shift+s"
+      }
+    }
+  },
   "db": {
     "host": "",
     "port": "3306",
@@ -46,9 +64,9 @@
   "resources": {
     "hub": {
       "shortcuts": {
-        "start": "alt+s",
-        "restart": "alt+r",
-        "stop": "alt+x",
+        "start": "shift+s",
+        "restart": "shift+r",
+        "stop": "shift+x",
         "logs": "shift+l"
       }
     },
@@ -59,8 +77,8 @@
   "ssh": {
     "hub": {
       "shortcuts": {
-        "add": "shift+a",
-        "remove": "shift+r",
+        "add": "shift+n",
+        "remove": "shift+d",
         "newTerminal": "shift+t"
       }
     }
@@ -75,6 +93,15 @@
     }
   },
   "tmux": {
+    "hub": {
+      "shortcuts": {
+        "start": "shift+s",
+        "stop": "shift+x",
+        "restartApi": "shift+a",
+        "restartWeb": "shift+w",
+        "create": "shift+n"
+      }
+    },
     "session": {
       "searchRoots": [
         "~/workspace",
@@ -84,7 +111,7 @@
       ],
       "searchDepth": 3,
       "defaultSessionName": "space",
-      "shortcut": "ctrl+f"
+      "shortcut": "alt+p"
     },
     "home": {
       "directory": "~",
@@ -127,7 +154,7 @@
       "selector": "fzf",
       "opener": "",
       "shortcuts": {
-        "create": "shift+c",
+        "create": "shift+n",
         "manage": "shift+m",
         "delete": "shift+d",
         "template": "shift+t"
@@ -135,7 +162,7 @@
     },
     "templateHub": {
       "shortcuts": {
-        "create": "shift+c",
+        "create": "shift+n",
         "edit": "shift+e",
         "delete": "shift+d"
       }

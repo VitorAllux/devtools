@@ -48,8 +48,8 @@ func TestLoadProjectConfigMergesShortcutDefaults(t *testing.T) {
 	if cfg.SSH.Hub.Shortcuts.Add != "alt-a" {
 		t.Fatalf("add shortcut = %q, want alt-a", cfg.SSH.Hub.Shortcuts.Add)
 	}
-	if cfg.SSH.Hub.Shortcuts.Remove != "shift+r" {
-		t.Fatalf("remove shortcut = %q, want shift+r", cfg.SSH.Hub.Shortcuts.Remove)
+	if cfg.SSH.Hub.Shortcuts.Remove != "shift+d" {
+		t.Fatalf("remove shortcut = %q, want shift+d", cfg.SSH.Hub.Shortcuts.Remove)
 	}
 	if cfg.Theme.Name != "royal-noir" {
 		t.Fatalf("theme = %q, want royal-noir", cfg.Theme.Name)
@@ -57,7 +57,7 @@ func TestLoadProjectConfigMergesShortcutDefaults(t *testing.T) {
 	if cfg.Workspace.Root != "~/workspace" {
 		t.Fatalf("workspace root = %q", cfg.Workspace.Root)
 	}
-	if cfg.Resources.Hub.Shortcuts.Start != "alt+s" {
+	if cfg.Resources.Hub.Shortcuts.Start != "shift+s" {
 		t.Fatalf("resources start shortcut = %q", cfg.Resources.Hub.Shortcuts.Start)
 	}
 }
@@ -92,13 +92,13 @@ func TestLoadProjectConfigMergesResourcesDefaults(t *testing.T) {
 		t.Fatalf("loadProjectConfig failed: %v", err)
 	}
 
-	if cfg.Resources.Hub.Shortcuts.Start != "alt+s" {
+	if cfg.Resources.Hub.Shortcuts.Start != "shift+s" {
 		t.Fatalf("start shortcut = %q", cfg.Resources.Hub.Shortcuts.Start)
 	}
 	if cfg.Resources.Hub.Shortcuts.Restart != "shift+r" {
 		t.Fatalf("restart shortcut = %q", cfg.Resources.Hub.Shortcuts.Restart)
 	}
-	if cfg.Resources.Hub.Shortcuts.Stop != "alt+x" {
+	if cfg.Resources.Hub.Shortcuts.Stop != "shift+x" {
 		t.Fatalf("stop shortcut = %q", cfg.Resources.Hub.Shortcuts.Stop)
 	}
 	if cfg.Resources.Hub.Shortcuts.Logs != "shift+l" {
@@ -168,6 +168,14 @@ func TestResolveTerminalConfigUsesEnvOverride(t *testing.T) {
 }
 
 func TestResolveShortcutConfigsUseEnvOverrides(t *testing.T) {
+	t.Setenv("DVV_SHELL_MAIN_SHORTCUT", "alt-g")
+	t.Setenv("DVV_SHELL_WORKSPACE_SHORTCUT", "alt-w")
+	t.Setenv("DVV_SHELL_TMUX_SHORTCUT", "alt-t")
+	t.Setenv("DVV_SHELL_SSH_SHORTCUT", "alt-s")
+	t.Setenv("DVV_CONFIG_ADD_SHORTCUT", "shift+n")
+	t.Setenv("DVV_CONFIG_CLEAR_SHORTCUT", "shift+d")
+	t.Setenv("DVV_CONFIG_VALIDATE_SHORTCUT", "shift+v")
+	t.Setenv("DVV_CONFIG_SECRETS_SHORTCUT", "shift+s")
 	t.Setenv("DVV_SSH_ADD_SHORTCUT", "alt-a")
 	t.Setenv("DVV_SSH_REMOVE_SHORTCUT", "alt-r")
 	t.Setenv("DVV_SSH_NEW_TERMINAL_SHORTCUT", "alt-t")
@@ -179,11 +187,25 @@ func TestResolveShortcutConfigsUseEnvOverrides(t *testing.T) {
 	t.Setenv("DVV_SECRETS_PREPARE_SHORTCUT", "alt-k")
 	t.Setenv("DVV_SECRETS_RESTORE_SHORTCUT", "alt-b")
 	t.Setenv("DVV_SECRETS_SYNC_SHORTCUT", "alt-y")
+	t.Setenv("DVV_TMUX_HUB_START_SHORTCUT", "shift+s")
+	t.Setenv("DVV_TMUX_HUB_STOP_SHORTCUT", "shift+x")
+	t.Setenv("DVV_TMUX_HUB_RESTART_API_SHORTCUT", "shift+a")
+	t.Setenv("DVV_TMUX_HUB_RESTART_WEB_SHORTCUT", "shift+w")
+	t.Setenv("DVV_TMUX_HUB_CREATE_SHORTCUT", "shift+n")
 
+	shell := resolveShellConfig(DefaultProjectConfig().Shell)
+	system := resolveSystemConfig(DefaultProjectConfig().System)
 	ssh := resolveSSHConfig(DefaultProjectConfig().SSH)
 	resources := resolveResourcesConfig(DefaultProjectConfig().Resources)
 	secrets := resolveSecretsConfig(DefaultProjectConfig().Secrets)
+	tmux := resolveTmuxConfig(DefaultProjectConfig().Tmux)
 
+	if shell.Shortcuts.MainHub != "alt-g" || shell.Shortcuts.Workspace != "alt-w" || shell.Shortcuts.Tmux != "alt-t" || shell.Shortcuts.SSH != "alt-s" {
+		t.Fatalf("shell shortcuts = %#v", shell.Shortcuts)
+	}
+	if system.ConfigHub.Shortcuts.Add != "shift+n" || system.ConfigHub.Shortcuts.Clear != "shift+d" || system.ConfigHub.Shortcuts.Validate != "shift+v" || system.ConfigHub.Shortcuts.Secrets != "shift+s" {
+		t.Fatalf("system shortcuts = %#v", system.ConfigHub.Shortcuts)
+	}
 	if ssh.Hub.Shortcuts.Add != "alt-a" || ssh.Hub.Shortcuts.Remove != "alt-r" || ssh.Hub.Shortcuts.NewTerminal != "alt-t" {
 		t.Fatalf("ssh shortcuts = %#v", ssh.Hub.Shortcuts)
 	}
@@ -195,6 +217,9 @@ func TestResolveShortcutConfigsUseEnvOverrides(t *testing.T) {
 	}
 	if secrets.Hub.Shortcuts.Prepare != "alt-k" || secrets.Hub.Shortcuts.Restore != "alt-b" || secrets.Hub.Shortcuts.Sync != "alt-y" {
 		t.Fatalf("secrets shortcuts = %#v", secrets.Hub.Shortcuts)
+	}
+	if tmux.Hub.Shortcuts.Start != "shift+s" || tmux.Hub.Shortcuts.Stop != "shift+x" || tmux.Hub.Shortcuts.RestartAPI != "shift+a" || tmux.Hub.Shortcuts.RestartWeb != "shift+w" || tmux.Hub.Shortcuts.Create != "shift+n" {
+		t.Fatalf("tmux hub shortcuts = %#v", tmux.Hub.Shortcuts)
 	}
 }
 
@@ -273,6 +298,9 @@ func TestLoadProjectConfigMergesWorkspaceDefaults(t *testing.T) {
 	if cfg.Tmux.Reset.Shortcut != "alt+r" {
 		t.Fatalf("tmux reset shortcut = %q", cfg.Tmux.Reset.Shortcut)
 	}
+	if cfg.Tmux.Hub.Shortcuts.Create != "shift+n" {
+		t.Fatalf("tmux hub defaults = %#v", cfg.Tmux.Hub.Shortcuts)
+	}
 	if cfg.Tmux.Session.SearchDepth != 3 {
 		t.Fatalf("tmux search depth = %d", cfg.Tmux.Session.SearchDepth)
 	}
@@ -285,7 +313,7 @@ func TestLoadProjectConfigMergesWorkspaceDefaults(t *testing.T) {
 	if cfg.Workspace.Interactive.Shortcuts.Template != "shift+t" {
 		t.Fatalf("template shortcut = %q", cfg.Workspace.Interactive.Shortcuts.Template)
 	}
-	if cfg.Workspace.TemplateHub.Shortcuts.Create != "shift+c" || cfg.Workspace.TemplateHub.Shortcuts.Edit != "shift+e" || cfg.Workspace.TemplateHub.Shortcuts.Delete != "shift+d" {
+	if cfg.Workspace.TemplateHub.Shortcuts.Create != "shift+n" || cfg.Workspace.TemplateHub.Shortcuts.Edit != "shift+e" || cfg.Workspace.TemplateHub.Shortcuts.Delete != "shift+d" {
 		t.Fatalf("template hub shortcuts = %#v", cfg.Workspace.TemplateHub.Shortcuts)
 	}
 	if cfg.Workspace.ProjectSearchDepth != 4 {

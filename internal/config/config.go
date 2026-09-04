@@ -25,6 +25,8 @@ type ProjectConfig struct {
 	Theme     ThemeConfig     `json:"theme"`
 	Profiles  ProfilesConfig  `json:"profiles"`
 	Terminal  TerminalConfig  `json:"terminal"`
+	Shell     ShellConfig     `json:"shell"`
+	System    SystemConfig    `json:"system"`
 	DB        DBConfig        `json:"db"`
 	Resources ResourcesConfig `json:"resources"`
 	Secrets   SecretsConfig   `json:"secrets"`
@@ -39,6 +41,32 @@ type ThemeConfig struct {
 
 type TerminalConfig struct {
 	Launcher string `json:"launcher"`
+}
+
+type ShellConfig struct {
+	Shortcuts ShellShortcutsConfig `json:"shortcuts"`
+}
+
+type ShellShortcutsConfig struct {
+	MainHub   string `json:"mainHub"`
+	Workspace string `json:"workspace"`
+	Tmux      string `json:"tmux"`
+	SSH       string `json:"ssh"`
+}
+
+type SystemConfig struct {
+	ConfigHub SystemConfigHubConfig `json:"configHub"`
+}
+
+type SystemConfigHubConfig struct {
+	Shortcuts SystemConfigHubShortcuts `json:"shortcuts"`
+}
+
+type SystemConfigHubShortcuts struct {
+	Add      string `json:"add"`
+	Clear    string `json:"clear"`
+	Validate string `json:"validate"`
+	Secrets  string `json:"secrets"`
 }
 
 type ProfilesConfig struct {
@@ -110,10 +138,23 @@ type SecretsHubShortcuts struct {
 }
 
 type TmuxConfig struct {
+	Hub          TmuxHubConfig           `json:"hub"`
 	Session      TmuxSessionConfig       `json:"session"`
 	Home         TmuxHomeConfig          `json:"home"`
 	Reset        TmuxResetConfig         `json:"reset"`
 	Environments []TmuxEnvironmentConfig `json:"environments"`
+}
+
+type TmuxHubConfig struct {
+	Shortcuts TmuxHubShortcuts `json:"shortcuts"`
+}
+
+type TmuxHubShortcuts struct {
+	Start      string `json:"start"`
+	Stop       string `json:"stop"`
+	RestartAPI string `json:"restartApi"`
+	RestartWeb string `json:"restartWeb"`
+	Create     string `json:"create"`
 }
 
 type TmuxSessionConfig struct {
@@ -299,6 +340,8 @@ func Load() (*Config, error) {
 	cfg.Project.Theme = resolveThemeConfig(cfg.Project.Theme)
 	cfg.Project.Profiles = resolveProfilesConfig(cfg.Project.Profiles)
 	cfg.Project.Terminal = resolveTerminalConfig(cfg.Project.Terminal)
+	cfg.Project.Shell = resolveShellConfig(cfg.Project.Shell)
+	cfg.Project.System = resolveSystemConfig(cfg.Project.System)
 	cfg.Project.SSH = resolveSSHConfig(cfg.Project.SSH)
 	cfg.Project.Secrets = resolveSecretsConfig(cfg.Project.Secrets)
 	cfg.Project.Resources = resolveResourcesConfig(cfg.Project.Resources)
@@ -446,6 +489,24 @@ func DefaultProjectConfig() ProjectConfig {
 		Terminal: TerminalConfig{
 			Launcher: "auto",
 		},
+		Shell: ShellConfig{
+			Shortcuts: ShellShortcutsConfig{
+				MainHub:   "alt+g",
+				Workspace: "alt+w",
+				Tmux:      "alt+t",
+				SSH:       "alt+s",
+			},
+		},
+		System: SystemConfig{
+			ConfigHub: SystemConfigHubConfig{
+				Shortcuts: SystemConfigHubShortcuts{
+					Add:      "shift+n",
+					Clear:    "shift+d",
+					Validate: "shift+v",
+					Secrets:  "shift+s",
+				},
+			},
+		},
 		DB: DBConfig{
 			Host:          "",
 			Port:          "3306",
@@ -457,9 +518,9 @@ func DefaultProjectConfig() ProjectConfig {
 		Resources: ResourcesConfig{
 			Hub: ResourcesHubConfig{
 				Shortcuts: ResourcesHubShortcuts{
-					Start:   "alt+s",
-					Restart: "alt+r",
-					Stop:    "alt+x",
+					Start:   "shift+s",
+					Restart: "shift+r",
+					Stop:    "shift+x",
 					Logs:    "shift+l",
 				},
 			},
@@ -468,8 +529,8 @@ func DefaultProjectConfig() ProjectConfig {
 		SSH: SSHConfig{
 			Hub: SSHHubConfig{
 				Shortcuts: SSHHubShortcuts{
-					Add:         "shift+a",
-					Remove:      "shift+r",
+					Add:         "shift+n",
+					Remove:      "shift+d",
 					NewTerminal: "shift+t",
 				},
 			},
@@ -490,6 +551,15 @@ func DefaultProjectConfig() ProjectConfig {
 
 func defaultTmuxConfig() TmuxConfig {
 	return TmuxConfig{
+		Hub: TmuxHubConfig{
+			Shortcuts: TmuxHubShortcuts{
+				Start:      "shift+s",
+				Stop:       "shift+x",
+				RestartAPI: "shift+a",
+				RestartWeb: "shift+w",
+				Create:     "shift+n",
+			},
+		},
 		Session: TmuxSessionConfig{
 			SearchRoots: []string{
 				"~/workspace",
@@ -499,7 +569,7 @@ func defaultTmuxConfig() TmuxConfig {
 			},
 			SearchDepth:        3,
 			DefaultSessionName: "space",
-			Shortcut:           "ctrl+f",
+			Shortcut:           "alt+p",
 		},
 		Home: TmuxHomeConfig{
 			Directory:   "~",
@@ -540,7 +610,7 @@ func defaultWorkspaceConfig() WorkspaceConfig {
 			Selector: "fzf",
 			Opener:   "",
 			Shortcuts: WorkspaceHubShortcutConfig{
-				Create:   "shift+c",
+				Create:   "shift+n",
 				Manage:   "shift+m",
 				Delete:   "shift+d",
 				Template: "shift+t",
@@ -548,7 +618,7 @@ func defaultWorkspaceConfig() WorkspaceConfig {
 		},
 		TemplateHub: WorkspaceTemplateHub{
 			Shortcuts: WorkspaceTemplateHubShortcutConfig{
-				Create: "shift+c",
+				Create: "shift+n",
 				Edit:   "shift+e",
 				Delete: "shift+d",
 			},
@@ -615,6 +685,8 @@ func mergeProjectConfigDefaults(target *ProjectConfig) {
 	if strings.TrimSpace(target.Terminal.Launcher) == "" {
 		target.Terminal.Launcher = defaults.Terminal.Launcher
 	}
+	target.Shell = mergeShellConfigDefaults(target.Shell, defaults.Shell)
+	target.System = mergeSystemConfigDefaults(target.System, defaults.System)
 	target.DB = mergeDBConfigDefaults(target.DB, defaults.DB)
 	target.Resources = mergeResourcesConfigDefaults(target.Resources, defaults.Resources)
 	target.Secrets = mergeSecretsConfigDefaults(target.Secrets, defaults.Secrets)
@@ -629,6 +701,38 @@ func mergeProjectConfigDefaults(target *ProjectConfig) {
 	}
 	target.Tmux = mergeTmuxConfigDefaults(target.Tmux, defaults.Tmux)
 	target.Workspace = mergeWorkspaceConfigDefaults(target.Workspace, defaults.Workspace)
+}
+
+func mergeShellConfigDefaults(target ShellConfig, defaults ShellConfig) ShellConfig {
+	if strings.TrimSpace(target.Shortcuts.MainHub) == "" {
+		target.Shortcuts.MainHub = defaults.Shortcuts.MainHub
+	}
+	if strings.TrimSpace(target.Shortcuts.Workspace) == "" {
+		target.Shortcuts.Workspace = defaults.Shortcuts.Workspace
+	}
+	if strings.TrimSpace(target.Shortcuts.Tmux) == "" {
+		target.Shortcuts.Tmux = defaults.Shortcuts.Tmux
+	}
+	if strings.TrimSpace(target.Shortcuts.SSH) == "" {
+		target.Shortcuts.SSH = defaults.Shortcuts.SSH
+	}
+	return target
+}
+
+func mergeSystemConfigDefaults(target SystemConfig, defaults SystemConfig) SystemConfig {
+	if strings.TrimSpace(target.ConfigHub.Shortcuts.Add) == "" {
+		target.ConfigHub.Shortcuts.Add = defaults.ConfigHub.Shortcuts.Add
+	}
+	if strings.TrimSpace(target.ConfigHub.Shortcuts.Clear) == "" {
+		target.ConfigHub.Shortcuts.Clear = defaults.ConfigHub.Shortcuts.Clear
+	}
+	if strings.TrimSpace(target.ConfigHub.Shortcuts.Validate) == "" {
+		target.ConfigHub.Shortcuts.Validate = defaults.ConfigHub.Shortcuts.Validate
+	}
+	if strings.TrimSpace(target.ConfigHub.Shortcuts.Secrets) == "" {
+		target.ConfigHub.Shortcuts.Secrets = defaults.ConfigHub.Shortcuts.Secrets
+	}
+	return target
 }
 
 func mergeProfilesConfigDefaults(target ProfilesConfig, defaults ProfilesConfig) ProfilesConfig {
@@ -760,6 +864,38 @@ func resolveTerminalConfig(cfg TerminalConfig) TerminalConfig {
 	return cfg
 }
 
+func resolveShellConfig(cfg ShellConfig) ShellConfig {
+	if value := firstSetEnv("DVV_SHELL_MAIN_SHORTCUT"); value != "" {
+		cfg.Shortcuts.MainHub = value
+	}
+	if value := firstSetEnv("DVV_SHELL_WORKSPACE_SHORTCUT"); value != "" {
+		cfg.Shortcuts.Workspace = value
+	}
+	if value := firstSetEnv("DVV_SHELL_TMUX_SHORTCUT"); value != "" {
+		cfg.Shortcuts.Tmux = value
+	}
+	if value := firstSetEnv("DVV_SHELL_SSH_SHORTCUT"); value != "" {
+		cfg.Shortcuts.SSH = value
+	}
+	return cfg
+}
+
+func resolveSystemConfig(cfg SystemConfig) SystemConfig {
+	if value := firstSetEnv("DVV_CONFIG_ADD_SHORTCUT"); value != "" {
+		cfg.ConfigHub.Shortcuts.Add = value
+	}
+	if value := firstSetEnv("DVV_CONFIG_CLEAR_SHORTCUT"); value != "" {
+		cfg.ConfigHub.Shortcuts.Clear = value
+	}
+	if value := firstSetEnv("DVV_CONFIG_VALIDATE_SHORTCUT"); value != "" {
+		cfg.ConfigHub.Shortcuts.Validate = value
+	}
+	if value := firstSetEnv("DVV_CONFIG_SECRETS_SHORTCUT"); value != "" {
+		cfg.ConfigHub.Shortcuts.Secrets = value
+	}
+	return cfg
+}
+
 func resolveSSHConfig(cfg SSHConfig) SSHConfig {
 	if value := firstSetEnv("DVV_SSH_ADD_SHORTCUT"); value != "" {
 		cfg.Hub.Shortcuts.Add = value
@@ -808,6 +944,21 @@ func resolveSecretsConfig(cfg SecretsConfig) SecretsConfig {
 }
 
 func mergeTmuxConfigDefaults(target TmuxConfig, defaults TmuxConfig) TmuxConfig {
+	if strings.TrimSpace(target.Hub.Shortcuts.Start) == "" {
+		target.Hub.Shortcuts.Start = defaults.Hub.Shortcuts.Start
+	}
+	if strings.TrimSpace(target.Hub.Shortcuts.Stop) == "" {
+		target.Hub.Shortcuts.Stop = defaults.Hub.Shortcuts.Stop
+	}
+	if strings.TrimSpace(target.Hub.Shortcuts.RestartAPI) == "" {
+		target.Hub.Shortcuts.RestartAPI = defaults.Hub.Shortcuts.RestartAPI
+	}
+	if strings.TrimSpace(target.Hub.Shortcuts.RestartWeb) == "" {
+		target.Hub.Shortcuts.RestartWeb = defaults.Hub.Shortcuts.RestartWeb
+	}
+	if strings.TrimSpace(target.Hub.Shortcuts.Create) == "" {
+		target.Hub.Shortcuts.Create = defaults.Hub.Shortcuts.Create
+	}
 	if target.Session.SearchRoots == nil {
 		target.Session.SearchRoots = defaults.Session.SearchRoots
 	}
@@ -902,6 +1053,21 @@ func mergeWorkspaceConfigDefaults(target WorkspaceConfig, defaults WorkspaceConf
 }
 
 func resolveTmuxConfig(cfg TmuxConfig) TmuxConfig {
+	if shortcut := firstSetEnv("DVV_TMUX_HUB_START_SHORTCUT"); shortcut != "" {
+		cfg.Hub.Shortcuts.Start = shortcut
+	}
+	if shortcut := firstSetEnv("DVV_TMUX_HUB_STOP_SHORTCUT"); shortcut != "" {
+		cfg.Hub.Shortcuts.Stop = shortcut
+	}
+	if shortcut := firstSetEnv("DVV_TMUX_HUB_RESTART_API_SHORTCUT"); shortcut != "" {
+		cfg.Hub.Shortcuts.RestartAPI = shortcut
+	}
+	if shortcut := firstSetEnv("DVV_TMUX_HUB_RESTART_WEB_SHORTCUT"); shortcut != "" {
+		cfg.Hub.Shortcuts.RestartWeb = shortcut
+	}
+	if shortcut := firstSetEnv("DVV_TMUX_HUB_CREATE_SHORTCUT"); shortcut != "" {
+		cfg.Hub.Shortcuts.Create = shortcut
+	}
 	if roots := firstSetEnv("DVV_TMUX_SESSION_SEARCH_ROOTS", "DVV_SESSION_SEARCH_ROOTS", "DEVT_SESSION_SEARCH_ROOTS"); roots != "" {
 		cfg.Session.SearchRoots = splitPathList(roots)
 	} else {

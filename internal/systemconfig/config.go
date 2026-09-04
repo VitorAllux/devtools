@@ -112,7 +112,8 @@ func (m Manager) keyHub(ctx context.Context, category Category, initial []Entry)
 		if _, err := m.Runner.LookPath("fzf"); err != nil {
 			return m.basicHub(entries)
 		}
-		output, err := m.Runner.OutputWithInput(ctx, "", []byte(configRows(entries)), "fzf", configFZFArgs(category)...)
+		keys := m.Config.SystemConfigHubKeys()
+		output, err := m.Runner.OutputWithInput(ctx, "", []byte(configRows(entries)), "fzf", configFZFArgs(category, keys)...)
 		if err != nil && len(output) == 0 {
 			return nil
 		}
@@ -120,14 +121,14 @@ func (m Manager) keyHub(ctx context.Context, category Category, initial []Entry)
 			return err
 		}
 		key, selected := ui.ParseFZFExpectOutput(string(output))
-		if key == "alt-a" {
+		if key == keys.Add.FZFKey {
 			if err := m.addCustom(); err != nil {
 				ui.Error("%v", err)
 			}
 			entries = nil
 			continue
 		}
-		if key == "alt-s" {
+		if key == keys.Secrets.FZFKey {
 			m.printSecretStatus()
 			_, _ = ui.Prompt("Press Enter to return")
 			continue
@@ -137,18 +138,18 @@ func (m Manager) keyHub(ctx context.Context, category Category, initial []Entry)
 		if !ok {
 			continue
 		}
-		if err := m.handleEntryAction(key, entry); err != nil {
+		if err := m.handleEntryAction(key, entry, keys); err != nil {
 			ui.Error("%v", err)
 		}
 		entries = nil
 	}
 }
 
-func (m Manager) handleEntryAction(key string, entry Entry) error {
+func (m Manager) handleEntryAction(key string, entry Entry, keys config.SystemConfigHubKeyBindings) error {
 	switch key {
-	case "alt-c":
+	case keys.Clear.FZFKey:
 		return m.Unset(entry.Key)
-	case "alt-v":
+	case keys.Validate.FZFKey:
 		m.validate(entry)
 		_, _ = ui.Prompt("Press Enter to return")
 		return nil
@@ -860,6 +861,22 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		}
 	case "DVV_PROFILE":
 		m.Config.Project.Profiles.Active = strings.ToLower(strings.TrimSpace(value))
+	case "DVV_SHELL_MAIN_SHORTCUT":
+		m.Config.Project.Shell.Shortcuts.MainHub = value
+	case "DVV_SHELL_WORKSPACE_SHORTCUT":
+		m.Config.Project.Shell.Shortcuts.Workspace = value
+	case "DVV_SHELL_TMUX_SHORTCUT":
+		m.Config.Project.Shell.Shortcuts.Tmux = value
+	case "DVV_SHELL_SSH_SHORTCUT":
+		m.Config.Project.Shell.Shortcuts.SSH = value
+	case "DVV_CONFIG_ADD_SHORTCUT":
+		m.Config.Project.System.ConfigHub.Shortcuts.Add = value
+	case "DVV_CONFIG_CLEAR_SHORTCUT":
+		m.Config.Project.System.ConfigHub.Shortcuts.Clear = value
+	case "DVV_CONFIG_VALIDATE_SHORTCUT":
+		m.Config.Project.System.ConfigHub.Shortcuts.Validate = value
+	case "DVV_CONFIG_SECRETS_SHORTCUT":
+		m.Config.Project.System.ConfigHub.Shortcuts.Secrets = value
 	case "DVV_SSH_ADD_SHORTCUT":
 		m.Config.Project.SSH.Hub.Shortcuts.Add = value
 	case "DVV_SSH_REMOVE_SHORTCUT":
@@ -894,6 +911,16 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.Tmux.Home.Shortcut = value
 	case "DVV_TMUX_RESET_SHORTCUT":
 		m.Config.Project.Tmux.Reset.Shortcut = value
+	case "DVV_TMUX_HUB_START_SHORTCUT":
+		m.Config.Project.Tmux.Hub.Shortcuts.Start = value
+	case "DVV_TMUX_HUB_STOP_SHORTCUT":
+		m.Config.Project.Tmux.Hub.Shortcuts.Stop = value
+	case "DVV_TMUX_HUB_RESTART_API_SHORTCUT":
+		m.Config.Project.Tmux.Hub.Shortcuts.RestartAPI = value
+	case "DVV_TMUX_HUB_RESTART_WEB_SHORTCUT":
+		m.Config.Project.Tmux.Hub.Shortcuts.RestartWeb = value
+	case "DVV_TMUX_HUB_CREATE_SHORTCUT":
+		m.Config.Project.Tmux.Hub.Shortcuts.Create = value
 	case "DVV_TMUX_ENVIRONMENTS":
 		m.Config.Project.Tmux.Environments = parseRuntimeTmuxEnvironments(value)
 	case "DVV_WORKSPACES_DIR":
@@ -1001,7 +1028,13 @@ func (m Manager) validate(entry Entry) {
 func (m Manager) print(entries []Entry) {
 	ui.Title("Configuration")
 	ui.Info("File: %s", m.Config.ConfigFile)
-	fmt.Printf("  %-3s %-12s %-34s %-26s %s\n", "SET", "GROUP", "KEY", "VALUE", "DESCRIPTION")
+	keyWidth := 34
+	for _, entry := range entries {
+		if len(entry.Key) > keyWidth {
+			keyWidth = len(entry.Key)
+		}
+	}
+	fmt.Printf("  %-3s %-12s %-*s %-26s %s\n", "SET", "GROUP", keyWidth, "KEY", "VALUE", "DESCRIPTION")
 	for _, entry := range entries {
 		status := "[ ]"
 		if entry.Default != "" {
@@ -1010,7 +1043,7 @@ func (m Manager) print(entries []Entry) {
 		if entry.Persisted {
 			status = "[x]"
 		}
-		fmt.Printf("  %-3s %-12s %-34s %-26s %s\n", status, entry.Category, entry.Key, compactField(maskValue(entry), 26), entry.Description)
+		fmt.Printf("  %-3s %-12s %-*s %-26s %s\n", status, entry.Category, keyWidth, entry.Key, compactField(maskValue(entry), 26), entry.Description)
 	}
 }
 
@@ -1022,25 +1055,26 @@ func (m Manager) printSecretStatus() {
 	checkSecret("AGE recipients", m.Config.AgeRecipientsFile)
 }
 
-func configFZFArgs(category Category) []string {
+func configFZFArgs(category Category, keys config.SystemConfigHubKeyBindings) []string {
 	borderLabel := "dvv config / " + category.Label
 	if strings.TrimSpace(category.Label) == "" {
 		borderLabel = "dvv config"
 	}
+	shortcuts := []ui.FZFShortcut{
+		{Label: "Enter", Description: "edit"},
+		{Key: keys.Add.FZFKey, Label: keys.Add.Label, Description: "add custom key"},
+		{Key: keys.Clear.FZFKey, Label: keys.Clear.Label, Description: "clear persisted value"},
+		{Key: keys.Validate.FZFKey, Label: keys.Validate.Label, Description: "validate value"},
+		{Key: keys.Secrets.FZFKey, Label: keys.Secrets.Label, Description: "show secrets status"},
+		{Label: "Esc", Description: "back"},
+	}
 	return ui.FZFHub{
 		Prompt:        ui.Crown("config") + ui.Muted("> "),
 		BorderLabel:   borderLabel,
-		Preview:       configPreviewCommand(),
+		Preview:       configPreviewCommand(shortcuts),
 		PreviewLabel:  "config panel",
 		PreviewWindow: "right,46%,border-rounded,wrap",
-		Shortcuts: []ui.FZFShortcut{
-			{Label: "Enter", Description: "edit"},
-			{Key: "alt-a", Label: "Alt+A", Description: "add custom"},
-			{Key: "alt-c", Label: "Alt+C", Description: "clear"},
-			{Key: "alt-v", Label: "Alt+V", Description: "validate"},
-			{Key: "alt-s", Label: "Alt+S", Description: "secrets"},
-			{Label: "Esc", Description: "exit"},
-		},
+		Shortcuts:     shortcuts,
 		ExtraArgs: []string{
 			"--delimiter=\t",
 			"--with-nth=2,3,4,5",
@@ -1096,7 +1130,8 @@ func configRow(entry Entry) string {
 	}, "\t")
 }
 
-func configPreviewCommand() string {
+func configPreviewCommand(shortcuts []ui.FZFShortcut) string {
+	commandDeck := ui.FZFPreviewCommandDeck(shortcuts)
 	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
 category=$(printf "%s" "$line" | cut -f3)
@@ -1118,7 +1153,8 @@ printf "\n%sMetadata%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Group" "$dvv_reset" "$category"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Type" "$dvv_reset" "$kind"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Source" "$dvv_reset" "$source"
-printf "\n%sEnter edit | Alt+A add | Alt+C clear | Alt+V validate | Alt+S secrets%s\n" "$dvv_muted" "$dvv_reset"
+printf "\n%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
+` + commandDeck + `
 ' sh {}`
 }
 
@@ -1191,9 +1227,22 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Shortcuts", "DVV_TMUX_SESSION_SHORTCUT", "Sets the zsh shortcut for the tmux directory picker.", "shortcut", cfg.Project.Tmux.Session.Shortcut, "", false},
 		{"Shortcuts", "DVV_TMUX_HOME_SHORTCUT", "Sets the zsh shortcut for opening a home tmux tab.", "shortcut", cfg.Project.Tmux.Home.Shortcut, "", false},
 		{"Shortcuts", "DVV_TMUX_RESET_SHORTCUT", "Sets the tmux shortcut for resetting API and Horizon panes.", "shortcut", cfg.Project.Tmux.Reset.Shortcut, "", false},
+		{"Shortcuts", "DVV_SHELL_MAIN_SHORTCUT", "Sets the zsh shortcut for opening the main dvv hub.", "shortcut", cfg.Project.Shell.Shortcuts.MainHub, "", false},
+		{"Shortcuts", "DVV_SHELL_WORKSPACE_SHORTCUT", "Sets the zsh shortcut for opening the workspace hub.", "shortcut", cfg.Project.Shell.Shortcuts.Workspace, "", false},
+		{"Shortcuts", "DVV_SHELL_TMUX_SHORTCUT", "Sets the zsh shortcut for opening the tmux hub.", "shortcut", cfg.Project.Shell.Shortcuts.Tmux, "", false},
+		{"Shortcuts", "DVV_SHELL_SSH_SHORTCUT", "Sets the zsh shortcut for opening the SSH hub.", "shortcut", cfg.Project.Shell.Shortcuts.SSH, "", false},
+		{"Shortcuts", "DVV_CONFIG_ADD_SHORTCUT", "Sets the config hub shortcut for adding a custom key.", "shortcut", cfg.Project.System.ConfigHub.Shortcuts.Add, "", false},
+		{"Shortcuts", "DVV_CONFIG_CLEAR_SHORTCUT", "Sets the config hub shortcut for clearing a persisted key.", "shortcut", cfg.Project.System.ConfigHub.Shortcuts.Clear, "", false},
+		{"Shortcuts", "DVV_CONFIG_VALIDATE_SHORTCUT", "Sets the config hub shortcut for validating a selected value.", "shortcut", cfg.Project.System.ConfigHub.Shortcuts.Validate, "", false},
+		{"Shortcuts", "DVV_CONFIG_SECRETS_SHORTCUT", "Sets the config hub shortcut for showing secrets status.", "shortcut", cfg.Project.System.ConfigHub.Shortcuts.Secrets, "", false},
 		{"Shortcuts", "DVV_SSH_ADD_SHORTCUT", "Sets the SSH hub shortcut for adding an entry.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Add, "", false},
 		{"Shortcuts", "DVV_SSH_REMOVE_SHORTCUT", "Sets the SSH hub shortcut for removing an entry.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Remove, "", false},
 		{"Shortcuts", "DVV_SSH_NEW_TERMINAL_SHORTCUT", "Sets the SSH hub shortcut for opening a new tab.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.NewTerminal, "", false},
+		{"Shortcuts", "DVV_TMUX_HUB_START_SHORTCUT", "Sets the tmux hub shortcut for starting or opening a target.", "shortcut", cfg.Project.Tmux.Hub.Shortcuts.Start, "", false},
+		{"Shortcuts", "DVV_TMUX_HUB_STOP_SHORTCUT", "Sets the tmux hub shortcut for stopping a target.", "shortcut", cfg.Project.Tmux.Hub.Shortcuts.Stop, "", false},
+		{"Shortcuts", "DVV_TMUX_HUB_RESTART_API_SHORTCUT", "Sets the tmux hub shortcut for restarting API and Horizon panes.", "shortcut", cfg.Project.Tmux.Hub.Shortcuts.RestartAPI, "", false},
+		{"Shortcuts", "DVV_TMUX_HUB_RESTART_WEB_SHORTCUT", "Sets the tmux hub shortcut for restarting Web panes.", "shortcut", cfg.Project.Tmux.Hub.Shortcuts.RestartWeb, "", false},
+		{"Shortcuts", "DVV_TMUX_HUB_CREATE_SHORTCUT", "Sets the tmux hub shortcut for saving a reusable API/Web target.", "shortcut", cfg.Project.Tmux.Hub.Shortcuts.Create, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_CREATE_SHORTCUT", "Sets the workspace hub shortcut for creating a workspace.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Create, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_MANAGE_SHORTCUT", "Sets the workspace hub shortcut for managing projects.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Manage, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_DELETE_SHORTCUT", "Sets the workspace hub shortcut for deleting workspaces.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Delete, "", false},

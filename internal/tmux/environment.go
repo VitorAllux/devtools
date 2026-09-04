@@ -252,7 +252,8 @@ func (m *Manager) targetStatus(ctx context.Context, session string, apiDir strin
 }
 
 func (m *Manager) fzfEnvironmentHub(ctx context.Context, targets []Target, defaultAction string, hubError string) (bool, string, error) {
-	shortcuts := tmuxHubShortcuts()
+	keys := m.Config.TmuxHubKeys()
+	shortcuts := tmuxHubShortcuts(keys)
 	args := ui.FZFHub{
 		Prompt:        ui.Crown("tmux") + ui.Muted("> "),
 		BorderLabel:   "dvv tmux",
@@ -273,7 +274,7 @@ func (m *Manager) fzfEnvironmentHub(ctx context.Context, targets []Target, defau
 		return false, "", nil
 	}
 	key, selected := ui.ParseFZFExpectOutput(string(output))
-	if key == "alt-n" {
+	if key == keys.Create.FZFKey {
 		if err := m.AddEnvironment(ctx); err != nil {
 			return true, err.Error(), nil
 		}
@@ -287,7 +288,7 @@ func (m *Manager) fzfEnvironmentHub(ctx context.Context, targets []Target, defau
 	if !ok {
 		return true, "Selected tmux target no longer exists", nil
 	}
-	action := tmuxActionFromKey(key, defaultAction)
+	action := tmuxActionFromKey(keys, key, defaultAction)
 	if err := m.RunEnvironmentAction(ctx, action, target); err != nil {
 		return true, err.Error(), nil
 	}
@@ -1361,14 +1362,14 @@ printf "  %sphp artisan horizon%s\n" "$dvv_muted" "$dvv_reset"
 ' sh {}`
 }
 
-func tmuxHubShortcuts() []ui.FZFShortcut {
+func tmuxHubShortcuts(keys config.TmuxHubKeyBindings) []ui.FZFShortcut {
 	return []ui.FZFShortcut{
 		{Label: "Enter", Description: "start/open"},
-		{Key: "alt-u", Label: "Alt+U", Description: "start/open"},
-		{Key: "alt-d", Label: "Alt+D", Description: "stop"},
-		{Key: "alt-a", Label: "Alt+A", Description: "restart API"},
-		{Key: "alt-w", Label: "Alt+W", Description: "restart Web"},
-		{Key: "alt-n", Label: "Alt+N", Description: "save custom API/Web tmux target"},
+		{Key: keys.Start.FZFKey, Label: keys.Start.Label, Description: "start/open"},
+		{Key: keys.Stop.FZFKey, Label: keys.Stop.Label, Description: "stop"},
+		{Key: keys.RestartAPI.FZFKey, Label: keys.RestartAPI.Label, Description: "restart API"},
+		{Key: keys.RestartWeb.FZFKey, Label: keys.RestartWeb.Label, Description: "restart Web"},
+		{Key: keys.Create.FZFKey, Label: keys.Create.Label, Description: "save tmux target"},
 		{Label: "Esc", Description: "exit"},
 	}
 }
@@ -1403,15 +1404,15 @@ print_commands
 ' sh {}`
 }
 
-func tmuxActionFromKey(key string, fallback string) string {
+func tmuxActionFromKey(keys config.TmuxHubKeyBindings, key string, fallback string) string {
 	switch key {
-	case "alt-u":
+	case keys.Start.FZFKey:
 		return "up"
-	case "alt-d":
+	case keys.Stop.FZFKey:
 		return "down"
-	case "alt-a":
+	case keys.RestartAPI.FZFKey:
 		return "api-restart"
-	case "alt-w":
+	case keys.RestartWeb.FZFKey:
 		return "web-restart"
 	default:
 		return fallback
@@ -1625,6 +1626,7 @@ func parseResetAPIArgs(args []string) (ResetAPIOptions, error) {
 }
 
 func showTmuxHelp(cfg *config.Config) {
+	keys := cfg.TmuxHubKeys()
 	ui.Title("Tmux Hub")
 	fmt.Printf("  %s dvv tmux\n\n", ui.Bold("Usage:"))
 	helpSection("Hub")
@@ -1636,15 +1638,15 @@ func showTmuxHelp(cfg *config.Config) {
 	fmt.Println()
 	helpSection("Hub Shortcuts")
 	helpEntry("Enter", "Start/open selected environment in a new terminal tab")
-	helpEntry("Alt+U", "Start/open selected environment")
-	helpEntry("Alt+D", "Stop selected environment")
-	helpEntry("Alt+A", "Restart API and Horizon")
-	helpEntry("Alt+W", "Restart Web")
-	helpEntry("Alt+N", "Save a custom API/Web tmux target")
+	helpEntry(keys.Start.Label, "Start/open selected environment")
+	helpEntry(keys.Stop.Label, "Stop selected environment")
+	helpEntry(keys.RestartAPI.Label, "Restart API and Horizon")
+	helpEntry(keys.RestartWeb.Label, "Restart Web")
+	helpEntry(keys.Create.Label, "Save a custom API/Web tmux target")
 	helpEntry("Esc", "Exit")
 	fmt.Println()
 	helpSection("Shell Shortcuts")
-	helpEntry(shortcutLabel(cfg.Project.Tmux.Session.Shortcut, "ctrl+f"), "Run dvv tmux:session")
+	helpEntry(shortcutLabel(cfg.Project.Tmux.Session.Shortcut, "alt+p"), "Run dvv tmux:session")
 	helpEntry(shortcutLabel(cfg.Project.Tmux.Home.Shortcut, "alt+f"), "Run dvv tmux:home without picker")
 	fmt.Println()
 	helpSection("Tmux Shortcut")
