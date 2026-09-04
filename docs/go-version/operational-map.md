@@ -69,8 +69,8 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | --- | --- | --- |
 | Default target | `dvv tmux` still reads legacy `API_DIR`, `WEB_DIR`, `TMUX_SESSION`, and `TMUX_WIN`. | Keep this for compatibility with existing local env files. |
 | Workspace targets | Workspace metadata adds one tmux target per `workspace-*` directory. | Use workspace paths when a task is worktree-based. |
-| Custom targets | `tmux.environments` or `DVV_TMUX_ENVIRONMENTS` adds named API/Web targets. | Use `Alt+N` in `dvv tmux` to pick API/Web projects from workspace discovery and save a reusable target. |
-| Workspace templates | `workspace.templates` or `DVV_WORKSPACE_TEMPLATES` adds reusable creation presets. | Use `Shift+T` in `dvv workspace` to save project/base selections and `Shift+C` to reuse them. |
+| Custom targets | `tmux.environments` or `DVV_TMUX_ENVIRONMENTS` adds named API/Web targets. | Use `Shift+N` in `dvv tmux` to pick API/Web projects from workspace discovery and save a reusable target. |
+| Workspace templates | `workspace.templates` or `DVV_WORKSPACE_TEMPLATES` adds reusable creation presets. | Use `Shift+T` in `dvv workspace` to save project/base selections and `Shift+N` to reuse them. |
 | Target validation | API dir must contain `artisan`; Web dir must contain `package.json`. | Keep invalid targets visible as missing/invalid, but block start actions. |
 | Tmux truecolor | Sessions created by `dvv` set `default-terminal=tmux-256color`, `COLORTERM=truecolor`, `terminal-features=*:RGB`, and `terminal-overrides=*:Tc`. | Keep color options runtime-applied; `.tmux.conf` is only managed for the explicit shortcut block. |
 | API reset shortcut | `Alt+R` runs `dvv tmux:reset-api` against the current tmux window, the last target opened or selected by `dvv tmux`, then a single detected Laravel API window. | Reset API/Horizon only; do not send commands to Web panes, and refuse multiple API candidates without a cached target. Manual runs may select a target. |
@@ -80,10 +80,10 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 
 | Detail | Current rule | Action |
 | --- | --- | --- |
-| Hub-first UX | Public commands should open hubs: `dvv ssh`, `dvv workspace`, `dvv tmux`, `dvv db`, `dvv resources`, `dvv secrets`, `dvv config`. | Keep mutation flows inside hubs where possible. |
+| Hub-first UX | `dvv` opens the main hub; public commands open feature hubs: `dvv ssh`, `dvv workspace`, `dvv tmux`, `dvv db`, `dvv resources`, `dvv secrets`, `dvv config`. | Keep mutation flows inside hubs where possible. |
 | Shortcut config | Hub action keys are configurable in `dvv.config.json`. | Read from config, do not hard-code feature shortcuts in command handlers. |
 | fzf previews | Detailed shortcut decks belong in the side preview panel. | Use shared `internal/ui.FZFHub` and `FZFPreviewCommandDeck`. |
-| Global shortcuts | Project-managed zsh shortcuts are `Ctrl+F`, `Alt+F`, `Alt+R` fallback, and `Alt+S`; project-managed tmux shortcut is `Alt+R`. | Avoid adding more global `Ctrl-*` bindings without explicit need. |
+| Global shortcuts | Project-managed zsh shortcuts are `Alt+G`, `Alt+W`, `Alt+T`, `Alt+P`, `Alt+F`, `Alt+S`, and the `Alt+R` fallback; project-managed tmux shortcut is `Alt+R`. | Use `Alt+letter` globally and `Shift+letter` inside fzf hubs. Avoid new global `Ctrl-*` bindings. |
 | Home tmux tab | `Alt+F` runs `dvv tmux:home`, opening `tmux.home.directory` without fzf. | `Ctrl+Shift+F` is avoided because Windows Terminal captures it for Find. |
 | Completion | Root completion lists public hubs by default. Compatibility routes are shown only when `DVV_COMPLETE_COMPAT=1`. | Keep root help, completion, and README aligned. |
 

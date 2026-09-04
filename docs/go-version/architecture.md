@@ -1,12 +1,12 @@
 # Go Architecture
 
-The `go-version` branch is a clean Go rewrite for `dvv`.
+The current `main` branch contains the Go rewrite for `dvv`.
 
 ## Source Of Truth
 
-- `main` keeps the previous Bash implementation for reference.
-- This branch should contain only the new Go project, launcher files, docs, examples, and tests.
-- Do not bring legacy scripts back into this branch. If behavior is needed, inspect `main` and port it intentionally.
+- The legacy Bash implementation is kept only as historical reference when available.
+- The active branch should contain only the Go project, launcher files, docs, examples, and tests.
+- Do not bring legacy scripts back. If behavior is needed, inspect the legacy reference and port it intentionally.
 - Use `docs/go-version/maintainer-harness.md` as the command ownership and testing map before changing cross-package behavior.
 
 ## Current Package Layout
@@ -81,7 +81,7 @@ dvv resources
 dvv config
 ```
 
-`dvv tmux:session` exists as the command behind the managed `Ctrl+F` shell shortcut. `dvv tmux:home` exists as the command behind the managed `Alt+F` shortcut and opens the configured home tmux tab without a picker. `dvv tmux:reset-api` exists as the command behind the managed `Alt+R` shortcut; it tries the current tmux window first, then the last opened or selected reset target, then a single detected Laravel API window. Manual runs can select from multiple API windows. `dvv env:bootstrap` is kept as a compatibility route for the previous bootstrap command.
+`dvv` opens the main hub when fzf is available in an interactive terminal; `dvv help` keeps the textual help surface. `dvv tmux:session` exists as the command behind the managed `Alt+P` shell shortcut. `dvv tmux:home` exists as the command behind the managed `Alt+F` shortcut and opens the configured home tmux tab without a picker. `dvv tmux:reset-api` exists as the command behind the managed `Alt+R` shortcut; it tries the current tmux window first, then the last opened or selected reset target, then a single detected Laravel API window. Manual runs can select from multiple API windows. `dvv env:bootstrap` is kept as a compatibility route for the previous bootstrap command.
 
 Compatibility routes used by tests or scripts may exist during migration, but root help and autocomplete should stay hub-first unless a script command is intentionally promoted.
 

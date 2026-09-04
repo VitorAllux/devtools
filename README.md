@@ -4,17 +4,17 @@ Personal developer CLI for local automation.
 
 Current version: `2.0.0-alpha.3`
 
-`dvv` is the Go rewrite of the previous shell-based devtools project. The command prefix is now `dvv`; the old `devv` command is intentionally not the public command for this branch.
+`dvv` is the Go rewrite of the previous shell-based devtools project. The command prefix is now `dvv`; the old `devv` command is intentionally not the public command.
 
 ## Status
 
-This branch is `go-version`. The current Go implementation includes:
+The current `main` branch contains the Go implementation:
 
 | Area | Status | Entry |
 | --- | --- | --- |
 | SSH | Ready | `dvv ssh` |
 | Workspace | Ready | `dvv workspace` |
-| Tmux | Ready | `dvv tmux`, `Ctrl+F`, and `Alt+R` |
+| Tmux | Ready | `dvv tmux`, `Alt+P`, and `Alt+R` |
 | Database | Ready | `dvv db` |
 | System config | Ready | `dvv config` |
 | Resources | Ready | `dvv resources` |
@@ -28,7 +28,6 @@ The public UX is hub-first: the main commands open interactive hubs, and create/
 ```bash
 git clone git@github.com:VitorAllux/devtools.git
 cd devtools
-git checkout go-version
 ./bin/dvv build
 mkdir -p ~/.local/bin
 ln -sf "$PWD/bin/dvv" ~/.local/bin/dvv
@@ -108,10 +107,12 @@ dvv check
 
 | Command | Purpose |
 | --- | --- |
+| `dvv` | Open the main hub. |
+| `dvv help` | Show command help. |
 | `dvv ssh` | Open the SSH hub. |
 | `dvv workspace` | Open the workspace hub. |
 | `dvv tmux` | Open the tmux environment hub. |
-| `dvv tmux:session` | Open the directory picker used by `Ctrl+F`. |
+| `dvv tmux:session` | Open the directory picker used by `Alt+P`. |
 | `dvv tmux:home` | Open the configured home tmux tab used by `Alt+F`. |
 | `dvv tmux:reset-api` | Reset or select API/Horizon tmux target. |
 | `dvv db` | Open the database hub. |
@@ -133,12 +134,15 @@ Compatibility routes such as `dvv ssh:list`, `dvv workspace:list`, `dvv db impor
 
 | Shortcut | Command |
 | --- | --- |
-| `Ctrl+F` | `dvv tmux:session` |
+| `Alt+G` | `dvv` |
+| `Alt+W` | `dvv workspace` |
+| `Alt+T` | `dvv tmux` |
+| `Alt+P` | `dvv tmux:session` |
 | `Alt+F` | `dvv tmux:home` |
 | `Alt+R` | `dvv tmux:reset-api` fallback outside tmux |
 | `Alt+S` | `dvv ssh` |
 
-The managed block is written to `~/.zshrc`. The `Alt+R` zsh binding is a fallback: inside tmux, the tmux binding handles the reset; outside tmux, it runs the command and prints a normal error instead of a terminal bell. Set `DVV_SKIP_SHELL_INTEGRATION=1` before setup to skip shortcut installation. Windows Terminal reserves `Ctrl+Shift+F` for Find, so the default direct home shortcut is `Alt+F`.
+The managed block is written to `~/.zshrc`. Global dvv shortcuts use `Alt+letter`; interactive hub actions use `Shift+letter`. The `Alt+R` zsh binding is a fallback: inside tmux, the tmux binding handles the reset; outside tmux, it runs the command and prints a normal error instead of a terminal bell. Set `DVV_SKIP_SHELL_INTEGRATION=1` before setup to skip shortcut installation. Windows Terminal reserves `Ctrl+Shift+F` for Find, so dvv avoids it by default.
 
 ## Tmux Shortcuts
 
@@ -167,8 +171,8 @@ Shortcuts:
 | Shortcut | Action |
 | --- | --- |
 | `Enter` | Open selected SSH entry in a new terminal tab attached to tmux. |
-| `Shift+A` | Add an SSH entry. |
-| `Shift+R` | Remove the selected SSH entry. |
+| `Shift+N` | Add an SSH entry. |
+| `Shift+D` | Remove the selected SSH entry. |
 | `Shift+T` | Open selected SSH entry in a new terminal tab. |
 | `Esc` | Exit. |
 
@@ -186,7 +190,7 @@ Shortcuts:
 | --- | --- |
 | `Enter` | Open the selected workspace with the configured or selected opener. |
 | `Tab` | Mark workspaces for deletion. |
-| `Shift+C` | Create a workspace. |
+| `Shift+N` | Create a workspace. |
 | `Shift+T` | Manage workspace templates. |
 | `Shift+M` | Manage projects in the selected workspace. |
 | `Shift+D` | Delete selected workspace(s). |
@@ -214,7 +218,7 @@ Creation rules:
 | `Issue` | `master` |
 | `Other` | Ask for source branch |
 
-Workspace templates are managed from the hub with `Shift+T`. A template stores a name, optional description, base selection, optional source branch, and selected projects in `DVV_WORKSPACE_TEMPLATES`. The template hub can create, edit, and delete saved templates with its own configurable shortcuts. When creating a workspace with `Shift+C`, the base selector lists `Bug`, `Issue`, `Other`, and saved templates in one screen. Choosing a template reuses its projects and base branch rules.
+Workspace templates are managed from the hub with `Shift+T`. A template stores a name, optional description, base selection, optional source branch, and selected projects in `DVV_WORKSPACE_TEMPLATES`. The template hub can create, edit, and delete saved templates with its own configurable shortcuts. When creating a workspace with `Shift+N`, the base selector lists `Bug`, `Issue`, `Other`, and saved templates in one screen. Choosing a template reuses its projects and base branch rules.
 
 Template hub shortcuts:
 
@@ -222,7 +226,7 @@ Template hub shortcuts:
 | --- | --- |
 | `Enter` | Edit the selected template. |
 | `Tab` | Mark templates for deletion. |
-| `Shift+C` | Create a template. |
+| `Shift+N` | Create a template. |
 | `Shift+E` | Edit the selected template. |
 | `Shift+D` | Delete selected template(s). |
 | `Esc` | Exit templates. |
@@ -242,11 +246,11 @@ Shortcuts:
 | Shortcut | Action |
 | --- | --- |
 | `Enter` | Start or open selected environment. |
-| `Alt+U` | Start or open selected environment. |
-| `Alt+D` | Stop selected environment. |
-| `Alt+A` | Restart API and Horizon panes. |
-| `Alt+W` | Restart Web pane. |
-| `Alt+N` | Save a custom API/Web tmux target. |
+| `Shift+S` | Start or open selected environment. |
+| `Shift+X` | Stop selected environment. |
+| `Shift+A` | Restart API and Horizon panes. |
+| `Shift+W` | Restart Web pane. |
+| `Shift+N` | Save a custom API/Web tmux target. |
 | `Esc` | Exit. |
 
 The directory picker is available through:
@@ -265,7 +269,7 @@ dvv tmux:home
 
 Default search root priority follows the previous Bash implementation: `TMUX_DEFAULT_DIR`, `~/workspace`, `~/Work/Development/dev`, `~/Work/Development`, `~/Development`, common parent of `API_DIR` and `WEB_DIR`, then `$HOME`.
 
-Custom API/Web environments can be created from `dvv tmux` with `Alt+N`. The flow asks for a target name, then opens project pickers for API and Web using the same `workspace.projectSearchRoots` discovery. Saved targets are stored in `DVV_TMUX_ENVIRONMENTS` as JSON, so a project outside a workspace can still appear as a named tmux target.
+Custom API/Web environments can be created from `dvv tmux` with `Shift+N`. The flow asks for a target name, then opens project pickers for API and Web using the same `workspace.projectSearchRoots` discovery. Saved targets are stored in `DVV_TMUX_ENVIRONMENTS` as JSON, so a project outside a workspace can still appear as a named tmux target.
 
 The current tmux window can be reset with:
 
@@ -317,9 +321,9 @@ Shortcuts:
 | Shortcut | Action |
 | --- | --- |
 | `Enter` | Show selected resource details. |
-| `Alt+S` | Start selected resource. |
-| `Alt+R` | Restart selected resource. |
-| `Alt+X` | Stop selected resource. |
+| `Shift+S` | Start selected resource. |
+| `Shift+R` | Restart selected resource. |
+| `Shift+X` | Stop selected resource. |
 | `Shift+L` | Open selected resource logs in a new terminal tab. |
 | `Esc` | Exit. |
 
@@ -362,10 +366,10 @@ Shortcuts:
 | Shortcut | Action |
 | --- | --- |
 | `Enter` | Open selected category or edit selected value inside a key hub. |
-| `Alt+A` | Add custom config key. |
-| `Alt+C` | Clear selected persisted value. |
-| `Alt+V` | Validate selected value. |
-| `Alt+S` | Show secret file status. |
+| `Shift+N` | Add custom config key. |
+| `Shift+D` | Clear selected persisted value. |
+| `Shift+V` | Validate selected value. |
+| `Shift+S` | Show secret file status. |
 | `Esc` | Exit. |
 
 ## Configuration Files
@@ -416,16 +420,30 @@ Theme:
 DVV_THEME=royal-noir
 ```
 
+Global shell shortcuts:
+
+```bash
+DVV_SHELL_MAIN_SHORTCUT=alt+g
+DVV_SHELL_WORKSPACE_SHORTCUT=alt+w
+DVV_SHELL_TMUX_SHORTCUT=alt+t
+DVV_SHELL_SSH_SHORTCUT=alt+s
+```
+
 Tmux directory picker:
 
 ```bash
 DVV_TMUX_SESSION_SEARCH_ROOTS=~/workspace:~/Work/Development/dev:~/Work/Development:~/Development
 DVV_TMUX_SESSION_SEARCH_DEPTH=3
 DVV_TMUX_SESSION_NAME=space
-DVV_TMUX_SESSION_SHORTCUT=ctrl+f
+DVV_TMUX_SESSION_SHORTCUT=alt+p
 DVV_TMUX_HOME_DIR=~
 DVV_TMUX_HOME_SESSION_NAME=home
 DVV_TMUX_HOME_SHORTCUT=alt+f
+DVV_TMUX_HUB_START_SHORTCUT=shift+s
+DVV_TMUX_HUB_STOP_SHORTCUT=shift+x
+DVV_TMUX_HUB_RESTART_API_SHORTCUT=shift+a
+DVV_TMUX_HUB_RESTART_WEB_SHORTCUT=shift+w
+DVV_TMUX_HUB_CREATE_SHORTCUT=shift+n
 DVV_TMUX_ENVIRONMENTS='[{"name":"on-premise","apiDir":"~/workspace/on-premise/api","webDir":"~/workspace/on-premise/web"}]'
 ```
 
@@ -434,9 +452,18 @@ Workspace templates:
 ```bash
 DVV_WORKSPACE_TEMPLATES='[{"name":"fullstack-bug","baseKind":"bug","projects":[{"name":"api","path":"~/workspace/projects/api"},{"name":"web","path":"~/workspace/projects/web"}]}]'
 DVV_WORKSPACE_TEMPLATE_SHORTCUT=shift+t
-DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT=shift+c
+DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT=shift+n
 DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT=shift+e
 DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT=shift+d
+```
+
+Config hub shortcuts:
+
+```bash
+DVV_CONFIG_ADD_SHORTCUT=shift+n
+DVV_CONFIG_CLEAR_SHORTCUT=shift+d
+DVV_CONFIG_VALIDATE_SHORTCUT=shift+v
+DVV_CONFIG_SECRETS_SHORTCUT=shift+s
 ```
 
 Terminal:
@@ -495,7 +522,7 @@ More detail lives in [docs/go-version/operational-map.md](docs/go-version/operat
 | [Operational map](docs/go-version/operational-map.md) | Practical edge cases, local paths, install behavior, and troubleshooting details. |
 | [Maintainer harness](docs/go-version/maintainer-harness.md) | Command ownership map, shared UI contracts, workspace harness rules, and test conventions. |
 | [Smoke checklist](docs/go-version/smoke-checklist.md) | Automated and manual smoke checks for Linux/WSL and macOS. |
-| [Merge readiness](docs/go-version/merge-readiness.md) | Validation, versioning, and criteria for replacing `main`. |
+| [Merge readiness](docs/go-version/merge-readiness.md) | Validation, versioning, and criteria for broad daily use. |
 | [Migration roadmap](docs/go-version/migration-roadmap.md) | Porting status and remaining migration work. |
 
 ## Troubleshooting
@@ -512,7 +539,7 @@ Common cases:
 | --- | --- |
 | `zsh: command not found: devv` | Use `dvv`. Run `dvv setup` if an old shortcut still calls `devv`. |
 | `npm ERR! path /root/package.json` | You ran an npm script outside the repo. Use `dvv build` or `dvv check`. |
-| `Ctrl+Shift+F` opens terminal Find | This is a Windows Terminal shortcut. Use `Alt+F` after `dvv setup`, or run `dvv tmux:home`. |
+| `Ctrl+Shift+F` opens terminal Find | This is a Windows Terminal shortcut. Use `Alt+F` for a home tmux tab or `Alt+P` for the directory picker after `dvv setup`. |
 | `Alt+R` beeps or does nothing | Run `dvv build`, then `dvv setup` and `exec zsh`. If a tmux server was already open, run `tmux source-file ~/.tmux.conf` or open the environment again with `dvv tmux`. |
 | `Alt+R` reports multiple Laravel API windows | Run `dvv tmux:reset-api` manually and select the target once, or run `dvv tmux:reset-api --session <name> --window <name>`. |
 | Autocomplete did not update | Run `dvv setup`, then open a new terminal or run `exec zsh`. |

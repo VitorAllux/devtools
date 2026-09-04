@@ -48,6 +48,24 @@ The file is versioned because it defines project behavior, theme identity, and d
   "terminal": {
     "launcher": "auto"
   },
+  "shell": {
+    "shortcuts": {
+      "mainHub": "alt+g",
+      "workspace": "alt+w",
+      "tmux": "alt+t",
+      "ssh": "alt+s"
+    }
+  },
+  "system": {
+    "configHub": {
+      "shortcuts": {
+        "add": "shift+n",
+        "clear": "shift+d",
+        "validate": "shift+v",
+        "secrets": "shift+s"
+      }
+    }
+  },
   "db": {
     "host": "",
     "port": "3306",
@@ -59,9 +77,9 @@ The file is versioned because it defines project behavior, theme identity, and d
   "resources": {
     "hub": {
       "shortcuts": {
-        "start": "alt+s",
-        "restart": "alt+r",
-        "stop": "alt+x",
+        "start": "shift+s",
+        "restart": "shift+r",
+        "stop": "shift+x",
         "logs": "shift+l"
       }
     },
@@ -81,13 +99,22 @@ The file is versioned because it defines project behavior, theme identity, and d
   "ssh": {
     "hub": {
       "shortcuts": {
-        "add": "shift+a",
-        "remove": "shift+r",
+        "add": "shift+n",
+        "remove": "shift+d",
         "newTerminal": "shift+t"
       }
     }
   },
   "tmux": {
+    "hub": {
+      "shortcuts": {
+        "start": "shift+s",
+        "stop": "shift+x",
+        "restartApi": "shift+a",
+        "restartWeb": "shift+w",
+        "create": "shift+n"
+      }
+    },
     "session": {
       "searchRoots": [
         "~/workspace",
@@ -97,7 +124,7 @@ The file is versioned because it defines project behavior, theme identity, and d
       ],
       "searchDepth": 3,
       "defaultSessionName": "space",
-      "shortcut": "ctrl+f"
+      "shortcut": "alt+p"
     },
     "home": {
       "directory": "~",
@@ -135,7 +162,7 @@ The file is versioned because it defines project behavior, theme identity, and d
       "selector": "fzf",
       "opener": "",
       "shortcuts": {
-        "create": "shift+c",
+        "create": "shift+n",
         "manage": "shift+m",
         "delete": "shift+d",
         "template": "shift+t"
@@ -143,7 +170,7 @@ The file is versioned because it defines project behavior, theme identity, and d
     },
     "templateHub": {
       "shortcuts": {
-        "create": "shift+c",
+        "create": "shift+n",
         "edit": "shift+e",
         "delete": "shift+d"
       }
@@ -253,7 +280,7 @@ Use `DVV_TERMINAL_LAUNCHER` for local overrides. `DEVT_TERMINAL_LAUNCHER` is acc
 
 ## Tmux Config
 
-The `tmux.session` section contains the standalone directory session picker used by `dvv tmux:session` and the zsh `Ctrl+F` shortcut:
+The `tmux.session` section contains the standalone directory session picker used by `dvv tmux:session` and the zsh `Alt+P` shortcut:
 
 - `searchRoots`: ordered roots used by the fuzzy directory search.
 - `searchDepth`: maximum depth for typed search below the active search root.
@@ -284,7 +311,7 @@ The `tmux.environments` list adds named API/Web targets to `dvv tmux`, useful wh
 - `apiDir`: API project directory.
 - `webDir`: Web project directory.
 
-The tmux hub can create these entries with `Alt+N`. It asks for a target name, then lets the user select API and Web projects from the same discovery roots used by the workspace hub. The saved value is persisted to `DVV_TMUX_ENVIRONMENTS` in runtime config.
+The tmux hub can create these entries with `Shift+N`. It asks for a target name, then lets the user select API and Web projects from the same discovery roots used by the workspace hub. The saved value is persisted to `DVV_TMUX_ENVIRONMENTS` in runtime config.
 
 ## Workspace Config
 
@@ -311,7 +338,7 @@ Workspace metadata is stored inside each workspace:
 
 Existing `workspace-*` directories are adopted when the hub opens if this metadata is missing. Adoption is additive only: it writes `.workspace/config.json` from detected worktrees and leaves all existing files in place.
 
-Workspace templates can be defined in `workspace.templates` or persisted through `DVV_WORKSPACE_TEMPLATES`. The workspace hub opens template management with `Shift+T`, and the template hub can create, edit, or delete templates with its own configurable shortcuts. During `Shift+C` workspace creation, the base selector also lists saved templates, so selecting a template reuses its project list and base branch rule.
+Workspace templates can be defined in `workspace.templates` or persisted through `DVV_WORKSPACE_TEMPLATES`. The workspace hub opens template management with `Shift+T`, and the template hub can create, edit, or delete templates with its own configurable shortcuts. During `Shift+N` workspace creation, the base selector also lists saved templates, so selecting a template reuses its project list and base branch rule.
 
 Supported lifecycle hook events are `workspace.creating`, `workspace.created`, `workspace.opened`, `workspace.removing`, `workspace.removed`, `project.adding`, `project.added`, `project.bootstrap`, `project.removing`, and `project.removed`.
 
@@ -331,7 +358,7 @@ esc
 
 For letter keys, `shift+a` maps to the uppercase key `A` in fzf. That is how most terminals expose Shift+letter.
 
-The shell integration writes `alt+letter` as an escaped zsh binding, such as `\ef` for `Alt+F` and `\er` for the `Alt+R` reset fallback. It can also write `ctrl+shift+letter` as a CSI-u binding, but terminal applications may reserve those chords for their own UI. Windows Terminal reserves `Ctrl+Shift+F` for Find, so `Alt+F` is the default direct home shortcut.
+The shell integration writes `alt+letter` as an escaped zsh binding, such as `\ep` for `Alt+P`, `\ef` for `Alt+F`, and `\er` for the `Alt+R` reset fallback. It can also write `ctrl+shift+letter` as a CSI-u binding, but terminal applications may reserve those chords for their own UI. Windows Terminal reserves `Ctrl+Shift+F` for Find, so dvv avoids it by default.
 
 Tmux shortcut integration writes `alt+letter` as `M-letter`, such as `M-r` for `Alt+R`, in the managed `~/.tmux.conf` block.
 Set `DVV_SKIP_TMUX_INTEGRATION=1` before `dvv setup` to skip `.tmux.conf` changes.

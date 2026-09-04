@@ -2,13 +2,13 @@
 
 ## Branch
 
-The rewrite branch is:
+The rewrite started on:
 
 ```text
 go-version
 ```
 
-`main` remains the stable previous implementation and behavior reference until the Go rewrite covers the critical flows. The Go rewrite command is `dvv`.
+`main` now contains the active Go implementation. The Go rewrite command is `dvv`.
 
 ## Migration Order
 
@@ -55,7 +55,7 @@ dvv workspace
 
 ## Phase 3: Tmux
 
-- [x] Port `dvv tmux:session` first to preserve the zsh `Ctrl+F` directory session picker.
+- [x] Port `dvv tmux:session` first to preserve the directory session picker behind the managed `Alt+P` shortcut.
 - [x] Port tmux target detection.
 - [x] Port the tmux hub and its start, stop, API restart, and web restart actions.
 - [x] Reuse workspace metadata and config where possible.
@@ -136,9 +136,9 @@ docs/plans/completed/2026-08-31-go-version-hardening-readiness.md
 - [x] Improve maintainer and agent readability harness documentation.
 - [x] Add `dvv doctor --fix` for safe local setup repair.
 
-## Merge Criteria For Main
+## Main Readiness Criteria
 
-The Go version can replace the current `main` implementation when these are true:
+The Go implementation is ready for broad daily use when these are true:
 
 - `ssh`, `workspace`, `tmux`, `db`, `systemconfig`, `resources`, and `secrets` are implemented in Go.
 - `go test ./...` passes.

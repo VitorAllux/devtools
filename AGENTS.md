@@ -15,7 +15,7 @@ These rules document the local conventions for future agents and maintainers wor
 - For interactive processes such as SSH, show loaders before terminal handoff and stop them before the child process owns the terminal.
 - Avoid global shell keybindings unless the project explicitly defines one. They can conflict with terminals, shells, editors, and IDEs.
 - Prefer explicit `dvv ...` commands. Personal shell shortcuts belong in the user's own shell config.
-- Project-managed zsh shortcuts are `Ctrl+F` for `dvv tmux:session`, `Alt+F` for `dvv tmux:home`, `Alt+R` as a `dvv tmux:reset-api` fallback, and `Alt+S` for `dvv ssh`.
+- Project-managed zsh shortcuts use `Alt+letter`: `Alt+G` for `dvv`, `Alt+W` for `dvv workspace`, `Alt+T` for `dvv tmux`, `Alt+P` for `dvv tmux:session`, `Alt+F` for `dvv tmux:home`, `Alt+S` for `dvv ssh`, and `Alt+R` as a `dvv tmux:reset-api` fallback.
 - Project-managed tmux shortcut is `Alt+R` for `dvv tmux:reset-api` with safe global fallback.
 
 ## Help And Command Lists
@@ -41,10 +41,10 @@ These rules document the local conventions for future agents and maintainers wor
 
 ## Shortcuts
 
-- Avoid new `Ctrl-*` shortcuts for dvv features. They commonly conflict with shells, terminal apps, VS Code, Cursor, and fzf defaults.
-- `Ctrl+F` is approved for the tmux directory session picker, preserved from the previous Bash implementation.
+- Avoid `Ctrl-*` shortcuts for dvv features. They commonly conflict with shells, terminal apps, VS Code, Cursor, and fzf defaults.
+- Global dvv shell shortcuts should use `Alt+letter` by default.
 - `Alt+F` is approved for opening a configured home tmux tab without the directory picker.
-- Root help should present the tmux hub as `dvv tmux`, the directory picker as the `Ctrl+F` shortcut, and the home tmux tab as the `Alt+F` shortcut.
+- Root help should present the tmux hub as `dvv tmux`, the directory picker as the `Alt+P` shortcut, and the home tmux tab as the `Alt+F` shortcut.
 - Root help may present `Alt+R` as a tmux shortcut with safe global fallback.
 - Do not use `Ctrl+Shift+F` as a managed default because Windows Terminal captures it for Find before zsh receives it.
 - Do not use `Ctrl+S`; many terminals treat it as XOFF flow control and appear frozen.
@@ -57,7 +57,7 @@ These rules document the local conventions for future agents and maintainers wor
 ```text
 Enter  open configured opener or choose from available openers
 Tab    multi-select or mark changes
-Shift+C  create workspace
+Shift+N  create workspace
 Shift+M  manage workspace projects
 Shift+D  delete workspace
 Esc    cancel/exit
@@ -84,8 +84,8 @@ dvv ssh
 
 ```text
 Enter  open selected SSH entry in a new terminal tab attached to a dedicated tmux session
-Shift+A  add SSH entry
-Shift+R  remove selected SSH entry
+Shift+N  add SSH entry
+Shift+D  remove selected SSH entry
 Shift+T  open selected SSH connection in a new terminal tab attached to tmux
 Esc    exit
 ```
@@ -129,7 +129,7 @@ dvv config
 dvv secrets
 ```
 
-- `dvv tmux:session` is kept for the managed `Ctrl+F` shortcut.
+- `dvv tmux:session` is kept for the managed `Alt+P` shortcut.
 - `dvv tmux:home` is kept for the managed `Alt+F` shortcut and should open the configured home directory without fzf selection.
 - `dvv tmux:reset-api` is kept for the managed `Alt+R` tmux shortcut. It should reset the current tmux window first, fall back to the last opened or manually selected target, then fall back to a single detected Laravel API window, and refuse ambiguous multiple-window matches from non-interactive shortcuts.
 - The zsh `Alt+R` fallback must only call `dvv tmux:reset-api`; do not reset arbitrary tmux windows when multiple API candidates are running.
@@ -177,7 +177,7 @@ dvv bootstrap
 
 ## Go Version Rewrite
 
-- The Go rewrite branch is `go-version`.
+- The Go rewrite started on `go-version`; `main` is now the active Go implementation.
 - Before implementing Go rewrite work, read:
 
 ```text
@@ -191,14 +191,14 @@ docs/plans/active
 docs/agents.md
 ```
 
-- Use `main`, README, and this file as the primary source of existing dvv behavior while porting features.
+- Use README, this file, and the legacy branch only as needed when checking historical behavior.
 - Use `https://github.com/EnzoJ0se/code-grove` as an architecture reference for Go package layout, config shape, workspace metadata, bootstrap rules, hooks, safety checks, and agent planning discipline.
 - Do not copy `code-grove` behavior blindly when it conflicts with dvv's command surface or local conventions.
 - Adopt the useful `code-grove` discipline around readable config, focused agent guides, lifecycle hooks, workspace metadata, safety packages, and plan/build/execute flows.
 - The public command for the Go rewrite is `dvv`.
-- Do not keep legacy Bash commands as fallback in this branch. Port intentionally from `main`.
+- Do not keep legacy Bash commands as fallback. Port intentionally from the legacy reference only when behavior still matters.
 - Initial migration order is `ssh`, `workspace`, `tmux`, `db`, `systemconfig`, `resources`, then optional `wsl`.
-- Extra hardening before replacing `main` includes profiles, secrets hub, resource logs, custom tmux environments, `doctor --fix`, and macOS smoke notes.
+- Extra hardening includes profiles, secrets hub, resource logs, custom tmux environments, `doctor --fix`, and macOS smoke notes.
 - The Python desktop control center is out of scope for the rewrite.
 - User-facing CLI text, generated help, autocomplete descriptions, errors, README content, and docs must remain in English.
 - Go code, package names, structs, config fields, command names, events, and tests must be in English.

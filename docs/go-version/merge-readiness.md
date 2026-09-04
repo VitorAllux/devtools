@@ -1,6 +1,6 @@
 # Merge Readiness
 
-This document defines the bar for replacing the current `main` implementation with the Go rewrite.
+This document defines the bar for keeping the Go implementation ready for daily use.
 
 ## Current Source Shape
 
@@ -22,7 +22,7 @@ Do not claim full macOS support until the manual macOS smoke checklist has passe
 
 ## Readiness Criteria
 
-Before merging `go-version` into `main`:
+Before treating a change as ready:
 
 1. `npm run check` passes.
 2. Global test coverage is at least 50%.
@@ -45,16 +45,16 @@ For a user-visible change:
 4. Rebuild with `dvv build`.
 5. Run `npm run check`.
 
-## Merge To Main
+## Main Branch Checklist
 
-Before `go-version` replaces the current `main` implementation:
+Before broad usage from `main`:
 
-1. Confirm `go-version` is pushed and reviewed.
+1. Confirm the branch is pushed and reviewed when the change is not direct-to-main.
 2. Confirm active plans are moved to `docs/plans/completed`.
 3. Confirm public help, completion, README command lists, and AGENTS rules agree.
-4. Confirm legacy Bash-only files are absent from this branch or intentionally documented as references.
+4. Confirm legacy Bash-only files are absent or intentionally documented as references.
 5. Confirm local runtime data and secrets are ignored and absent from git history.
-6. Merge through a normal PR or reviewed fast-forward path.
+6. Merge through a normal PR, or push directly only when the maintainer explicitly wants direct-to-main.
 
 ## Future Improvements
 
