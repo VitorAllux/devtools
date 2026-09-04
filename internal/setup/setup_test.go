@@ -113,6 +113,8 @@ func TestTmuxShortcutsStaleDetectsCurrentBinding(t *testing.T) {
 		`# >>> dvv tmux shortcuts >>>`,
 		expected,
 		`# <<< dvv tmux shortcuts <<<`,
+		"",
+		TmuxThemeBlock(cfg),
 	}, "\n")
 
 	if tmuxShortcutsStale(current, cfg) {
@@ -122,6 +124,46 @@ func TestTmuxShortcutsStaleDetectsCurrentBinding(t *testing.T) {
 	oldBinding := strings.Replace(current, "M-r", "M-x", 1)
 	if !tmuxShortcutsStale(oldBinding, cfg) {
 		t.Fatal("expected old tmux reset shortcut block to be stale")
+	}
+
+	oldTheme := strings.Replace(current, "#05020a", "#000000", 1)
+	if !tmuxShortcutsStale(oldTheme, cfg) {
+		t.Fatal("expected old tmux theme block to be stale")
+	}
+}
+
+func TestTmuxThemeBlockFollowsCLITheme(t *testing.T) {
+	cfg := &config.Config{Project: config.DefaultProjectConfig()}
+	cfg.Project.Theme.Name = "tokyo-night"
+
+	block := TmuxThemeBlock(cfg)
+	if !strings.Contains(block, "Theme: tokyo-night") ||
+		!strings.Contains(block, `status-style "bg=#e0af68,fg=#1a1b26"`) ||
+		!strings.Contains(block, `window-status-current-style "bg=#bb9af7,fg=#ffffff,bold"`) {
+		t.Fatalf("tmux theme block did not follow CLI theme: %s", block)
+	}
+}
+
+func TestTmuxThemeBlockCanUseExplicitTheme(t *testing.T) {
+	follow := false
+	cfg := &config.Config{Project: config.DefaultProjectConfig()}
+	cfg.Project.Theme.Name = "tokyo-night"
+	cfg.Project.Tmux.Theme.FollowCLITheme = &follow
+	cfg.Project.Tmux.Theme.Name = "dracula"
+
+	block := TmuxThemeBlock(cfg)
+	if !strings.Contains(block, "Theme: dracula") || !strings.Contains(block, `status-style "bg=#f1fa8c,fg=#282a36"`) {
+		t.Fatalf("tmux theme block did not use explicit theme: %s", block)
+	}
+}
+
+func TestTmuxThemeBlockCanBeDisabled(t *testing.T) {
+	enabled := false
+	cfg := &config.Config{Project: config.DefaultProjectConfig()}
+	cfg.Project.Tmux.Theme.Enabled = &enabled
+
+	if block := TmuxThemeBlock(cfg); block != "" {
+		t.Fatalf("tmux theme block = %q, want empty", block)
 	}
 }
 

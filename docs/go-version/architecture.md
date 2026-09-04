@@ -45,7 +45,7 @@ internal/wsl
 - `cmd/dvv`: binary entrypoint.
 - `internal/app`: command routing and root help.
 - `internal/config`: project config, legacy env compatibility, path expansion, and hub key bindings.
-- `internal/bootstrap`: workspace copy rules, conditional bootstrap commands, and generated workspace agent file.
+- `internal/bootstrap`: workspace copy rules, conditional bootstrap commands, generated workspace `AGENTS.md`, `.agents` manifest, focused guides, and skill lookup paths.
 - `internal/db`: database hub, MySQL create/drop/truncate, local dump cleaning, and local or Google Drive import.
 - `internal/discovery`: configured and discovered project list building.
 - `internal/git`: branch/ref checks, worktree detection, add/remove/prune, and dirty status.

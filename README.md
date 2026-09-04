@@ -39,7 +39,7 @@ Make sure `~/.local/bin` is on `PATH`. The launcher exposes:
 dvv
 ```
 
-After installing, enable completion, managed zsh shortcuts, and managed tmux shortcuts:
+After installing, enable completion, managed zsh shortcuts, and managed tmux integration:
 
 ```bash
 dvv setup
@@ -119,7 +119,7 @@ dvv check
 | `dvv resources` | Open the local resources hub. |
 | `dvv secrets` | Open the local secrets hub. |
 | `dvv config` | Open the configuration hub. |
-| `dvv setup` | Install zsh completion, managed shell shortcuts, and managed tmux shortcuts. |
+| `dvv setup` | Install zsh completion, managed shell shortcuts, and managed tmux integration. |
 | `dvv bootstrap` | Restore AGE/Bitwarden secrets and SSH backup. |
 | `dvv build` | Rebuild the local Go binary. |
 | `dvv check` | Run build, tests, `go vet`, and smoke from the project root. |
@@ -144,9 +144,23 @@ Compatibility routes such as `dvv ssh:list`, `dvv workspace:list`, `dvv db impor
 
 The managed block is written to `~/.zshrc`. Global dvv shortcuts use `Alt+letter`; interactive hub actions use `Shift+letter`. The `Alt+R` zsh binding is a fallback: inside tmux, the tmux binding handles the reset; outside tmux, it runs the command and prints a normal error instead of a terminal bell. Set `DVV_SKIP_SHELL_INTEGRATION=1` before setup to skip shortcut installation. Windows Terminal reserves `Ctrl+Shift+F` for Find, so dvv avoids it by default.
 
-## Tmux Shortcuts
+## Tmux Integration
 
-`dvv setup` also manages this tmux shortcut in `~/.tmux.conf`:
+`dvv setup` also manages tmux shortcut and theme blocks in `~/.tmux.conf`.
+
+The tmux theme follows the active CLI theme by default. When `DVV_THEME=tokyo-night`, setup writes Tokyo Night status, window, pane border, message, and copy-mode colors. The status bar remains a full-width visible bar and uses the theme status color as its background. Change the CLI theme in `dvv config` -> `Theme`, then run `dvv setup` to refresh tmux.
+
+Theme controls:
+
+```bash
+DVV_TMUX_THEME_ENABLED=1
+DVV_TMUX_THEME_FOLLOW_CLI=1
+DVV_TMUX_THEME_NAME=royal-noir
+```
+
+Use `DVV_TMUX_THEME_ENABLED=0` to remove the managed tmux theme block. Use `DVV_TMUX_THEME_FOLLOW_CLI=0` with `DVV_TMUX_THEME_NAME=<theme>` when tmux should use a different theme from the CLI.
+
+The managed reset shortcut is:
 
 | Shortcut | Command |
 | --- | --- |
@@ -158,7 +172,7 @@ Running `dvv tmux:reset-api` manually opens a reset target selector when several
 
 Running `dvv tmux:reset-api --session <name> --window <name>` keeps the target explicit and does not fall back to another window.
 
-Set `tmux.reset.shortcut` or `DVV_TMUX_RESET_SHORTCUT` to change it. Use `none` to disable the managed tmux shortcut and the zsh fallback. `dvv setup` writes the config, prefers the absolute built binary when available, and attempts to reload it in any running tmux server. Reset shortcut output is written to `~/.cache/devv/tmux-reset.log` so failures do not print command text into the active pane. Set `DVV_SKIP_TMUX_INTEGRATION=1` before setup to skip `.tmux.conf` changes.
+Set `tmux.reset.shortcut` or `DVV_TMUX_RESET_SHORTCUT` to change it. Use `none` to disable the managed tmux shortcut and the zsh fallback. `dvv setup` writes the config, prefers the absolute built binary when available, and attempts to reload it in any running tmux server. Reset shortcut output is written to `~/.cache/devv/tmux-reset.log` so failures do not print command text into the active pane. Set `DVV_SKIP_TMUX_INTEGRATION=1` before setup to skip all `.tmux.conf` changes.
 
 ## SSH Hub
 
@@ -193,6 +207,7 @@ Shortcuts:
 | `Shift+N` | Create a workspace. |
 | `Shift+T` | Manage workspace templates. |
 | `Shift+M` | Manage projects in the selected workspace. |
+| `Shift+H` | Sync the workspace agent harness. |
 | `Shift+D` | Delete selected workspace(s). |
 | `Esc` | Exit. |
 
@@ -219,6 +234,24 @@ Creation rules:
 | `Other` | Ask for source branch |
 
 Workspace templates are managed from the hub with `Shift+T`. A template stores a name, optional description, base selection, optional source branch, and selected projects in `DVV_WORKSPACE_TEMPLATES`. The template hub can create, edit, and delete saved templates with its own configurable shortcuts. When creating a workspace with `Shift+N`, the base selector lists `Bug`, `Issue`, `Other`, and saved templates in one screen. Choosing a template reuses its projects and base branch rules.
+
+### Workspace Agent Harness
+
+Workspace creation and project management synchronize an agent harness inside the workspace. Existing workspaces can be synchronized from the hub with `Shift+H`.
+
+Generated files:
+
+| File | Purpose |
+| --- | --- |
+| `AGENTS.md` | Portuguese workspace-level instructions for agents working from VS Code, Cursor, Codex, or other local tools. |
+| `.agents/manifest.json` | Machine-readable workspace context, project list, skill lookup paths, guides, and shared rules. |
+| `.agents/planning.md` | Planning guide for scoped workspace changes. |
+| `.agents/implementation.md` | Implementation guide for worktree boundaries and project-local rules. |
+| `.agents/testing.md` | Validation guide. |
+| `.agents/code-review.md` | Review guide. |
+| `.agents/skills/` | Workspace-local skills directory. |
+
+The generated `AGENTS.md` is written in Portuguese and tells agents to read `.workspace/config.json`, search configured skill paths, prefer project-local rules, and ask concise questions when the task, target project, branch, or destructive risk is unclear. `<agentsDir>/skills` is always created and searched first, so changing `DVV_WORKSPACE_HARNESS_AGENTS_DIR` keeps the local skills folder with the harness.
 
 Template hub shortcuts:
 
@@ -412,6 +445,9 @@ DVV_WORKSPACES_DIR=~/workspace
 DVV_WORKSPACE_PROJECT_ROOTS=~/workspace:~/Development/projects:~/Work/Development/dev
 DVV_WORKSPACE_PROJECT_SEARCH_DEPTH=4
 DVV_WORKSPACE_OPENER=cursor
+DVV_WORKSPACE_HARNESS_AGENTS_DIR=.agents
+DVV_WORKSPACE_HARNESS_SKILL_PATHS=.agents/skills:.codex/skills:.claude/skills:~/.codex/skills:~/.agents/skills:~/.claude/skills
+DVV_WORKSPACE_HARNESS_PROJECT_SKILL_PATHS=.agents/skills:.codex/skills:.claude/skills
 ```
 
 Theme:
@@ -439,6 +475,9 @@ DVV_TMUX_SESSION_SHORTCUT=alt+p
 DVV_TMUX_HOME_DIR=~
 DVV_TMUX_HOME_SESSION_NAME=home
 DVV_TMUX_HOME_SHORTCUT=alt+f
+DVV_TMUX_THEME_ENABLED=1
+DVV_TMUX_THEME_FOLLOW_CLI=1
+DVV_TMUX_THEME_NAME=royal-noir
 DVV_TMUX_HUB_START_SHORTCUT=shift+s
 DVV_TMUX_HUB_STOP_SHORTCUT=shift+x
 DVV_TMUX_HUB_RESTART_API_SHORTCUT=shift+a
@@ -502,12 +541,14 @@ DVV_RESOURCES_LOG_TAIL=200
 | No workspace found | The workspace hub still opens and offers create inside the hub. |
 | Deletion safety | Dirty worktrees and leftover content require explicit confirmation. |
 | Tmux custom environments | `dvv tmux` can store named API/Web targets for projects outside workspace metadata. |
+| Tmux theme | `dvv setup` writes tmux status, window, pane, message, and copy-mode colors from the active CLI theme by default. The status bar stays full-width and visible. |
 | Tmux reset target | `dvv tmux` stores the last opened or manually selected reset target in `~/.cache/devv/tmux-reset-target.json` for the global `Alt+R` fallback. |
+| Workspace agent harness | Workspace create/add flows and `Shift+H` write `AGENTS.md`, `.agents/manifest.json`, guides, and skill lookup paths inside the workspace. |
 | Resource logs | `dvv resources` opens service, Docker, or Compose logs in a new terminal tab. |
 | Secrets | `dvv secrets` manages local AGE/SSH backup state; `dvv bootstrap` restores AGE/Bitwarden-backed SSH data without committing private files. |
 | Doctor fix | `dvv doctor --fix` creates safe local runtime files, rebuilds, and reinstalls managed shell/tmux integration. |
 | Long operations | Confirmed actions use Royal Noir loaders; imports use a percentage bar that fills to `completed`. |
-| Colors/loaders | Default theme is Royal Noir. Use `dvv config` -> `Theme` or `DVV_THEME` to switch themes. Set `NO_COLOR=1` or `DVV_NO_LOADER=1` to disable color/loader behavior. |
+| Colors/loaders | Default theme is Royal Noir. Use `dvv config` -> `Theme` or `DVV_THEME` to switch themes. Run `dvv setup` to refresh tmux colors. Set `NO_COLOR=1` or `DVV_NO_LOADER=1` to disable color/loader behavior. |
 | Autocomplete | Public hub commands are completed by default. Set `DVV_COMPLETE_COMPAT=1` to expose script-friendly compatibility routes in zsh completion. |
 
 More detail lives in [docs/go-version/operational-map.md](docs/go-version/operational-map.md).

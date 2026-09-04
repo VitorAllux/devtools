@@ -353,6 +353,32 @@ func TestFZFHubKeepsEmptyWorkspaceHubOpen(t *testing.T) {
 	}
 }
 
+func TestFZFHubHarnessRequiresSingleWorkspace(t *testing.T) {
+	root := t.TempDir()
+	first := filepath.Join(root, "workspace-alpha")
+	second := filepath.Join(root, "workspace-beta")
+	runner := newWorkspaceRunner()
+	runner.fzfOutput = []byte("H\n" + ui.FZFHiddenRow(first, "alpha") + "\n" + ui.FZFHiddenRow(second, "beta") + "\n")
+	manager := NewManager(testWorkspaceConfig(root), runner)
+
+	keepOpen, message, err := manager.fzfHub(context.Background(), []Details{
+		{Workspace: Workspace{Name: "alpha", DirName: "workspace-alpha", Path: first}, HasMetadata: true},
+		{Workspace: Workspace{Name: "beta", DirName: "workspace-beta", Path: second}, HasMetadata: true},
+	}, "")
+	if err != nil {
+		t.Fatalf("fzfHub returned error: %v", err)
+	}
+	if !keepOpen {
+		t.Fatal("harness selection error should keep the hub open")
+	}
+	if !strings.Contains(message, "select only one workspace") {
+		t.Fatalf("message = %q", message)
+	}
+	if _, err := os.Stat(filepath.Join(first, "AGENTS.md")); !os.IsNotExist(err) {
+		t.Fatalf("harness should not sync when multiple workspaces are selected, stat err=%v", err)
+	}
+}
+
 func TestWorkspaceSelectionParsingHelpers(t *testing.T) {
 	path := "/tmp/workspace-alpha"
 	line := ui.FZFHiddenRow(path, "alpha")
@@ -684,6 +710,9 @@ func TestExecuteCreatePlanWritesMetadataAndAgentsFile(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(plan.WorkspacePath, "AGENTS.md")); err != nil {
 		t.Fatalf("AGENTS.md missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(plan.WorkspacePath, ".agents", "manifest.json")); err != nil {
+		t.Fatalf(".agents/manifest.json missing: %v", err)
 	}
 	if !runner.hasRun("git -C " + source + " worktree add -b issue-42 " + filepath.Join(plan.WorkspacePath, "api") + " origin/master") {
 		t.Fatalf("git worktree add was not executed, runs = %#v", runner.runs)

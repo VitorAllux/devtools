@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/VitorAllux/devtools/internal/config"
+	"github.com/VitorAllux/devtools/internal/metadata"
 )
 
 func TestMatchesRequiredAndMissingFiles(t *testing.T) {
@@ -149,6 +151,83 @@ func TestWriteAgentsFileRejectsEscapingPathAndRespectsOverwrite(t *testing.T) {
 	if written {
 		t.Fatal("expected existing AGENTS.md to be preserved when overwrite is false")
 	}
+
+	legacyGenerated := []byte("# Workspace Guide\n\n" +
+		"This workspace was created by dvv.\n\n" +
+		"Use `.workspace/config.json` as the source of truth for project paths, base branches, and work branches.\n")
+	if err := os.WriteFile(target, legacyGenerated, 0o644); err != nil {
+		t.Fatalf("WriteFile legacy generated failed: %v", err)
+	}
+	written, updated, err := WriteAgentsFileDetailed(cfg, workspacePath)
+	if err != nil {
+		t.Fatalf("WriteAgentsFileDetailed legacy returned error: %v", err)
+	}
+	if !written || !updated {
+		t.Fatalf("expected managed legacy AGENTS.md to be updated, written=%v updated=%v", written, updated)
+	}
+	content, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("ReadFile updated AGENTS.md failed: %v", err)
+	}
+	if !strings.Contains(string(content), "# Guia Do Workspace") || !strings.Contains(string(content), "Procure skills relevantes") {
+		t.Fatalf("legacy AGENTS.md was not updated to Portuguese harness: %s", content)
+	}
+}
+
+func TestWriteWorkspaceHarnessWritesManifestGuidesAndSkillPaths(t *testing.T) {
+	root := t.TempDir()
+	workspacePath := filepath.Join(root, "workspace-alpha")
+	if err := os.MkdirAll(workspacePath, 0o755); err != nil {
+		t.Fatalf("MkdirAll workspace failed: %v", err)
+	}
+	if err := metadata.Write(workspacePath, metadata.Workspace{
+		Version:       1,
+		WorkspaceName: "alpha",
+		WorkspaceDir:  "workspace-alpha",
+		WorkBranch:    "task-alpha",
+		Projects: []metadata.Project{
+			{Name: "api", Path: filepath.Join(workspacePath, "api"), BaseBranch: "master", WorkBranch: "task-alpha"},
+		},
+	}); err != nil {
+		t.Fatalf("metadata write failed: %v", err)
+	}
+	project := config.DefaultProjectConfig()
+	cfg := config.Config{ConfigDir: filepath.Join(root, "config"), Project: project}
+
+	result, err := WriteWorkspaceHarness(cfg, workspacePath)
+	if err != nil {
+		t.Fatalf("WriteWorkspaceHarness returned error: %v", err)
+	}
+	if !result.AgentsFileWritten || !result.ManifestWritten || len(result.GuideFilesWritten) != 4 {
+		t.Fatalf("harness result = %#v", result)
+	}
+	agentsContent, err := os.ReadFile(filepath.Join(workspacePath, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("ReadFile AGENTS.md failed: %v", err)
+	}
+	if !strings.Contains(string(agentsContent), "Procure skills relevantes") || !strings.Contains(string(agentsContent), "Pergunte antes de agir") {
+		t.Fatalf("AGENTS.md missing agent operating rules: %s", agentsContent)
+	}
+	manifestContent, err := os.ReadFile(filepath.Join(workspacePath, ".agents", "manifest.json"))
+	if err != nil {
+		t.Fatalf("ReadFile manifest failed: %v", err)
+	}
+	var manifest agentsManifest
+	if err := json.Unmarshal(manifestContent, &manifest); err != nil {
+		t.Fatalf("Unmarshal manifest failed: %v", err)
+	}
+	if manifest.Workspace.Name != "alpha" || len(manifest.Workspace.Projects) != 1 || manifest.Workspace.Projects[0].Path != "api" {
+		t.Fatalf("manifest workspace = %#v", manifest.Workspace)
+	}
+	if !containsString(manifest.Skills.LookupOrder, ".agents/skills") || !containsString(manifest.Skills.LookupOrder, "api/.agents/skills") || !containsString(manifest.Skills.LookupOrder, "api/.codex/skills") {
+		t.Fatalf("manifest skill lookup = %#v", manifest.Skills.LookupOrder)
+	}
+	if _, err := os.Stat(filepath.Join(workspacePath, ".agents", "planning.md")); err != nil {
+		t.Fatalf("planning guide missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspacePath, ".agents", "skills")); err != nil {
+		t.Fatalf("workspace skills dir missing: %v", err)
+	}
 }
 
 func TestCopyDirCopiesNestedFilesAndRejectsNestedSymlink(t *testing.T) {
@@ -178,6 +257,15 @@ func TestCopyDirCopiesNestedFilesAndRejectsNestedSymlink(t *testing.T) {
 	if err := copyDir(badSource, filepath.Join(root, "bad-target")); err == nil {
 		t.Fatal("expected nested symlink copy to be rejected")
 	}
+}
+
+func containsString(values []string, expected string) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+	return false
 }
 
 type bootstrapRunner struct {

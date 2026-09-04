@@ -220,7 +220,7 @@ Built-in themes:
 | `solarized-dark` | Classic low-contrast terminal palette. |
 | `one-dark` | Atom-style dark palette with balanced accent colors. |
 
-Theme selection persists `DVV_THEME` in `~/.config/devv/config.env` and updates shared UI helpers, `fzf` colors, loader colors, prompts, status labels, and config previews from one theme registry.
+Theme selection persists `DVV_THEME` in `~/.config/devv/config.env` and updates shared UI helpers, `fzf` colors, loader colors, prompts, status labels, config previews, and the managed tmux theme block from one theme registry. The tmux status bar remains full-width and uses the theme status color as its background. Tmux reads the refreshed colors after `dvv setup` reloads `~/.tmux.conf`.
 
 ## Profiles Config
 
@@ -301,7 +301,13 @@ The `tmux.reset` section contains the tmux-level reset shortcut used inside runn
 
 `dvv tmux:reset-api` is the command behind this binding. Setup prefers the absolute built binary from `dist/dvv` so the shortcut does not depend on the tmux server's `PATH`. It finds a Laravel API pane in the current tmux window first, preferring pane `0`, then the active pane, then any pane with an `artisan` file. If the current window is not an API target, it falls back to the last target opened or manually selected through `dvv tmux`, then to a single detected Laravel API window when the shortcut is used elsewhere. Running the command manually opens a selector if several API windows are available. It runs cache/config reset commands, restarts `php artisan serve`, and restarts Horizon only when another pane points at the same API project. The Web pane is intentionally skipped.
 
-Shortcut changes are applied by running `dvv setup`; `dvv build` and `npm run build` do not edit shell or tmux files.
+The `tmux.theme` section controls the managed tmux theme block written by `dvv setup`:
+
+- `enabled`: writes or removes the managed tmux theme block. Defaults to `true`.
+- `followCliTheme`: uses the active `DVV_THEME` palette for tmux. Defaults to `true`.
+- `name`: explicit tmux theme used when `followCliTheme` is disabled.
+
+Theme and shortcut changes are applied by running `dvv setup`; `dvv build` and `npm run build` do not edit shell or tmux files.
 
 The `tmux.environments` list adds named API/Web targets to `dvv tmux`, useful when a project should have a managed tmux environment but is not part of a workspace. Each entry supports:
 
@@ -326,7 +332,7 @@ The `workspace` section contains these groups:
 - `interactive`: selector, opener, and configurable hub shortcuts.
 - `templateHub`: configurable shortcuts for creating, editing, and deleting workspace templates.
 - `bootstrap`: copy rules and conditional commands.
-- `workspaceHarness`: generated workspace `AGENTS.md` behavior.
+- `workspaceHarness`: generated workspace `AGENTS.md`, `.agents` manifest, focused guides, rules, and skill lookup paths.
 - `hooks`: commands for workspace and project lifecycle events.
 - `safety`: confirmations, dirty worktree blocking, force remove policy, direct-child-only deletion, and leftover deletion confirmation.
 
@@ -339,6 +345,30 @@ Workspace metadata is stored inside each workspace:
 Existing `workspace-*` directories are adopted when the hub opens if this metadata is missing. Adoption is additive only: it writes `.workspace/config.json` from detected worktrees and leaves all existing files in place.
 
 Workspace templates can be defined in `workspace.templates` or persisted through `DVV_WORKSPACE_TEMPLATES`. The workspace hub opens template management with `Shift+T`, and the template hub can create, edit, or delete templates with its own configurable shortcuts. During `Shift+N` workspace creation, the base selector also lists saved templates, so selecting a template reuses its project list and base branch rule.
+
+The `workspaceHarness` section controls the files generated for agents working inside a workspace:
+
+- `agentsFile`: controls the workspace-level `AGENTS.md`; `useCustom` reads `~/.config/devv/AGENTS.md` when present, otherwise dvv writes the generated default.
+- `agentsDir`: controls the workspace `.agents` directory, manifest, and default focused guides. `overwriteGuides` defaults to `false` so local guide edits are preserved.
+- `skillPaths`: workspace-level and user-level skill lookup paths. Relative paths are interpreted from the workspace root, and `~` paths are expanded. `<agentsDir>/skills` is created and searched first even when `agentsDir.path` is customized.
+- `projectSkillPaths`: skill lookup paths relative to each project worktree.
+- `rules`: short rules rendered into the generated Portuguese `AGENTS.md` and `.agents/manifest.json`.
+
+Workspace create/add flows synchronize the harness automatically. Existing workspaces can be synchronized from `dvv workspace` with `Shift+H`.
+
+Generated harness files:
+
+```text
+<workspace>/AGENTS.md
+<workspace>/.agents/manifest.json
+<workspace>/.agents/planning.md
+<workspace>/.agents/implementation.md
+<workspace>/.agents/testing.md
+<workspace>/.agents/code-review.md
+<workspace>/.agents/skills/
+```
+
+The generated `AGENTS.md` is written in Portuguese. It tells agents to read workspace metadata, search configured skill paths, prefer project-local rules, and ask concise questions when context or risk is unclear.
 
 Supported lifecycle hook events are `workspace.creating`, `workspace.created`, `workspace.opened`, `workspace.removing`, `workspace.removed`, `project.adding`, `project.added`, `project.bootstrap`, `project.removing`, and `project.removed`.
 
@@ -360,7 +390,7 @@ For letter keys, `shift+a` maps to the uppercase key `A` in fzf. That is how mos
 
 The shell integration writes `alt+letter` as an escaped zsh binding, such as `\ep` for `Alt+P`, `\ef` for `Alt+F`, and `\er` for the `Alt+R` reset fallback. It can also write `ctrl+shift+letter` as a CSI-u binding, but terminal applications may reserve those chords for their own UI. Windows Terminal reserves `Ctrl+Shift+F` for Find, so dvv avoids it by default.
 
-Tmux shortcut integration writes `alt+letter` as `M-letter`, such as `M-r` for `Alt+R`, in the managed `~/.tmux.conf` block.
+Tmux integration writes `alt+letter` as `M-letter`, such as `M-r` for `Alt+R`, and writes the managed theme block from the configured dvv theme palette.
 Set `DVV_SKIP_TMUX_INTEGRATION=1` before `dvv setup` to skip `.tmux.conf` changes.
 
 ## Local Runtime Data

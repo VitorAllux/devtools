@@ -25,8 +25,10 @@ const resetKey = shortcutToTmuxKey(
     "alt+r",
 );
 
-const begin = "# >>> dvv tmux shortcuts >>>";
-const end = "# <<< dvv tmux shortcuts <<<";
+const shortcutsBegin = "# >>> dvv tmux shortcuts >>>";
+const shortcutsEnd = "# <<< dvv tmux shortcuts <<<";
+const themeBegin = "# >>> dvv tmux theme >>>";
+const themeEnd = "# <<< dvv tmux theme <<<";
 
 let content = "";
 try {
@@ -34,33 +36,43 @@ try {
 } catch (error) {
   if (error.code !== "ENOENT") {
     if (process.env.DVV_VERBOSE_SETUP === "1") {
-      console.error(`dvv tmux shortcuts skipped: ${error.message}`);
+      console.error(`dvv tmux integration skipped: ${error.message}`);
     }
     process.exit(0);
   }
 }
 
-content = removeManagedBlock(content, begin, end);
+content = removeManagedBlock(content, shortcutsBegin, shortcutsEnd);
+content = removeManagedBlock(content, themeBegin, themeEnd);
 
-if (!resetKey) {
+const blocks = [];
+if (resetKey) {
+  blocks.push([
+    shortcutsBegin,
+    "# Managed by dvv. Edit dvv.config.json or set DVV_SKIP_TMUX_INTEGRATION=1 before setup.",
+    `unbind-key -n ${resetKey}`,
+    `bind-key -n ${resetKey} run-shell -b ${tmuxQuote(resetCommand(root))}`,
+    shortcutsEnd,
+  ].join("\n"));
+}
+
+const themeBlock = tmuxThemeBlock(root);
+if (themeBlock) {
+  blocks.push(themeBlock);
+}
+
+if (blocks.length === 0) {
   writeTmuxConf(tmuxConf, content.trimEnd() ? `${content.trimEnd()}\n` : "");
   sourceTmuxConf(tmuxConf);
-  console.error(`dvv tmux shortcuts disabled in ${tmuxConf}`);
+  console.error(`dvv tmux integration disabled in ${tmuxConf}`);
   process.exit(0);
 }
 
-const block = [
-  begin,
-  "# Managed by dvv. Edit dvv.config.json or set DVV_SKIP_TMUX_INTEGRATION=1 before setup.",
-  `unbind-key -n ${resetKey}`,
-  `bind-key -n ${resetKey} run-shell -b ${tmuxQuote(resetCommand(root))}`,
-  end,
-].join("\n");
-
-const next = `${content.trimEnd()}\n\n${block}\n`;
+const prefix = content.trimEnd();
+const next = `${prefix ? `${prefix}\n\n` : ""}${blocks.join("\n\n")}\n`;
 writeTmuxConf(tmuxConf, next);
 sourceTmuxConf(tmuxConf);
-console.error(`dvv tmux shortcuts installed in ${tmuxConf}`);
+console.error(`dvv tmux integration installed in ${tmuxConf}`);
 
 function readProjectConfig(file) {
   try {
@@ -134,6 +146,44 @@ function tmuxQuote(value) {
   return shellQuote(value);
 }
 
+function tmuxThemeBlock(root) {
+  if (process.env.DVV_SKIP_TMUX_THEME === "1") {
+    return "";
+  }
+  const env = {
+    ...process.env,
+    DVV_DIR: root,
+  };
+  if (!env.GOCACHE) {
+    env.GOCACHE = path.join(os.tmpdir(), "dvv-go-build-cache");
+  }
+
+  const binaryName = process.platform === "win32" ? "dvv.exe" : "dvv";
+  const binaryPath = path.join(root, "dist", binaryName);
+  let command = binaryPath;
+  let args = ["__tmux:theme-block"];
+  if (!fs.existsSync(binaryPath)) {
+    command = "go";
+    args = ["run", "-buildvcs=false", "./cmd/dvv", "__tmux:theme-block"];
+  }
+
+  const result = childProcess.spawnSync(command, args, {
+    cwd: root,
+    env,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: false,
+  });
+  if (result.error || (result.status ?? 1) !== 0) {
+    if (process.env.DVV_VERBOSE_SETUP === "1") {
+      const detail = result.error ? result.error.message : result.stderr || `exit ${result.status ?? 1}`;
+      console.error(`dvv tmux theme skipped: ${String(detail).trim()}`);
+    }
+    return "";
+  }
+  return String(result.stdout || "").trim();
+}
+
 function removeManagedBlock(content, begin, end) {
   const start = content.indexOf(begin);
   const finish = content.indexOf(end);
@@ -148,7 +198,7 @@ function writeTmuxConf(file, content) {
     fs.writeFileSync(file, content, "utf8");
   } catch (error) {
     if (process.env.DVV_VERBOSE_SETUP === "1") {
-      console.error(`dvv tmux shortcuts skipped: ${error.message}`);
+      console.error(`dvv tmux integration skipped: ${error.message}`);
     }
   }
 }

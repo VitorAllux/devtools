@@ -21,7 +21,7 @@ For workspace changes, also read `internal/workspace`, `internal/git`, `internal
 | Command | Main packages | Config area | Runtime files and systems | Primary tests and docs |
 | --- | --- | --- | --- | --- |
 | `dvv ssh` | `internal/ssh`, `internal/terminal`, `internal/secrets`, `internal/ui` | `ssh`, `shortcuts`, `theme`, `terminal` | SSH server list, AGE backup, Bitwarden restore, tmux sessions, terminal tabs | `internal/ssh`, `internal/terminal`, README, configuration, theme |
-| `dvv workspace` | `internal/workspace`, `internal/discovery`, `internal/git`, `internal/metadata`, `internal/hooks`, `internal/safety`, `internal/ui` | `workspace`, `shortcuts`, `theme` | `workspace-*` directories, git worktrees, `.workspace/config.json`, generated workspace `AGENTS.md` | `internal/workspace`, `internal/git`, `internal/metadata`, `internal/hooks`, `internal/safety`, architecture, configuration |
+| `dvv workspace` | `internal/workspace`, `internal/discovery`, `internal/git`, `internal/metadata`, `internal/hooks`, `internal/safety`, `internal/ui` | `workspace`, `shortcuts`, `theme` | `workspace-*` directories, git worktrees, `.workspace/config.json`, generated workspace `AGENTS.md`, `.agents/manifest.json`, agent guides | `internal/workspace`, `internal/git`, `internal/metadata`, `internal/hooks`, `internal/safety`, architecture, configuration |
 | `dvv tmux` | `internal/tmux`, `internal/terminal`, `internal/ui` | `tmux`, `shortcuts`, `terminal`, `theme` | tmux sessions, configured environment roots, custom API/Web targets, terminal tabs | `internal/tmux`, `internal/terminal`, operational map |
 | `dvv tmux:session` | `internal/tmux`, `internal/setup`, `internal/terminal` | `tmux`, `shortcuts`, `terminal` | `Alt+P` zsh binding, tmux sessions, directory picker roots | `internal/tmux`, `internal/setup`, completion checks |
 | `dvv tmux:home` | `internal/tmux`, `internal/setup`, `internal/terminal` | `tmux`, `shortcuts`, `terminal` | `Alt+F` zsh binding, configured home tmux session, terminal tabs | `internal/tmux`, `internal/setup`, completion checks |
@@ -58,8 +58,10 @@ Workspace generation is controlled by project config and metadata, not by shell 
 - Workspaces are named `workspace-<name>`.
 - Workspaces contain git worktrees for selected projects.
 - Generated workspace metadata lives in `.workspace/config.json`.
-- Generated workspace agent instructions are controlled by `workspaceHarness.agentsFile`.
-- Generated `AGENTS.md` files should explain the workspace composition, expected project order, bootstrap notes, and safe cleanup rules.
+- Generated workspace agent instructions are controlled by `workspaceHarness`.
+- Generated `AGENTS.md` files are written in Portuguese and should explain the workspace composition, expected project order, skill lookup paths, project-local rule precedence, clarification rules, and safe cleanup rules.
+- Generated `.agents/manifest.json` files should stay machine-readable and include workspace metadata, project paths, skill lookup order, focused guide paths, and shared rules.
+- `Shift+H` in the workspace hub synchronizes the harness for existing workspaces.
 - Generated docs must not include private hosts, database credentials, tokens, or local-only secrets.
 - Adoption of an existing workspace may write missing metadata only. It must not move, rename, clean, or remove files.
 - Deletion must preserve the safety posture: direct children only, dirty worktree checks, symlink protection, and separate confirmation for leftover content.

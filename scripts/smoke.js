@@ -29,6 +29,7 @@ const env = {
   DVV_DIR: root,
   DVV_NO_LOADER: "1",
   DVV_SKIP_TMUX_SOURCE: "1",
+  DVV_THEME: "tokyo-night",
   DVV_ZSH_COMPLETION_DIR: completionDir,
   DVV_WORKSPACES_DIR: workspaceRoot,
   DVV_DUMPS_DIR: dumpsDir,
@@ -78,6 +79,11 @@ assertIncludes(tmuxConf, "bind-key -n M-r", "managed Alt+R tmux sequence");
 assertIncludes(tmuxConf, "--fallback-global", "managed Alt+R global fallback");
 assertIncludes(tmuxConf, "tmux display-message", "managed Alt+R failure feedback");
 assertIncludes(tmuxConf, "tmux-reset.log", "managed Alt+R silent log");
+assertIncludes(tmuxConf, "# >>> dvv tmux theme >>>", "managed tmux theme block");
+assertIncludes(tmuxConf, "Theme: tokyo-night", "managed tmux theme follows CLI theme");
+assertIncludes(tmuxConf, "status-style \"bg=#e0af68,fg=#1a1b26\"", "managed Tokyo Night visible status bar");
+assertIncludes(tmuxConf, "window-status-current-style \"bg=#bb9af7,fg=#ffffff,bold\"", "managed Tokyo Night active tmux window style");
+assertIncludes(tmuxConf, "pane-active-border-style \"fg=#bb9af7\"", "managed Tokyo Night active pane border");
 
 const completion = readFile(path.join(root, "completions", "_dvv"));
 assertIncludes(completion, "DVV_COMPLETE_COMPAT", "compatibility completion gate");

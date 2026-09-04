@@ -139,6 +139,7 @@ type SecretsHubShortcuts struct {
 
 type TmuxConfig struct {
 	Hub          TmuxHubConfig           `json:"hub"`
+	Theme        TmuxThemeConfig         `json:"theme"`
 	Session      TmuxSessionConfig       `json:"session"`
 	Home         TmuxHomeConfig          `json:"home"`
 	Reset        TmuxResetConfig         `json:"reset"`
@@ -155,6 +156,12 @@ type TmuxHubShortcuts struct {
 	RestartAPI string `json:"restartApi"`
 	RestartWeb string `json:"restartWeb"`
 	Create     string `json:"create"`
+}
+
+type TmuxThemeConfig struct {
+	Enabled        *bool  `json:"enabled,omitempty"`
+	FollowCLITheme *bool  `json:"followCliTheme,omitempty"`
+	Name           string `json:"name"`
 }
 
 type TmuxSessionConfig struct {
@@ -232,6 +239,7 @@ type WorkspaceHubShortcutConfig struct {
 	Manage   string `json:"manage"`
 	Delete   string `json:"delete"`
 	Template string `json:"template"`
+	Harness  string `json:"harness"`
 }
 
 type WorkspaceTemplateHub struct {
@@ -252,7 +260,11 @@ type WorkspaceBootstrap struct {
 }
 
 type WorkspaceHarnessConfig struct {
-	AgentsFile AgentsFileConfig `json:"agentsFile"`
+	AgentsFile        AgentsFileConfig     `json:"agentsFile"`
+	AgentsDir         AgentsDirConfig      `json:"agentsDir"`
+	SkillPaths        []string             `json:"skillPaths"`
+	ProjectSkillPaths []string             `json:"projectSkillPaths"`
+	Rules             []WorkspaceAgentRule `json:"rules"`
 }
 
 type AgentsFileConfig struct {
@@ -260,6 +272,17 @@ type AgentsFileConfig struct {
 	UseCustom bool   `json:"useCustom"`
 	Path      string `json:"path"`
 	Overwrite bool   `json:"overwrite"`
+}
+
+type AgentsDirConfig struct {
+	Enabled         bool   `json:"enabled"`
+	Path            string `json:"path"`
+	OverwriteGuides bool   `json:"overwriteGuides"`
+}
+
+type WorkspaceAgentRule struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 type WorkspaceCopyRule struct {
@@ -560,6 +583,11 @@ func defaultTmuxConfig() TmuxConfig {
 				Create:     "shift+n",
 			},
 		},
+		Theme: TmuxThemeConfig{
+			Enabled:        boolPtr(true),
+			FollowCLITheme: boolPtr(true),
+			Name:           "royal-noir",
+		},
 		Session: TmuxSessionConfig{
 			SearchRoots: []string{
 				"~/workspace",
@@ -580,6 +608,13 @@ func defaultTmuxConfig() TmuxConfig {
 			Shortcut: "alt+r",
 		},
 	}
+}
+
+func BoolValue(value *bool, fallback bool) bool {
+	if value == nil {
+		return fallback
+	}
+	return *value
 }
 
 func defaultWorkspaceConfig() WorkspaceConfig {
@@ -614,6 +649,7 @@ func defaultWorkspaceConfig() WorkspaceConfig {
 				Manage:   "shift+m",
 				Delete:   "shift+d",
 				Template: "shift+t",
+				Harness:  "shift+h",
 			},
 		},
 		TemplateHub: WorkspaceTemplateHub{
@@ -645,6 +681,31 @@ func defaultWorkspaceConfig() WorkspaceConfig {
 				UseCustom: true,
 				Path:      "AGENTS.md",
 				Overwrite: false,
+			},
+			AgentsDir: AgentsDirConfig{
+				Enabled:         true,
+				Path:            ".agents",
+				OverwriteGuides: false,
+			},
+			SkillPaths: []string{
+				".agents/skills",
+				".codex/skills",
+				".claude/skills",
+				"~/.codex/skills",
+				"~/.agents/skills",
+				"~/.claude/skills",
+			},
+			ProjectSkillPaths: []string{
+				".agents/skills",
+				".codex/skills",
+				".claude/skills",
+			},
+			Rules: []WorkspaceAgentRule{
+				{Name: "workspace-source", Description: "Use .workspace/config.json como fonte de verdade para projetos, paths e branches do workspace."},
+				{Name: "question-when-unclear", Description: "Pergunte de forma objetiva quando tarefa, projeto alvo, branch ou risco estiver ambíguo."},
+				{Name: "project-boundaries", Description: "Trate cada filho direto como um git worktree e deixe regras locais do projeto prevalecerem."},
+				{Name: "skill-lookup", Description: "Procure skills do workspace primeiro, depois skills dos projetos e por fim skills globais do usuário."},
+				{Name: "destructive-safety", Description: "Inspecione git status antes de edições destrutivas, troca de branch, limpeza ou remoção."},
 			},
 		},
 		Hooks: map[string][]HookConfig{},
@@ -731,6 +792,19 @@ func mergeSystemConfigDefaults(target SystemConfig, defaults SystemConfig) Syste
 	}
 	if strings.TrimSpace(target.ConfigHub.Shortcuts.Secrets) == "" {
 		target.ConfigHub.Shortcuts.Secrets = defaults.ConfigHub.Shortcuts.Secrets
+	}
+	return target
+}
+
+func mergeTmuxThemeConfigDefaults(target TmuxThemeConfig, defaults TmuxThemeConfig) TmuxThemeConfig {
+	if target.Enabled == nil {
+		target.Enabled = defaults.Enabled
+	}
+	if target.FollowCLITheme == nil {
+		target.FollowCLITheme = defaults.FollowCLITheme
+	}
+	if strings.TrimSpace(target.Name) == "" {
+		target.Name = defaults.Name
 	}
 	return target
 }
@@ -944,6 +1018,7 @@ func resolveSecretsConfig(cfg SecretsConfig) SecretsConfig {
 }
 
 func mergeTmuxConfigDefaults(target TmuxConfig, defaults TmuxConfig) TmuxConfig {
+	target.Theme = mergeTmuxThemeConfigDefaults(target.Theme, defaults.Theme)
 	if strings.TrimSpace(target.Hub.Shortcuts.Start) == "" {
 		target.Hub.Shortcuts.Start = defaults.Hub.Shortcuts.Start
 	}
@@ -1028,6 +1103,9 @@ func mergeWorkspaceConfigDefaults(target WorkspaceConfig, defaults WorkspaceConf
 	if strings.TrimSpace(target.Interactive.Shortcuts.Template) == "" {
 		target.Interactive.Shortcuts.Template = defaults.Interactive.Shortcuts.Template
 	}
+	if strings.TrimSpace(target.Interactive.Shortcuts.Harness) == "" {
+		target.Interactive.Shortcuts.Harness = defaults.Interactive.Shortcuts.Harness
+	}
 	if strings.TrimSpace(target.TemplateHub.Shortcuts.Create) == "" {
 		target.TemplateHub.Shortcuts.Create = defaults.TemplateHub.Shortcuts.Create
 	}
@@ -1046,6 +1124,18 @@ func mergeWorkspaceConfigDefaults(target WorkspaceConfig, defaults WorkspaceConf
 	if strings.TrimSpace(target.WorkspaceHarness.AgentsFile.Path) == "" {
 		target.WorkspaceHarness.AgentsFile.Path = defaults.WorkspaceHarness.AgentsFile.Path
 	}
+	if strings.TrimSpace(target.WorkspaceHarness.AgentsDir.Path) == "" {
+		target.WorkspaceHarness.AgentsDir.Path = defaults.WorkspaceHarness.AgentsDir.Path
+	}
+	if target.WorkspaceHarness.SkillPaths == nil {
+		target.WorkspaceHarness.SkillPaths = defaults.WorkspaceHarness.SkillPaths
+	}
+	if target.WorkspaceHarness.ProjectSkillPaths == nil {
+		target.WorkspaceHarness.ProjectSkillPaths = defaults.WorkspaceHarness.ProjectSkillPaths
+	}
+	if target.WorkspaceHarness.Rules == nil {
+		target.WorkspaceHarness.Rules = defaults.WorkspaceHarness.Rules
+	}
 	if target.Hooks == nil {
 		target.Hooks = map[string][]HookConfig{}
 	}
@@ -1053,6 +1143,16 @@ func mergeWorkspaceConfigDefaults(target WorkspaceConfig, defaults WorkspaceConf
 }
 
 func resolveTmuxConfig(cfg TmuxConfig) TmuxConfig {
+	if enabled, ok := firstBoolEnv("DVV_TMUX_THEME_ENABLED"); ok {
+		cfg.Theme.Enabled = boolPtr(enabled)
+	}
+	if follow, ok := firstBoolEnv("DVV_TMUX_THEME_FOLLOW_CLI"); ok {
+		cfg.Theme.FollowCLITheme = boolPtr(follow)
+	}
+	if name := firstSetEnv("DVV_TMUX_THEME_NAME"); name != "" {
+		cfg.Theme.Name = name
+	}
+	cfg.Theme.Name = strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(cfg.Theme.Name), "_", "-"), " ", "-"))
 	if shortcut := firstSetEnv("DVV_TMUX_HUB_START_SHORTCUT"); shortcut != "" {
 		cfg.Hub.Shortcuts.Start = shortcut
 	}
@@ -1117,6 +1217,10 @@ func resolveTmuxConfig(cfg TmuxConfig) TmuxConfig {
 	}
 	cfg.Environments = uniqueTmuxEnvironments(cfg.Environments)
 	return cfg
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }
 
 func parseTmuxEnvironments(value string) []TmuxEnvironmentConfig {
@@ -1206,6 +1310,9 @@ func resolveWorkspaceConfig(cfg WorkspaceConfig) WorkspaceConfig {
 	if shortcut := firstSetEnv("DVV_WORKSPACE_TEMPLATE_SHORTCUT"); shortcut != "" {
 		cfg.Interactive.Shortcuts.Template = shortcut
 	}
+	if shortcut := firstSetEnv("DVV_WORKSPACE_HARNESS_SHORTCUT"); shortcut != "" {
+		cfg.Interactive.Shortcuts.Harness = shortcut
+	}
 	if shortcut := firstSetEnv("DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT"); shortcut != "" {
 		cfg.TemplateHub.Shortcuts.Create = shortcut
 	}
@@ -1214,6 +1321,15 @@ func resolveWorkspaceConfig(cfg WorkspaceConfig) WorkspaceConfig {
 	}
 	if shortcut := firstSetEnv("DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT"); shortcut != "" {
 		cfg.TemplateHub.Shortcuts.Delete = shortcut
+	}
+	if path := firstSetEnv("DVV_WORKSPACE_HARNESS_AGENTS_DIR"); path != "" {
+		cfg.WorkspaceHarness.AgentsDir.Path = path
+	}
+	if paths := firstSetEnv("DVV_WORKSPACE_HARNESS_SKILL_PATHS"); paths != "" {
+		cfg.WorkspaceHarness.SkillPaths = normalizeHarnessPaths(splitPathList(paths))
+	}
+	if paths := firstSetEnv("DVV_WORKSPACE_HARNESS_PROJECT_SKILL_PATHS"); paths != "" {
+		cfg.WorkspaceHarness.ProjectSkillPaths = normalizeHarnessPaths(splitPathList(paths))
 	}
 	if value, ok := firstBoolEnv("DVV_WORKSPACE_REQUIRE_CONFIRMATION"); ok {
 		cfg.Safety.RequireConfirmation = value
@@ -1230,7 +1346,31 @@ func resolveWorkspaceConfig(cfg WorkspaceConfig) WorkspaceConfig {
 	if value, ok := firstBoolEnv("DVV_WORKSPACE_CONFIRM_LEFTOVER_DELETION"); ok {
 		cfg.Safety.ConfirmLeftoverDeletion = value
 	}
+	cfg.WorkspaceHarness.SkillPaths = normalizeHarnessPaths(cfg.WorkspaceHarness.SkillPaths)
+	cfg.WorkspaceHarness.ProjectSkillPaths = normalizeHarnessPaths(cfg.WorkspaceHarness.ProjectSkillPaths)
 	return cfg
+}
+
+func normalizeHarnessPaths(paths []string) []string {
+	out := make([]string, 0, len(paths))
+	seen := map[string]bool{}
+	for _, path := range paths {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
+		}
+		if strings.HasPrefix(path, "~") || strings.Contains(path, "$") || filepath.IsAbs(path) {
+			path = ExpandPath(path)
+		} else {
+			path = filepath.ToSlash(filepath.Clean(path))
+		}
+		if path == "." || seen[path] {
+			continue
+		}
+		seen[path] = true
+		out = append(out, path)
+	}
+	return out
 }
 
 func parseWorkspaceTemplates(value string) []WorkspaceTemplate {

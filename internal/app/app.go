@@ -34,6 +34,13 @@ func Run(args []string) int {
 	ui.SetTheme(cfg.Project.Theme.Name)
 
 	runner := run.ExecRunner{}
+	if len(args) > 0 && args[0] == "__tmux:theme-block" {
+		block := setupcmd.TmuxThemeBlock(cfg)
+		if block != "" {
+			fmt.Println(block)
+		}
+		return 0
+	}
 	if len(args) == 0 {
 		if shouldOpenMainHub(runner) {
 			if err := runMainHub(ctx, cfg, runner); err != nil {
@@ -271,7 +278,7 @@ func showHelp(cfg *config.Config) {
 	helpSection("System")
 	helpEntry("build", "*", "Rebuild the local dvv binary")
 	helpEntry("check", "*", "Run build, tests, vet, and smoke from the project root")
-	helpEntry("setup", "*", "Install zsh completion, shell shortcuts, and tmux shortcuts")
+	helpEntry("setup", "*", "Install zsh completion, shell shortcuts, and tmux integration")
 	helpEntry("bootstrap", "*", "Restore AGE/Bitwarden secrets and SSH backup")
 	helpEntry("secrets", ">", "Open the local secrets hub")
 	helpEntry("doctor", "?", "Check local dependencies and integration")

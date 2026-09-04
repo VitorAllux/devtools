@@ -911,6 +911,14 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.Tmux.Home.Shortcut = value
 	case "DVV_TMUX_RESET_SHORTCUT":
 		m.Config.Project.Tmux.Reset.Shortcut = value
+	case "DVV_TMUX_THEME_ENABLED":
+		m.Config.Project.Tmux.Theme.Enabled = runtimeBoolPtr(value)
+	case "DVV_TMUX_THEME_FOLLOW_CLI":
+		m.Config.Project.Tmux.Theme.FollowCLITheme = runtimeBoolPtr(value)
+	case "DVV_TMUX_THEME_NAME":
+		if theme, ok := ui.ThemeByName(value); ok {
+			m.Config.Project.Tmux.Theme.Name = theme.Name
+		}
 	case "DVV_TMUX_HUB_START_SHORTCUT":
 		m.Config.Project.Tmux.Hub.Shortcuts.Start = value
 	case "DVV_TMUX_HUB_STOP_SHORTCUT":
@@ -941,6 +949,8 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.Workspace.Interactive.Shortcuts.Delete = value
 	case "DVV_WORKSPACE_TEMPLATE_SHORTCUT":
 		m.Config.Project.Workspace.Interactive.Shortcuts.Template = value
+	case "DVV_WORKSPACE_HARNESS_SHORTCUT":
+		m.Config.Project.Workspace.Interactive.Shortcuts.Harness = value
 	case "DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT":
 		m.Config.Project.Workspace.TemplateHub.Shortcuts.Create = value
 	case "DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT":
@@ -949,6 +959,12 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.Workspace.TemplateHub.Shortcuts.Delete = value
 	case "DVV_WORKSPACE_TEMPLATES":
 		m.Config.Project.Workspace.Templates = parseRuntimeWorkspaceTemplates(value)
+	case "DVV_WORKSPACE_HARNESS_AGENTS_DIR":
+		m.Config.Project.Workspace.WorkspaceHarness.AgentsDir.Path = value
+	case "DVV_WORKSPACE_HARNESS_SKILL_PATHS":
+		m.Config.Project.Workspace.WorkspaceHarness.SkillPaths = expandedPathList(value)
+	case "DVV_WORKSPACE_HARNESS_PROJECT_SKILL_PATHS":
+		m.Config.Project.Workspace.WorkspaceHarness.ProjectSkillPaths = splitPathList(value)
 	case "DVV_DB_HOST":
 		m.Config.Project.DB.Host = value
 	case "DVV_DB_PORT":
@@ -1223,6 +1239,9 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Tmux", "DVV_TMUX_SESSION_SEARCH_DEPTH", "Limits directory picker search depth.", "number", fmt.Sprintf("%d", cfg.Project.Tmux.Session.SearchDepth), "", false},
 		{"Tmux", "DVV_TMUX_HOME_DIR", "Sets the directory opened by the direct home tmux shortcut.", "path", cfg.Project.Tmux.Home.Directory, "", false},
 		{"Tmux", "DVV_TMUX_HOME_SESSION_NAME", "Sets the tmux session name used by the direct home shortcut.", "text", cfg.Project.Tmux.Home.SessionName, "", false},
+		{"Tmux", "DVV_TMUX_THEME_ENABLED", "Controls whether setup writes the managed tmux theme block.", "bool", boolValue(config.BoolValue(cfg.Project.Tmux.Theme.Enabled, true)), "", false},
+		{"Tmux", "DVV_TMUX_THEME_FOLLOW_CLI", "Makes tmux use the active CLI theme selected by DVV_THEME.", "bool", boolValue(config.BoolValue(cfg.Project.Tmux.Theme.FollowCLITheme, true)), "", false},
+		{"Tmux", "DVV_TMUX_THEME_NAME", "Selects the tmux theme when follow CLI theme is disabled.", "theme", cfg.Project.Tmux.Theme.Name, "", false},
 		{"Tmux", "DVV_TMUX_ENVIRONMENTS", "Stores custom API/Web tmux environments as JSON.", "json", tmuxEnvironmentsJSON(cfg.Project.Tmux.Environments), "", false},
 		{"Shortcuts", "DVV_TMUX_SESSION_SHORTCUT", "Sets the zsh shortcut for the tmux directory picker.", "shortcut", cfg.Project.Tmux.Session.Shortcut, "", false},
 		{"Shortcuts", "DVV_TMUX_HOME_SHORTCUT", "Sets the zsh shortcut for opening a home tmux tab.", "shortcut", cfg.Project.Tmux.Home.Shortcut, "", false},
@@ -1247,6 +1266,7 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Shortcuts", "DVV_WORKSPACE_MANAGE_SHORTCUT", "Sets the workspace hub shortcut for managing projects.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Manage, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_DELETE_SHORTCUT", "Sets the workspace hub shortcut for deleting workspaces.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Delete, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "Sets the workspace hub shortcut for opening template management.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Template, "", false},
+		{"Shortcuts", "DVV_WORKSPACE_HARNESS_SHORTCUT", "Sets the workspace hub shortcut for syncing agent harness files.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Harness, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT", "Sets the template hub shortcut for creating templates.", "shortcut", cfg.Project.Workspace.TemplateHub.Shortcuts.Create, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT", "Sets the template hub shortcut for editing templates.", "shortcut", cfg.Project.Workspace.TemplateHub.Shortcuts.Edit, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT", "Sets the template hub shortcut for deleting templates.", "shortcut", cfg.Project.Workspace.TemplateHub.Shortcuts.Delete, "", false},
@@ -1255,6 +1275,9 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Workspace", "DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "Limits repository discovery depth.", "number", fmt.Sprintf("%d", cfg.Project.Workspace.ProjectSearchDepth), "", false},
 		{"Workspace", "DVV_WORKSPACE_OPENER", "Sets how a selected workspace opens.", "choice", defaultString(cfg.Project.Workspace.Interactive.Opener, "auto"), "", false},
 		{"Workspace", "DVV_WORKSPACE_TEMPLATES", "Stores saved workspace templates with base branch and project list.", "json", workspaceTemplatesJSON(cfg.Project.Workspace.Templates), "", false},
+		{"Workspace", "DVV_WORKSPACE_HARNESS_AGENTS_DIR", "Sets where workspace agent guides and manifest are written.", "path", cfg.Project.Workspace.WorkspaceHarness.AgentsDir.Path, "", false},
+		{"Workspace", "DVV_WORKSPACE_HARNESS_SKILL_PATHS", "Sets workspace and user skill lookup paths for agents.", "path-list", strings.Join(cfg.Project.Workspace.WorkspaceHarness.SkillPaths, string(os.PathListSeparator)), "", false},
+		{"Workspace", "DVV_WORKSPACE_HARNESS_PROJECT_SKILL_PATHS", "Sets per-project skill lookup paths relative to each worktree.", "path-list", strings.Join(cfg.Project.Workspace.WorkspaceHarness.ProjectSkillPaths, string(os.PathListSeparator)), "", false},
 		{"Database", "DVV_DB_HOST", "Sets the MySQL host; empty uses client defaults.", "text", cfg.Project.DB.Host, "", false},
 		{"Database", "DVV_DB_PORT", "Sets the MySQL TCP port when a host is set.", "number", cfg.Project.DB.Port, "", false},
 		{"Database", "DVV_DB_USER", "Sets the MySQL user for database actions.", "text", cfg.Project.DB.User, "", false},
@@ -1555,6 +1578,11 @@ func boolValue(value bool) string {
 		return "1"
 	}
 	return "0"
+}
+
+func runtimeBoolPtr(value string) *bool {
+	enabled := value == "1" || strings.EqualFold(value, "true") || strings.EqualFold(value, "yes") || strings.EqualFold(value, "on")
+	return &enabled
 }
 
 func showHelp() {

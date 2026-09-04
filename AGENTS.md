@@ -17,6 +17,7 @@ These rules document the local conventions for future agents and maintainers wor
 - Prefer explicit `dvv ...` commands. Personal shell shortcuts belong in the user's own shell config.
 - Project-managed zsh shortcuts use `Alt+letter`: `Alt+G` for `dvv`, `Alt+W` for `dvv workspace`, `Alt+T` for `dvv tmux`, `Alt+P` for `dvv tmux:session`, `Alt+F` for `dvv tmux:home`, `Alt+S` for `dvv ssh`, and `Alt+R` as a `dvv tmux:reset-api` fallback.
 - Project-managed tmux shortcut is `Alt+R` for `dvv tmux:reset-api` with safe global fallback.
+- Project-managed tmux theme follows the active CLI theme by default and is refreshed by `dvv setup`.
 
 ## Help And Command Lists
 
@@ -25,7 +26,7 @@ These rules document the local conventions for future agents and maintainers wor
 - `dvv check` is the developer-facing validation command and must run the full suite from the project root, regardless of the current working directory.
 - `npm run build` should only rebuild project artifacts inside the repository.
 - `npm run check` is a repo-local script; prefer `dvv check` in user-facing workflow docs.
-- `dvv setup` is the explicit command for shell and tmux integration. It may update zsh completion, managed shell shortcuts, and managed tmux shortcuts.
+- `dvv setup` is the explicit command for shell and tmux integration. It may update zsh completion, managed shell shortcuts, tmux reset shortcuts, and the managed tmux theme block.
 - `dvv doctor` checks local dependencies and integration state without changing files.
 - Use shared help helpers so command names and descriptions stay aligned.
 - Keep command descriptions in this shape:
@@ -59,6 +60,7 @@ Enter  open configured opener or choose from available openers
 Tab    multi-select or mark changes
 Shift+N  create workspace
 Shift+M  manage workspace projects
+Shift+H  sync workspace agent harness
 Shift+D  delete workspace
 Esc    cancel/exit
 ```
@@ -106,6 +108,11 @@ dvv workspace
 - When no workspace opener is configured, `Enter` should list openers detected on the system and let the user choose.
 - Supported opener values are `cursor`, `code`, `vscode`, `opencode`, `codex`, and `shell`.
 - Workspace templates are managed from the template hub opened by the configured template shortcut and reused from the workspace creation base/template selector.
+- Workspace create/add flows should synchronize the configured agent harness: `AGENTS.md`, `.agents/manifest.json`, focused guide files, and skill lookup directories.
+- The workspace hub `Shift+H` action synchronizes the selected workspace harness for existing workspaces.
+- The harness must always create `<agentsDir>/skills` and place it first in the generated skill lookup order.
+- Generated workspace `AGENTS.md` files are written in Portuguese and should tell agents to read workspace metadata, search configured skills before inventing a workflow, prefer project-local rules, and ask concise questions when context or risk is unclear.
+- Do not overwrite edited `.agents` guide files unless `workspaceHarness.agentsDir.overwriteGuides` is explicitly enabled.
 
 ## Worktree Workspace Rules
 

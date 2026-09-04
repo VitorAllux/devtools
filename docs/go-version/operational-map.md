@@ -23,7 +23,7 @@ This document maps the operational details that are easy to forget while using o
 | Versioned launcher | `bin/dvv` is committed as the source-checkout launcher and rebuild helper. | Keep it small and source-controlled. |
 | Compiled binary | `dist/dvv` is a build artifact. | Do not commit it. |
 | Shell integration | `dvv setup` installs completion and managed zsh shortcuts. | Run only when setup, completion, or shortcut behavior changes. |
-| Tmux integration | `dvv setup` installs the managed tmux reset shortcut in `~/.tmux.conf` and tries to reload it in running tmux servers. | Use `tmux.reset.shortcut` or `DVV_TMUX_RESET_SHORTCUT` to change it. |
+| Tmux integration | `dvv setup` installs the managed tmux reset shortcut and theme block in `~/.tmux.conf`, then tries to reload running tmux servers. | Use `tmux.reset.shortcut`, `tmux.theme`, or the matching `DVV_TMUX_*` keys to change it. |
 | Doctor fix | `dvv doctor --fix` creates safe runtime files, rebuilds, and reinstalls managed shell/tmux integration. | Use after a checkout move or broken local setup. |
 | Legacy shortcut cleanup | `dvv setup` removes old one-line `devv`/`dvv` shortcut bindings before writing the managed block. | Use the managed block instead of scattered shell lines. |
 
@@ -71,8 +71,10 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | Workspace targets | Workspace metadata adds one tmux target per `workspace-*` directory. | Use workspace paths when a task is worktree-based. |
 | Custom targets | `tmux.environments` or `DVV_TMUX_ENVIRONMENTS` adds named API/Web targets. | Use `Shift+N` in `dvv tmux` to pick API/Web projects from workspace discovery and save a reusable target. |
 | Workspace templates | `workspace.templates` or `DVV_WORKSPACE_TEMPLATES` adds reusable creation presets. | Use `Shift+T` in `dvv workspace` to save project/base selections and `Shift+N` to reuse them. |
+| Workspace agent harness | `workspaceHarness` writes `AGENTS.md`, `.agents/manifest.json`, focused guides, and skill lookup paths into each workspace. | Create/add flows sync it automatically; use `Shift+H` in `dvv workspace` for existing workspaces. |
 | Target validation | API dir must contain `artisan`; Web dir must contain `package.json`. | Keep invalid targets visible as missing/invalid, but block start actions. |
-| Tmux truecolor | Sessions created by `dvv` set `default-terminal=tmux-256color`, `COLORTERM=truecolor`, `terminal-features=*:RGB`, and `terminal-overrides=*:Tc`. | Keep color options runtime-applied; `.tmux.conf` is only managed for the explicit shortcut block. |
+| Tmux theme | `dvv setup` writes status, window, pane border, message, and copy-mode colors from the active CLI theme by default. The status bar stays full-width and uses the theme status color as its background. | Change `DVV_THEME`, then run `dvv setup`; set `DVV_TMUX_THEME_FOLLOW_CLI=0` to use a separate tmux theme. |
+| Tmux truecolor | Sessions created by `dvv` set `default-terminal=tmux-256color`, `COLORTERM=truecolor`, `terminal-features=*:RGB`, and `terminal-overrides=*:Tc`. | Keep color options runtime-applied; `.tmux.conf` is managed only for explicit integration blocks. |
 | API reset shortcut | `Alt+R` runs `dvv tmux:reset-api` against the current tmux window, the last target opened or selected by `dvv tmux`, then a single detected Laravel API window. | Reset API/Horizon only; do not send commands to Web panes, and refuse multiple API candidates without a cached target. Manual runs may select a target. |
 | Reset target cache | Last opened reset target is stored in `~/.cache/devv/tmux-reset-target.json`. | Treat it as runtime state, not project config. |
 

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/VitorAllux/devtools/internal/bootstrap"
 	"github.com/VitorAllux/devtools/internal/config"
 	"github.com/VitorAllux/devtools/internal/discovery"
 	"github.com/VitorAllux/devtools/internal/ui"
@@ -169,6 +170,15 @@ func (m *Manager) fzfHub(ctx context.Context, details []Details, hubError string
 			return true, err.Error(), nil
 		}
 		return true, "", nil
+	case keys.Harness.FZFKey:
+		ws, ok, err := m.singleSelectedWorkspace(selectedPaths)
+		if err != nil || !ok {
+			return true, messageFromError(err, "Select one workspace to sync agent harness"), nil
+		}
+		if err := m.syncHarnessInteractive(ctx, []string{ws.Path}); err != nil {
+			return true, err.Error(), nil
+		}
+		return true, "", nil
 	case keys.Delete.FZFKey:
 		if len(selectedPaths) == 0 {
 			return true, "Select at least one workspace to delete", nil
@@ -199,7 +209,7 @@ func (m *Manager) basicHub(ctx context.Context, details []Details, hubError stri
 	}
 	printWorkspaceList(details)
 	fmt.Println()
-	fmt.Printf("Commands: number opens | %s creates | %s templates | %s number manages | %s number deletes | q exits\n", keys.Create.Label, keys.Template.Label, keys.Manage.Label, keys.Delete.Label)
+	fmt.Printf("Commands: number opens | %s creates | %s templates | %s number manages | %s number syncs selected workspace harness | %s number deletes | q exits\n", keys.Create.Label, keys.Template.Label, keys.Manage.Label, keys.Harness.Label, keys.Delete.Label)
 	value, err := ui.Prompt("Workspace")
 	if err != nil {
 		return false, "", err
@@ -232,6 +242,16 @@ func (m *Manager) basicHub(ctx context.Context, details []Details, hubError stri
 			return true, "Invalid workspace selection: " + fields[1], nil
 		}
 		if err := m.manageInteractive(ctx, details[index].Workspace); err != nil {
+			return true, err.Error(), nil
+		}
+		return true, "", nil
+	}
+	if len(fields) == 2 && matchesShortcut(fields[0], keys.Harness.FZFKey) {
+		index, ok := parseSelectionIndex(fields[1], len(details))
+		if !ok {
+			return true, "Invalid workspace selection: " + fields[1], nil
+		}
+		if err := m.syncHarnessInteractive(ctx, []string{details[index].Workspace.Path}); err != nil {
 			return true, err.Error(), nil
 		}
 		return true, "", nil
@@ -328,6 +348,29 @@ func (m *Manager) createInteractive(ctx context.Context) (Workspace, error) {
 		return Workspace{}, createErr
 	}
 	return Workspace{Name: plan.WorkspaceName, DirName: plan.WorkspaceDir, Path: plan.WorkspacePath}, nil
+}
+
+func (m *Manager) syncHarnessInteractive(ctx context.Context, paths []string) error {
+	for _, path := range paths {
+		ws, err := m.Resolve(path)
+		if err != nil {
+			return err
+		}
+		var result bootstrap.HarnessResult
+		if err := ui.RunWithRoyalLoader(workspaceLoaderOptions("syncing", "agent harness", ws.DirName, "synced", true), func() error {
+			var syncErr error
+			result, syncErr = bootstrap.WriteWorkspaceHarness(*m.Config, ws.Path)
+			return syncErr
+		}); err != nil {
+			return err
+		}
+		if result.AgentsFileWritten || result.ManifestWritten || len(result.GuideFilesWritten) > 0 {
+			ui.OK("Synced agent harness %s", ws.DirName)
+		} else {
+			ui.Info("Agent harness unchanged %s", ws.DirName)
+		}
+	}
+	return nil
 }
 
 func (m *Manager) manageInteractive(ctx context.Context, ws Workspace) error {
@@ -844,6 +887,7 @@ func workspaceHubShortcuts(keys config.WorkspaceHubKeyBindings) []ui.FZFShortcut
 		{Key: keys.Create.FZFKey, Label: keys.Create.Label, Description: "create workspace"},
 		{Key: keys.Template.FZFKey, Label: keys.Template.Label, Description: "manage templates"},
 		{Key: keys.Manage.FZFKey, Label: keys.Manage.Label, Description: "manage projects"},
+		{Key: keys.Harness.FZFKey, Label: keys.Harness.Label, Description: "sync selected workspace harness"},
 		{Key: keys.Delete.FZFKey, Label: keys.Delete.Label, Description: "delete selected"},
 		{Label: "Esc", Description: "exit hub"},
 	}

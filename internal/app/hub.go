@@ -103,7 +103,7 @@ func mainHubItems(cfg *config.Config) []mainHubItem {
 		{"secrets", "Secrets", "hub", "", "Prepare AGE keys and sync encrypted SSH backup files."},
 		{"config", "System", "hub", "", "Change themes, profiles, paths, shortcuts, safety, and integrations."},
 		{"doctor", "System", "check", "", "Check local dependencies, runtime files, and shell/tmux integration."},
-		{"setup", "System", "install", "", "Install zsh completion, shell shortcuts, and tmux shortcuts."},
+		{"setup", "System", "install", "", "Install zsh completion, shell shortcuts, and tmux integration."},
 		{"build", "System", "build", "", "Rebuild the local dvv binary from any working directory."},
 		{"check", "System", "test", "", "Run build, tests, go vet, and smoke validation."},
 		{"help", "System", "text", "", "Show the command-oriented help screen."},

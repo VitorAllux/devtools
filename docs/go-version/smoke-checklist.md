@@ -17,7 +17,7 @@ dvv check
 | Build | `scripts/build.js` and `dvv build` from a non-repository directory. |
 | Help | Main hub fallback help and hub help for `ssh`, `workspace`, `tmux`, `db`, `resources`, `secrets`, `config`, `bootstrap`, and `check`. |
 | Doctor | `dvv doctor` exits cleanly in a temporary home directory. |
-| Setup | `dvv setup` writes completion, managed zsh shortcuts including the `Alt+R` fallback, and managed tmux shortcuts to temporary files only. |
+| Setup | `dvv setup` writes completion, managed zsh shortcuts including the `Alt+R` fallback, managed tmux shortcuts, and managed tmux theme to temporary files only. |
 | Compatibility | Script-friendly `ssh:list` and `workspace:list` still run without being advertised as primary UX. |
 | Completion | Static zsh completion keeps public hubs visible and gates compatibility completions behind `DVV_COMPLETE_COMPAT`. |
 
@@ -37,7 +37,8 @@ Run these checks on the machine that will use the CLI daily:
 | Doctor fix | `dvv doctor --fix` | Safe runtime dirs/files are created, binary rebuilds, and shell/tmux integration is refreshed. |
 | Config | `dvv config` | Category hub opens; Theme and All Keys work. |
 | SSH | `dvv ssh` | Hub opens, fake or real entries render, and a selected entry opens in a new terminal tab. |
-| Workspace | `dvv workspace` | Hub opens even when empty, existing `workspace-*` dirs are adopted, create/manage/delete/template flows show loaders. |
+| Workspace | `dvv workspace` | Hub opens even when empty, existing `workspace-*` dirs are adopted, create/manage/delete/template/harness sync flows show loaders. |
+| Workspace agent harness | `Shift+H` from `dvv workspace` | Selected workspace gets `AGENTS.md`, `.agents/manifest.json`, focused guides, and `.agents/skills/` without overwriting edited guides by default. |
 | Tmux | `dvv tmux` | Environment hub opens; selected actions route to tmux commands; `Shift+N` can select API/Web projects and save a custom target. |
 | Tmux reset | `Alt+R` inside a dvv tmux environment | API pane receives Laravel cache/config reset commands, Horizon restarts when present, and Web is untouched. |
 | Tmux reset fallback | `Alt+R` from another tmux tab | Current window resets when it has API panes; otherwise the cached target or a single detected Laravel API window is reset, while ambiguous multiple candidates are refused. |
@@ -56,7 +57,7 @@ Run after installing Homebrew dependencies listed in the README:
 | --- | --- | --- |
 | Source install | `ln -sf "$PWD/bin/dvv" ~/.local/bin/dvv` | `dvv` is on `PATH` and points at this checkout. |
 | Build | `dvv build` | Go binary builds locally. |
-| Setup | `dvv setup` | zsh completion, managed shell shortcuts, and managed tmux shortcuts are installed. |
+| Setup | `dvv setup` | zsh completion, managed shell shortcuts, managed tmux shortcuts, and managed tmux theme are installed. |
 | Doctor | `dvv doctor` | Checks `brew` and `osascript`; does not warn about Linux-only `systemctl` or `service`. |
 | Terminal | `DVV_TERMINAL_LAUNCHER=terminal dvv ssh` | SSH handoff opens in Terminal.app. |
 | iTerm2 | `DVV_TERMINAL_LAUNCHER=iterm2 dvv ssh` | SSH handoff opens in iTerm2 when installed. |

@@ -44,6 +44,7 @@ type WorkspaceHubKeyBindings struct {
 	Manage   KeyBinding
 	Delete   KeyBinding
 	Template KeyBinding
+	Harness  KeyBinding
 }
 
 type WorkspaceTemplateHubKeyBindings struct {
@@ -112,6 +113,7 @@ func (c *Config) WorkspaceHubKeys() WorkspaceHubKeyBindings {
 		Manage:   normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Manage, defaults.Manage),
 		Delete:   normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Delete, defaults.Delete),
 		Template: normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Template, defaults.Template),
+		Harness:  normalizeKeyOrDefault(c.Project.Workspace.Interactive.Shortcuts.Harness, defaults.Harness),
 	}
 }
 

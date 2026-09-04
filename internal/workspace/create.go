@@ -168,7 +168,7 @@ func (m *Manager) executeCreatePlan(ctx context.Context, plan CreatePlan, onItem
 		result.Failed++
 		result.Errors = append(result.Errors, err.Error())
 	}
-	if _, err := bootstrap.WriteAgentsFile(*m.Config, plan.WorkspacePath); err != nil {
+	if _, err := bootstrap.WriteWorkspaceHarness(*m.Config, plan.WorkspacePath); err != nil {
 		result.Failed++
 		result.Errors = append(result.Errors, err.Error())
 	}

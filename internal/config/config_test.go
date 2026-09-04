@@ -57,8 +57,17 @@ func TestLoadProjectConfigMergesShortcutDefaults(t *testing.T) {
 	if cfg.Workspace.Root != "~/workspace" {
 		t.Fatalf("workspace root = %q", cfg.Workspace.Root)
 	}
+	if cfg.Workspace.Interactive.Shortcuts.Harness != "shift+h" {
+		t.Fatalf("workspace harness shortcut = %q", cfg.Workspace.Interactive.Shortcuts.Harness)
+	}
+	if cfg.Workspace.WorkspaceHarness.AgentsDir.Path != ".agents" || len(cfg.Workspace.WorkspaceHarness.SkillPaths) == 0 {
+		t.Fatalf("workspace harness defaults = %#v", cfg.Workspace.WorkspaceHarness)
+	}
 	if cfg.Resources.Hub.Shortcuts.Start != "shift+s" {
 		t.Fatalf("resources start shortcut = %q", cfg.Resources.Hub.Shortcuts.Start)
+	}
+	if !BoolValue(cfg.Tmux.Theme.Enabled, false) || !BoolValue(cfg.Tmux.Theme.FollowCLITheme, false) || cfg.Tmux.Theme.Name != "royal-noir" {
+		t.Fatalf("tmux theme defaults = %#v", cfg.Tmux.Theme)
 	}
 }
 
@@ -192,6 +201,9 @@ func TestResolveShortcutConfigsUseEnvOverrides(t *testing.T) {
 	t.Setenv("DVV_TMUX_HUB_RESTART_API_SHORTCUT", "shift+a")
 	t.Setenv("DVV_TMUX_HUB_RESTART_WEB_SHORTCUT", "shift+w")
 	t.Setenv("DVV_TMUX_HUB_CREATE_SHORTCUT", "shift+n")
+	t.Setenv("DVV_TMUX_THEME_ENABLED", "0")
+	t.Setenv("DVV_TMUX_THEME_FOLLOW_CLI", "0")
+	t.Setenv("DVV_TMUX_THEME_NAME", "Tokyo Night")
 
 	shell := resolveShellConfig(DefaultProjectConfig().Shell)
 	system := resolveSystemConfig(DefaultProjectConfig().System)
@@ -220,6 +232,9 @@ func TestResolveShortcutConfigsUseEnvOverrides(t *testing.T) {
 	}
 	if tmux.Hub.Shortcuts.Start != "shift+s" || tmux.Hub.Shortcuts.Stop != "shift+x" || tmux.Hub.Shortcuts.RestartAPI != "shift+a" || tmux.Hub.Shortcuts.RestartWeb != "shift+w" || tmux.Hub.Shortcuts.Create != "shift+n" {
 		t.Fatalf("tmux hub shortcuts = %#v", tmux.Hub.Shortcuts)
+	}
+	if BoolValue(tmux.Theme.Enabled, true) || BoolValue(tmux.Theme.FollowCLITheme, true) || tmux.Theme.Name != "tokyo-night" {
+		t.Fatalf("tmux theme config = %#v", tmux.Theme)
 	}
 }
 
@@ -252,6 +267,11 @@ func TestLoadProjectConfigMergesWorkspaceDefaults(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "dvv.config.json")
 	content := []byte(`{
   "tmux": {
+    "theme": {
+      "enabled": false,
+      "followCliTheme": false,
+      "name": "dracula"
+    },
     "session": {
       "shortcut": "ctrl+p"
     }
@@ -298,6 +318,9 @@ func TestLoadProjectConfigMergesWorkspaceDefaults(t *testing.T) {
 	if cfg.Tmux.Reset.Shortcut != "alt+r" {
 		t.Fatalf("tmux reset shortcut = %q", cfg.Tmux.Reset.Shortcut)
 	}
+	if BoolValue(cfg.Tmux.Theme.Enabled, true) || BoolValue(cfg.Tmux.Theme.FollowCLITheme, true) || cfg.Tmux.Theme.Name != "dracula" {
+		t.Fatalf("tmux theme config = %#v", cfg.Tmux.Theme)
+	}
 	if cfg.Tmux.Hub.Shortcuts.Create != "shift+n" {
 		t.Fatalf("tmux hub defaults = %#v", cfg.Tmux.Hub.Shortcuts)
 	}
@@ -312,6 +335,9 @@ func TestLoadProjectConfigMergesWorkspaceDefaults(t *testing.T) {
 	}
 	if cfg.Workspace.Interactive.Shortcuts.Template != "shift+t" {
 		t.Fatalf("template shortcut = %q", cfg.Workspace.Interactive.Shortcuts.Template)
+	}
+	if cfg.Workspace.Interactive.Shortcuts.Harness != "shift+h" {
+		t.Fatalf("harness shortcut = %q", cfg.Workspace.Interactive.Shortcuts.Harness)
 	}
 	if cfg.Workspace.TemplateHub.Shortcuts.Create != "shift+n" || cfg.Workspace.TemplateHub.Shortcuts.Edit != "shift+e" || cfg.Workspace.TemplateHub.Shortcuts.Delete != "shift+d" {
 		t.Fatalf("template hub shortcuts = %#v", cfg.Workspace.TemplateHub.Shortcuts)
@@ -328,6 +354,9 @@ func TestLoadProjectConfigMergesWorkspaceDefaults(t *testing.T) {
 	if len(cfg.Workspace.Bootstrap.Commands) == 0 {
 		t.Fatal("bootstrap command defaults should be preserved")
 	}
+	if cfg.Workspace.WorkspaceHarness.AgentsDir.Path != ".agents" || len(cfg.Workspace.WorkspaceHarness.Rules) == 0 {
+		t.Fatalf("workspace harness defaults were not preserved: %#v", cfg.Workspace.WorkspaceHarness)
+	}
 }
 
 func TestResolveWorkspaceConfigUsesEnvOverrides(t *testing.T) {
@@ -340,9 +369,13 @@ func TestResolveWorkspaceConfigUsesEnvOverrides(t *testing.T) {
 	t.Setenv("DVV_WORKSPACE_MANAGE_SHORTCUT", "alt-m")
 	t.Setenv("DVV_WORKSPACE_DELETE_SHORTCUT", "alt-d")
 	t.Setenv("DVV_WORKSPACE_TEMPLATE_SHORTCUT", "alt-t")
+	t.Setenv("DVV_WORKSPACE_HARNESS_SHORTCUT", "alt-h")
 	t.Setenv("DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT", "ctrl-c")
 	t.Setenv("DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT", "ctrl-e")
 	t.Setenv("DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT", "ctrl-d")
+	t.Setenv("DVV_WORKSPACE_HARNESS_AGENTS_DIR", ".ai")
+	t.Setenv("DVV_WORKSPACE_HARNESS_SKILL_PATHS", ".ai/skills:~/.codex/skills")
+	t.Setenv("DVV_WORKSPACE_HARNESS_PROJECT_SKILL_PATHS", ".agents/skills:.codex/skills")
 	t.Setenv("DVV_WORKSPACE_TEMPLATES", `[{"name":"fullstack","baseKind":"other","baseBranch":"release","projects":[{"name":"api","path":"~/api"},{"path":"~/web"}]}]`)
 	t.Setenv("DVV_WORKSPACE_REQUIRE_CONFIRMATION", "0")
 	t.Setenv("DVV_WORKSPACE_BLOCK_DIRTY_PROJECTS", "false")
@@ -364,7 +397,7 @@ func TestResolveWorkspaceConfigUsesEnvOverrides(t *testing.T) {
 	if cfg.Interactive.Opener != "cursor" {
 		t.Fatalf("opener = %q", cfg.Interactive.Opener)
 	}
-	if cfg.Interactive.Shortcuts.Create != "alt-c" || cfg.Interactive.Shortcuts.Manage != "alt-m" || cfg.Interactive.Shortcuts.Delete != "alt-d" || cfg.Interactive.Shortcuts.Template != "alt-t" {
+	if cfg.Interactive.Shortcuts.Create != "alt-c" || cfg.Interactive.Shortcuts.Manage != "alt-m" || cfg.Interactive.Shortcuts.Delete != "alt-d" || cfg.Interactive.Shortcuts.Template != "alt-t" || cfg.Interactive.Shortcuts.Harness != "alt-h" {
 		t.Fatalf("workspace shortcuts = %#v", cfg.Interactive.Shortcuts)
 	}
 	if cfg.TemplateHub.Shortcuts.Create != "ctrl-c" || cfg.TemplateHub.Shortcuts.Edit != "ctrl-e" || cfg.TemplateHub.Shortcuts.Delete != "ctrl-d" {
@@ -372,6 +405,15 @@ func TestResolveWorkspaceConfigUsesEnvOverrides(t *testing.T) {
 	}
 	if len(cfg.Templates) != 1 || cfg.Templates[0].BaseBranch != "release" || cfg.Templates[0].Projects[0].Path != "/home/tester/api" || cfg.Templates[0].Projects[1].Name != "web" {
 		t.Fatalf("workspace templates = %#v", cfg.Templates)
+	}
+	if cfg.WorkspaceHarness.AgentsDir.Path != ".ai" {
+		t.Fatalf("agents dir = %q", cfg.WorkspaceHarness.AgentsDir.Path)
+	}
+	if len(cfg.WorkspaceHarness.SkillPaths) != 2 || cfg.WorkspaceHarness.SkillPaths[0] != ".ai/skills" || cfg.WorkspaceHarness.SkillPaths[1] != "/home/tester/.codex/skills" {
+		t.Fatalf("skill paths = %#v", cfg.WorkspaceHarness.SkillPaths)
+	}
+	if len(cfg.WorkspaceHarness.ProjectSkillPaths) != 2 || cfg.WorkspaceHarness.ProjectSkillPaths[0] != ".agents/skills" {
+		t.Fatalf("project skill paths = %#v", cfg.WorkspaceHarness.ProjectSkillPaths)
 	}
 	if cfg.Safety.RequireConfirmation || cfg.Safety.BlockRemoveWithDirtyProjects || !cfg.Safety.AllowForceRemove || cfg.Safety.OnlyRemoveDirectChildren || cfg.Safety.ConfirmLeftoverDeletion {
 		t.Fatalf("workspace safety overrides were not applied: %#v", cfg.Safety)

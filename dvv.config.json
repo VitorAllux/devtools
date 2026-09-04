@@ -102,6 +102,11 @@
         "create": "shift+n"
       }
     },
+    "theme": {
+      "enabled": true,
+      "followCliTheme": true,
+      "name": "royal-noir"
+    },
     "session": {
       "searchRoots": [
         "~/workspace",
@@ -157,7 +162,8 @@
         "create": "shift+n",
         "manage": "shift+m",
         "delete": "shift+d",
-        "template": "shift+t"
+        "template": "shift+t",
+        "harness": "shift+h"
       }
     },
     "templateHub": {
@@ -274,7 +280,47 @@
         "useCustom": true,
         "path": "AGENTS.md",
         "overwrite": false
-      }
+      },
+      "agentsDir": {
+        "enabled": true,
+        "path": ".agents",
+        "overwriteGuides": false
+      },
+      "skillPaths": [
+        ".agents/skills",
+        ".codex/skills",
+        ".claude/skills",
+        "~/.codex/skills",
+        "~/.agents/skills",
+        "~/.claude/skills"
+      ],
+      "projectSkillPaths": [
+        ".agents/skills",
+        ".codex/skills",
+        ".claude/skills"
+      ],
+      "rules": [
+        {
+          "name": "workspace-source",
+          "description": "Use .workspace/config.json como fonte de verdade para projetos, paths e branches do workspace."
+        },
+        {
+          "name": "question-when-unclear",
+          "description": "Pergunte de forma objetiva quando tarefa, projeto alvo, branch ou risco estiver ambíguo."
+        },
+        {
+          "name": "project-boundaries",
+          "description": "Trate cada filho direto como um git worktree e deixe regras locais do projeto prevalecerem."
+        },
+        {
+          "name": "skill-lookup",
+          "description": "Procure skills do workspace primeiro, depois skills dos projetos e por fim skills globais do usuário."
+        },
+        {
+          "name": "destructive-safety",
+          "description": "Inspecione git status antes de edições destrutivas, troca de branch, limpeza ou remoção."
+        }
+      ]
     },
     "hooks": {},
     "safety": {

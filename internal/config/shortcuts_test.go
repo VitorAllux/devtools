@@ -42,7 +42,7 @@ func TestWorkspaceHubKeysUseDefaults(t *testing.T) {
 	if keys.Create.FZFKey != "N" || keys.Create.Label != "Shift+N" {
 		t.Fatalf("create key = %#v", keys.Create)
 	}
-	if keys.Manage.FZFKey != "M" || keys.Delete.FZFKey != "D" || keys.Template.FZFKey != "T" {
+	if keys.Manage.FZFKey != "M" || keys.Delete.FZFKey != "D" || keys.Template.FZFKey != "T" || keys.Harness.FZFKey != "H" {
 		t.Fatalf("workspace keys = %#v", keys)
 	}
 }
