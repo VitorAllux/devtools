@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -10,6 +11,11 @@ import (
 
 type Client struct {
 	Runner run.Runner
+}
+
+type WorktreeStep struct {
+	Stage  string
+	Detail string
 }
 
 func New(runner run.Runner) Client {
@@ -129,17 +135,35 @@ func (c Client) DetectBaseBranch(ctx context.Context, projectPath string, remote
 }
 
 func (c Client) AddWorktree(ctx context.Context, projectPath string, destination string, branch string) error {
+	return c.AddWorktreeWithSteps(ctx, projectPath, destination, branch, nil)
+}
+
+func (c Client) AddWorktreeWithSteps(ctx context.Context, projectPath string, destination string, branch string, onStep func(WorktreeStep)) error {
+	notifyWorktreeStep(onStep, "prune", "remove stale worktree refs")
 	if err := c.PruneWorktrees(ctx, projectPath); err != nil {
 		return err
 	}
-	return run.Quiet(ctx, c.Runner, "", "git", "-C", projectPath, "worktree", "add", destination, branch)
+	notifyWorktreeStep(onStep, "checkout", fmt.Sprintf("create checkout from existing branch %s", branch))
+	return run.Quiet(ctx, c.Runner, "", "git", "-C", projectPath, "worktree", "add", "--quiet", destination, branch)
 }
 
 func (c Client) AddWorktreeNewBranch(ctx context.Context, projectPath string, destination string, branch string, baseRef string) error {
+	return c.AddWorktreeNewBranchWithSteps(ctx, projectPath, destination, branch, baseRef, nil)
+}
+
+func (c Client) AddWorktreeNewBranchWithSteps(ctx context.Context, projectPath string, destination string, branch string, baseRef string, onStep func(WorktreeStep)) error {
+	notifyWorktreeStep(onStep, "prune", "remove stale worktree refs")
 	if err := c.PruneWorktrees(ctx, projectPath); err != nil {
 		return err
 	}
-	return run.Quiet(ctx, c.Runner, "", "git", "-C", projectPath, "worktree", "add", "-b", branch, destination, baseRef)
+	notifyWorktreeStep(onStep, "checkout", fmt.Sprintf("create branch %s from %s", branch, baseRef))
+	return run.Quiet(ctx, c.Runner, "", "git", "-C", projectPath, "worktree", "add", "--quiet", "-b", branch, destination, baseRef)
+}
+
+func notifyWorktreeStep(onStep func(WorktreeStep), stage string, detail string) {
+	if onStep != nil {
+		onStep(WorktreeStep{Stage: stage, Detail: detail})
+	}
 }
 
 func (c Client) RemoveWorktree(ctx context.Context, baseProjectPath string, worktreePath string, force bool) error {

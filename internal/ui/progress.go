@@ -19,6 +19,7 @@ type ProgressOptions struct {
 }
 
 type RoyalProgressLoader struct {
+	mu        sync.RWMutex
 	options   ProgressOptions
 	current   atomic.Int64
 	done      chan struct{}
@@ -69,6 +70,18 @@ func (p *RoyalProgressLoader) Set(current int64) {
 	p.current.Store(current)
 }
 
+func (p *RoyalProgressLoader) SetDetail(detail string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.options.Detail = detail
+}
+
+func (p *RoyalProgressLoader) snapshot() ProgressOptions {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.options
+}
+
 func (p *RoyalProgressLoader) Start() {
 	if !LoaderEnabled() || p.options.Total <= 0 {
 		return
@@ -111,7 +124,7 @@ func (p *RoyalProgressLoader) Finish(ok bool) {
 }
 
 func (p *RoyalProgressLoader) Percent() int {
-	return progressPercent(p.current.Load(), p.options.Total)
+	return progressPercent(p.current.Load(), p.snapshot().Total)
 }
 
 func (p *RoyalProgressLoader) render(status progressStatus) {
@@ -119,11 +132,12 @@ func (p *RoyalProgressLoader) render(status progressStatus) {
 	if status == progressSuccess {
 		percent = 100
 	}
-	fmt.Fprintf(os.Stderr, "\r%s", renderRoyalProgressFrame(p.options, percent, status))
+	clearTerminalLine()
+	fmt.Fprintf(os.Stderr, "\r%s", renderRoyalProgressFrame(p.snapshot(), percent, status))
 }
 
 func (p *RoyalProgressLoader) clear() {
-	fmt.Fprint(os.Stderr, "\r\033[2K")
+	clearTerminalLine()
 	if !useColor() {
 		fmt.Fprint(os.Stderr, "\r"+strings.Repeat(" ", p.clearSize)+"\r")
 	}

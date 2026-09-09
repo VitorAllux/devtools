@@ -101,16 +101,25 @@ func TestAddWorktreeNewBranchPrunesBeforeAdding(t *testing.T) {
 	runner := &gitRunner{}
 	client := New(runner)
 
-	if err := client.AddWorktreeNewBranch(context.Background(), "/repo", "/workspace/api", "issue-42", "origin/master"); err != nil {
+	steps := []string{}
+	if err := client.AddWorktreeNewBranchWithSteps(context.Background(), "/repo", "/workspace/api", "issue-42", "origin/master", func(step WorktreeStep) {
+		steps = append(steps, step.Stage+":"+step.Detail)
+	}); err != nil {
 		t.Fatalf("AddWorktreeNewBranch returned error: %v", err)
 	}
 
 	want := []string{
 		"git -C /repo worktree prune",
-		"git -C /repo worktree add -b issue-42 /workspace/api origin/master",
+		"git -C /repo worktree add --quiet -b issue-42 /workspace/api origin/master",
 	}
 	if strings.Join(runner.runs, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("runs = %#v", runner.runs)
+	}
+	if strings.Join(steps, "\n") != strings.Join([]string{
+		"prune:remove stale worktree refs",
+		"checkout:create branch issue-42 from origin/master",
+	}, "\n") {
+		t.Fatalf("steps = %#v", steps)
 	}
 }
 
@@ -127,7 +136,7 @@ func TestAddAndRemoveWorktreeCommands(t *testing.T) {
 
 	want := []string{
 		"git -C /repo worktree prune",
-		"git -C /repo worktree add /workspace/api feature",
+		"git -C /repo worktree add --quiet /workspace/api feature",
 		"git -C /repo worktree remove --force /workspace/api",
 		"git -C /repo worktree prune",
 	}

@@ -127,6 +127,32 @@ func TestRenderRoyalLoaderResultUsesCustomSuccessAction(t *testing.T) {
 	}
 }
 
+func TestRoyalStatusLoaderUpdatesCurrentFrame(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	loader := NewRoyalStatusLoader(LoaderOptions{
+		Action:  "creating",
+		Subject: "workspace",
+		Detail:  "workspace-task",
+	})
+
+	loader.Set("creating", "api-eloverde", "create-branch in workspace-task")
+	frame := renderRoyalLoaderFrame(loader.snapshot(), 0, 0)
+
+	expected := []string{
+		"creating",
+		"api-eloverde",
+		"create-branch in workspace-task",
+	}
+	for _, value := range expected {
+		if !strings.Contains(frame, value) {
+			t.Fatalf("status loader frame missing %q in %q", value, frame)
+		}
+	}
+	if strings.Contains(frame, "%") {
+		t.Fatalf("status loader frame should not show percent: %q", frame)
+	}
+}
+
 func TestRenderRoyalProgressFrame(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	frame := renderRoyalProgressFrame(ProgressOptions{
@@ -206,6 +232,22 @@ func TestRoyalProgressLoaderTracksProgress(t *testing.T) {
 	}
 	loader.Start()
 	loader.Finish(true)
+}
+
+func TestRoyalProgressLoaderUpdatesDetail(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	loader := NewRoyalProgressLoader(ProgressOptions{
+		Action:  "importing",
+		Subject: "dump.sql",
+		Detail:  "scanning tables",
+		Total:   200,
+	})
+
+	loader.SetDetail("table users")
+	frame := renderRoyalProgressFrame(loader.snapshot(), 25, progressRunning)
+	if !strings.Contains(frame, "table users") || strings.Contains(frame, "scanning tables") {
+		t.Fatalf("progress frame should use updated detail: %q", frame)
+	}
 }
 
 func TestRunWithRoyalProgressReturnsFunctionResult(t *testing.T) {

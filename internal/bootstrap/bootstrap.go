@@ -44,6 +44,12 @@ type ProjectResult struct {
 	Failures int             `json:"failures"`
 }
 
+type ProjectStep struct {
+	Stage  string
+	Name   string
+	Detail string
+}
+
 type HarnessResult struct {
 	AgentsFileWritten bool     `json:"agentsFileWritten"`
 	AgentsFileUpdated bool     `json:"agentsFileUpdated"`
@@ -66,8 +72,13 @@ func Matches(projectPath string, when config.WorkspaceBootstrapWhen) bool {
 }
 
 func RunProject(ctx context.Context, cfg config.WorkspaceBootstrap, runner run.Runner, project Project, dryRun bool) ProjectResult {
+	return RunProjectWithSteps(ctx, cfg, runner, project, dryRun, nil)
+}
+
+func RunProjectWithSteps(ctx context.Context, cfg config.WorkspaceBootstrap, runner run.Runner, project Project, dryRun bool, onStep func(ProjectStep)) ProjectResult {
 	result := ProjectResult{Project: project}
 	for _, rule := range cfg.CopyRules {
+		notifyProjectStep(onStep, "copy", rule.From, "copy to "+rule.To)
 		action := applyCopyRule(project, rule, dryRun)
 		if action.Status != "missing-source" {
 			result.Copies = append(result.Copies, action)
@@ -81,6 +92,7 @@ func RunProject(ctx context.Context, cfg config.WorkspaceBootstrap, runner run.R
 			continue
 		}
 		action := CommandAction{Name: command.Name, Command: command.Command, Args: command.Args}
+		notifyProjectStep(onStep, "command", command.Name, strings.Join(append([]string{command.Command}, command.Args...), " "))
 		if dryRun {
 			action.Status = "dry-run"
 			result.Commands = append(result.Commands, action)
@@ -96,6 +108,12 @@ func RunProject(ctx context.Context, cfg config.WorkspaceBootstrap, runner run.R
 		result.Commands = append(result.Commands, action)
 	}
 	return result
+}
+
+func notifyProjectStep(onStep func(ProjectStep), stage string, name string, detail string) {
+	if onStep != nil {
+		onStep(ProjectStep{Stage: stage, Name: name, Detail: detail})
+	}
 }
 
 func WriteAgentsFile(cfg config.Config, workspacePath string) (bool, error) {

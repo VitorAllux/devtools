@@ -10,9 +10,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync/atomic"
+	"unicode"
 
 	"github.com/VitorAllux/devtools/internal/config"
 	"github.com/VitorAllux/devtools/internal/run"
@@ -29,6 +31,16 @@ type Action struct {
 	Name        string
 	Label       string
 	Description string
+}
+
+var sqlTablePatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)^--\s*(?:table structure for table|dumping data for table)\s+(.+)`),
+	regexp.MustCompile(`(?i)^CREATE\s+(?:TEMPORARY\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(.+)`),
+	regexp.MustCompile(`(?i)^INSERT\s+(?:IGNORE\s+)?INTO\s+(.+)`),
+	regexp.MustCompile(`(?i)^REPLACE\s+(?:LOW_PRIORITY\s+|DELAYED\s+)?INTO\s+(.+)`),
+	regexp.MustCompile(`(?i)^ALTER\s+TABLE\s+(.+)`),
+	regexp.MustCompile(`(?i)^DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(.+)`),
+	regexp.MustCompile(`(?i)^LOCK\s+TABLES\s+(.+)`),
 }
 
 func Run(ctx context.Context, cfg *config.Config, runner run.Runner, args []string) error {
@@ -334,11 +346,23 @@ func (m *Manager) downloadDump(ctx context.Context) (string, error) {
 	if _, err := m.Runner.LookPath("rclone"); err != nil {
 		return "", fmt.Errorf("rclone is required to download dumps")
 	}
-	remote := m.Config.Project.DB.RcloneRemote
+	remotes, remotesErr := m.rcloneRemotes(ctx)
+	remote := normalizeRcloneRemote(m.Config.Project.DB.RcloneRemote)
 	if value, err := ui.Prompt("Rclone remote [" + remote + "]"); err != nil {
 		return "", err
 	} else if strings.TrimSpace(value) != "" {
-		remote = strings.TrimSpace(value)
+		remote = normalizeRcloneRemote(value)
+	}
+	if remote == "" {
+		return "", fmt.Errorf("rclone remote cannot be empty")
+	}
+	if remotesErr == nil {
+		if len(remotes) == 0 {
+			return "", fmt.Errorf("rclone has no configured remotes; run `rclone config` before downloading dumps")
+		}
+		if !rcloneRemoteExists(remotes, remote) {
+			return "", unknownRcloneRemoteError(remote, remotes)
+		}
 	}
 	fileID, err := ui.Prompt("Google Drive File ID or link")
 	if err != nil {
@@ -357,9 +381,59 @@ func (m *Manager) downloadDump(ctx context.Context) (string, error) {
 	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "downloading", Subject: filepath.Base(dest), ShowResult: true, SuccessAction: "downloaded"}, func() error {
 		return run.Quiet(ctx, m.Runner, "", "rclone", "backend", "copyid", remote+":", fileID, dest)
 	}); err != nil {
+		if isUnknownRcloneRemoteError(err) {
+			return "", unknownRcloneRemoteError(remote, remotes)
+		}
 		return "", err
 	}
 	return dest, nil
+}
+
+func (m *Manager) rcloneRemotes(ctx context.Context) ([]string, error) {
+	out, err := m.Runner.Output(ctx, "", "rclone", "listremotes")
+	if err != nil {
+		return nil, err
+	}
+	remotes := []string{}
+	for _, line := range strings.Split(string(out), "\n") {
+		remote := normalizeRcloneRemote(line)
+		if remote != "" {
+			remotes = append(remotes, remote)
+		}
+	}
+	sort.Strings(remotes)
+	return remotes, nil
+}
+
+func normalizeRcloneRemote(value string) string {
+	return strings.TrimSuffix(strings.TrimSpace(value), ":")
+}
+
+func rcloneRemoteExists(remotes []string, remote string) bool {
+	remote = normalizeRcloneRemote(remote)
+	for _, candidate := range remotes {
+		if normalizeRcloneRemote(candidate) == remote {
+			return true
+		}
+	}
+	return false
+}
+
+func unknownRcloneRemoteError(remote string, remotes []string) error {
+	if len(remotes) == 0 {
+		return fmt.Errorf("rclone remote %q is not configured; run `rclone config` before downloading dumps", remote)
+	}
+	return fmt.Errorf("rclone remote %q is not configured; available remotes: %s", remote, strings.Join(remotes, ", "))
+}
+
+func isUnknownRcloneRemoteError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := err.Error()
+	return strings.Contains(message, "didn't find section in config file") ||
+		strings.Contains(message, "did not find section in config file") ||
+		strings.Contains(message, "section in config file")
 }
 
 func (m *Manager) selectImportDatabase(ctx context.Context) (string, error) {
@@ -508,6 +582,7 @@ func (m *Manager) importDump(ctx context.Context, dump string, dbName string) er
 	progress := ui.NewRoyalProgressLoader(ui.ProgressOptions{
 		Action:  "importing",
 		Subject: filepath.Base(dump),
+		Detail:  "scanning tables",
 		Total:   info.Size(),
 	})
 	counting := &countingReader{reader: file, onRead: progress.Add}
@@ -521,6 +596,9 @@ func (m *Manager) importDump(ctx context.Context, dump string, dbName string) er
 		source = gz
 	}
 	sqlReader, removedInvalidLines := sanitizeSQLReader(source)
+	sqlReader = newTableTrackingReader(sqlReader, func(table string) {
+		progress.SetDetail("table " + table)
+	})
 
 	cmd := exec.CommandContext(ctx,
 		"mysql",
@@ -664,6 +742,147 @@ func (r *countingReader) Read(p []byte) (int, error) {
 		r.onRead(n)
 	}
 	return n, err
+}
+
+type tableTrackingReader struct {
+	reader  io.Reader
+	onTable func(string)
+	buffer  string
+	current string
+}
+
+func newTableTrackingReader(reader io.Reader, onTable func(string)) io.Reader {
+	if onTable == nil {
+		return reader
+	}
+	return &tableTrackingReader{reader: reader, onTable: onTable}
+}
+
+func (r *tableTrackingReader) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	if n > 0 {
+		r.consume(string(p[:n]))
+	}
+	if err == io.EOF && r.buffer != "" {
+		r.consumeLine(r.buffer)
+		r.buffer = ""
+	}
+	return n, err
+}
+
+func (r *tableTrackingReader) consume(chunk string) {
+	r.buffer += chunk
+	for {
+		index := strings.IndexByte(r.buffer, '\n')
+		if index < 0 {
+			break
+		}
+		r.consumeLine(r.buffer[:index])
+		r.buffer = r.buffer[index+1:]
+	}
+	if len(r.buffer) > 64*1024 {
+		r.consumeLine(r.buffer)
+		r.buffer = ""
+	}
+}
+
+func (r *tableTrackingReader) consumeLine(line string) {
+	table := detectSQLTable(line)
+	if table == "" || table == r.current {
+		return
+	}
+	r.current = table
+	r.onTable(table)
+}
+
+func detectSQLTable(line string) string {
+	line = strings.TrimSpace(strings.TrimPrefix(line, "\xef\xbb\xbf"))
+	if line == "" {
+		return ""
+	}
+	line = unwrapMySQLVersionedComment(line)
+	for _, pattern := range sqlTablePatterns {
+		matches := pattern.FindStringSubmatch(line)
+		if len(matches) < 2 {
+			continue
+		}
+		return extractTableIdentifier(matches[1])
+	}
+	return ""
+}
+
+func unwrapMySQLVersionedComment(line string) string {
+	if !strings.HasPrefix(line, "/*!") {
+		return line
+	}
+	index := 3
+	for index < len(line) && line[index] >= '0' && line[index] <= '9' {
+		index++
+	}
+	if index == 3 {
+		return line
+	}
+	body := strings.TrimSpace(line[index:])
+	body = strings.TrimSuffix(body, ";")
+	body = strings.TrimSpace(strings.TrimSuffix(body, "*/"))
+	return strings.TrimSpace(body)
+}
+
+func extractTableIdentifier(value string) string {
+	rest := strings.TrimSpace(value)
+	last := ""
+	for {
+		token, remaining := popSQLIdentifier(rest)
+		if token == "" {
+			return ""
+		}
+		last = token
+		rest = strings.TrimSpace(remaining)
+		if !strings.HasPrefix(rest, ".") {
+			break
+		}
+		rest = strings.TrimSpace(strings.TrimPrefix(rest, "."))
+	}
+	return cleanSQLIdentifier(last)
+}
+
+func popSQLIdentifier(value string) (string, string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", ""
+	}
+	quote := value[0]
+	if quote == '`' || quote == '"' || quote == '\'' {
+		for index := 1; index < len(value); index++ {
+			if value[index] == quote {
+				if index+1 < len(value) && value[index+1] == quote {
+					index++
+					continue
+				}
+				return value[:index+1], value[index+1:]
+			}
+		}
+		return "", value
+	}
+	for index, char := range value {
+		if unicode.IsSpace(char) || char == '(' || char == ',' || char == ';' {
+			return value[:index], value[index:]
+		}
+	}
+	return value, ""
+}
+
+func cleanSQLIdentifier(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) >= 2 {
+		first := value[0]
+		last := value[len(value)-1]
+		if (first == '`' && last == '`') || (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+			value = value[1 : len(value)-1]
+			value = strings.ReplaceAll(value, string([]byte{first, first}), string(first))
+		}
+	}
+	return value
 }
 
 func sanitizeSQLReader(source io.Reader) (io.Reader, func() int64) {
