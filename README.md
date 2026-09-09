@@ -443,6 +443,7 @@ Workspace:
 ```bash
 DVV_WORKSPACES_DIR=~/workspace
 DVV_WORKSPACE_PROJECT_ROOTS=~/workspace:~/Development/projects:~/Work/Development/dev
+DVV_WORKSPACE_PROJECT_EXCLUDE_DIRS=worktrees:External:dumps
 DVV_WORKSPACE_PROJECT_SEARCH_DEPTH=4
 DVV_WORKSPACE_OPENER=cursor
 DVV_WORKSPACE_HARNESS_AGENTS_DIR=.agents

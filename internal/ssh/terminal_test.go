@@ -3,6 +3,7 @@ package ssh
 import (
 	"context"
 	"errors"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -79,7 +80,7 @@ func TestOpenInTmuxStopsWhenProbeFails(t *testing.T) {
 }
 
 func TestOpenInNewTerminalCreatesDetachedTmuxSessionAndLaunchesTerminal(t *testing.T) {
-	runner := &terminalFakeRunner{paths: map[string]bool{"tmux": true, "x-terminal-emulator": true}}
+	runner := &terminalFakeRunner{paths: terminalLauncherTestPaths()}
 	manager := Manager{
 		Runner:          runner,
 		connectionProbe: successfulConnectionProbe,
@@ -98,7 +99,7 @@ func TestOpenInNewTerminalCreatesDetachedTmuxSessionAndLaunchesTerminal(t *testi
 		t.Fatalf("tmux session command = %q, want ssh command", run)
 	}
 	start := runner.lastStart()
-	if !strings.HasPrefix(start, "x-terminal-emulator -e env COLORTERM=truecolor tmux attach -t dvv-ssh-api-") {
+	if !hasTerminalAttachStart(start, "dvv-ssh-api-") {
 		t.Fatalf("terminal command = %q, want terminal attach", start)
 	}
 }
@@ -107,6 +108,10 @@ func TestOpenInNewTerminalUsesConfiguredTerminalLauncher(t *testing.T) {
 	project := config.DefaultProjectConfig()
 	project.Terminal.Launcher = "konsole"
 	runner := &terminalFakeRunner{paths: map[string]bool{"tmux": true, "konsole": true, "x-terminal-emulator": true}}
+	if runtime.GOOS == "darwin" {
+		project.Terminal.Launcher = "terminal"
+		runner.paths["osascript"] = true
+	}
 	manager := Manager{
 		Config:          &config.Config{Project: project},
 		Runner:          runner,
@@ -116,6 +121,12 @@ func TestOpenInNewTerminalUsesConfiguredTerminalLauncher(t *testing.T) {
 	err := manager.OpenInNewTerminal(context.Background(), Entry{Name: "api", Target: "forge@example.com"})
 	if err != nil {
 		t.Fatalf("OpenInNewTerminal returned error: %v", err)
+	}
+	if runtime.GOOS == "darwin" {
+		if start := runner.lastStart(); !hasTerminalAttachStart(start, "dvv-ssh-api-") {
+			t.Fatalf("terminal command = %q, want Terminal.app attach", start)
+		}
+		return
 	}
 	if start := runner.lastStart(); !strings.HasPrefix(start, "konsole --new-tab -e env COLORTERM=truecolor tmux attach -t dvv-ssh-api-") {
 		t.Fatalf("terminal command = %q, want konsole attach", start)
@@ -199,4 +210,20 @@ func (r *terminalFakeRunner) lastCommand() string {
 
 func (r *terminalFakeRunner) lastStart() string {
 	return strings.TrimSpace(r.start + " " + strings.Join(r.sargs, " "))
+}
+
+func terminalLauncherTestPaths() map[string]bool {
+	paths := map[string]bool{"tmux": true, "x-terminal-emulator": true}
+	if runtime.GOOS == "darwin" {
+		paths["osascript"] = true
+	}
+	return paths
+}
+
+func hasTerminalAttachStart(start string, sessionPrefix string) bool {
+	if runtime.GOOS == "darwin" {
+		return strings.HasPrefix(start, "osascript -e tell application \"Terminal\"") &&
+			strings.Contains(start, "do script \"'env' 'COLORTERM=truecolor' 'tmux' 'attach' '-t' '"+sessionPrefix)
+	}
+	return strings.HasPrefix(start, "x-terminal-emulator -e env COLORTERM=truecolor tmux attach -t "+sessionPrefix)
 }

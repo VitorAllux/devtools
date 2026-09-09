@@ -327,6 +327,7 @@ The `workspace` section contains these groups:
 - `projects`: explicit ordered base repositories.
 - `templates`: reusable workspace creation presets with base branch rules and project lists.
 - `projectSearchRoots`: ordered roots used to discover base git repositories.
+- `projectExcludeDirs`: directory names or absolute paths skipped during base repository discovery.
 - `projectSearchDepth`: discovery depth below each project search root.
 - `git`: remote name, base branch priority, branch reuse/creation rules, branch name template, and base branch by workspace type.
 - `interactive`: selector, opener, and configurable hub shortcuts.
@@ -444,6 +445,7 @@ Workspace overrides:
 ```text
 DVV_WORKSPACES_DIR
 DVV_WORKSPACE_PROJECT_ROOTS
+DVV_WORKSPACE_PROJECT_EXCLUDE_DIRS
 DVV_WORKSPACE_PROJECT_SEARCH_DEPTH
 DVV_WORKSPACE_OPENER
 ```

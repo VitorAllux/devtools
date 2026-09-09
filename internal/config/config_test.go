@@ -363,6 +363,7 @@ func TestResolveWorkspaceConfigUsesEnvOverrides(t *testing.T) {
 	t.Setenv("HOME", "/home/tester")
 	t.Setenv("DVV_WORKSPACES_DIR", "~/dvv-workspaces")
 	t.Setenv("DVV_WORKSPACE_PROJECT_ROOTS", "~/a:/opt/projects")
+	t.Setenv("DVV_WORKSPACE_PROJECT_EXCLUDE_DIRS", "worktrees:~/dumps")
 	t.Setenv("DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "7")
 	t.Setenv("DVV_WORKSPACE_OPENER", "cursor")
 	t.Setenv("DVV_WORKSPACE_CREATE_SHORTCUT", "alt-c")
@@ -390,6 +391,9 @@ func TestResolveWorkspaceConfigUsesEnvOverrides(t *testing.T) {
 	}
 	if got := cfg.ProjectSearchRoots; len(got) != 2 || got[0] != "/home/tester/a" || got[1] != "/opt/projects" {
 		t.Fatalf("project roots = %#v", got)
+	}
+	if got := cfg.ProjectExcludeDirs; len(got) != 2 || got[0] != "worktrees" || got[1] != "/home/tester/dumps" {
+		t.Fatalf("project exclude dirs = %#v", got)
 	}
 	if cfg.ProjectSearchDepth != 7 {
 		t.Fatalf("project search depth = %d", cfg.ProjectSearchDepth)

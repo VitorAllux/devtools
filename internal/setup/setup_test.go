@@ -384,7 +384,7 @@ func TestInvalidWorkspaceNamesDetectsBrokenUTF8(t *testing.T) {
 		t.Fatalf("MkdirAll valid failed: %v", err)
 	}
 	if err := os.MkdirAll(invalidPath, 0o755); err != nil {
-		t.Fatalf("MkdirAll invalid failed: %v", err)
+		t.Skipf("filesystem does not allow invalid UTF-8 filenames: %v", err)
 	}
 
 	names := invalidWorkspaceNames(root)

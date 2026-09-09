@@ -935,6 +935,8 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.Workspace.Root = config.ExpandPath(value)
 	case "DVV_WORKSPACE_PROJECT_ROOTS":
 		m.Config.Project.Workspace.ProjectSearchRoots = expandedPathList(value)
+	case "DVV_WORKSPACE_PROJECT_EXCLUDE_DIRS":
+		m.Config.Project.Workspace.ProjectExcludeDirs = expandedPathList(value)
 	case "DVV_WORKSPACE_PROJECT_SEARCH_DEPTH":
 		if isNumber(value) {
 			fmt.Sscanf(value, "%d", &m.Config.Project.Workspace.ProjectSearchDepth)
@@ -1272,6 +1274,7 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Shortcuts", "DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT", "Sets the template hub shortcut for deleting templates.", "shortcut", cfg.Project.Workspace.TemplateHub.Shortcuts.Delete, "", false},
 		{"Workspace", "DVV_WORKSPACES_DIR", "Sets where workspace-* folders are created.", "path", cfg.Project.Workspace.Root, "", false},
 		{"Workspace", "DVV_WORKSPACE_PROJECT_ROOTS", "Sets roots scanned for base git repositories.", "path-list", strings.Join(cfg.Project.Workspace.ProjectSearchRoots, string(os.PathListSeparator)), "", false},
+		{"Workspace", "DVV_WORKSPACE_PROJECT_EXCLUDE_DIRS", "Skips directories during base repository discovery.", "path-list", strings.Join(cfg.Project.Workspace.ProjectExcludeDirs, string(os.PathListSeparator)), "", false},
 		{"Workspace", "DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "Limits repository discovery depth.", "number", fmt.Sprintf("%d", cfg.Project.Workspace.ProjectSearchDepth), "", false},
 		{"Workspace", "DVV_WORKSPACE_OPENER", "Sets how a selected workspace opens.", "choice", defaultString(cfg.Project.Workspace.Interactive.Opener, "auto"), "", false},
 		{"Workspace", "DVV_WORKSPACE_TEMPLATES", "Stores saved workspace templates with base branch and project list.", "json", workspaceTemplatesJSON(cfg.Project.Workspace.Templates), "", false},

@@ -20,7 +20,7 @@ func TestDiscoverKeepsConfiguredProjectsFirst(t *testing.T) {
 		}
 	}
 
-	projects, err := Discover(context.Background(), gitclient.New(discoveryRunner{}), []Project{{Name: "configured", Path: configured}}, []string{root}, 3)
+	projects, err := Discover(context.Background(), gitclient.New(discoveryRunner{}), []Project{{Name: "configured", Path: configured}}, []string{root}, nil, 3)
 	if err != nil {
 		t.Fatalf("Discover failed: %v", err)
 	}
@@ -42,12 +42,35 @@ func TestDiscoverHonorsDepth(t *testing.T) {
 		t.Fatalf("MkdirAll failed: %v", err)
 	}
 
-	projects, err := Discover(context.Background(), gitclient.New(discoveryRunner{}), nil, []string{root}, 2)
+	projects, err := Discover(context.Background(), gitclient.New(discoveryRunner{}), nil, []string{root}, nil, 2)
 	if err != nil {
 		t.Fatalf("Discover failed: %v", err)
 	}
 	if len(projects) != 0 {
 		t.Fatalf("deep project should be skipped: %#v", projects)
+	}
+}
+
+func TestDiscoverSkipsExcludedDirectories(t *testing.T) {
+	root := t.TempDir()
+	api := filepath.Join(root, "api")
+	for _, path := range []string{
+		api,
+		filepath.Join(root, "worktrees", "workspace-task", "api"),
+		filepath.Join(root, "External", "devtools"),
+		filepath.Join(root, "dumps", "old-repo"),
+	} {
+		if err := os.MkdirAll(filepath.Join(path, ".git"), 0o755); err != nil {
+			t.Fatalf("MkdirAll failed: %v", err)
+		}
+	}
+
+	projects, err := Discover(context.Background(), gitclient.New(discoveryRunner{}), nil, []string{root}, []string{"worktrees", "External", "dumps"}, 4)
+	if err != nil {
+		t.Fatalf("Discover failed: %v", err)
+	}
+	if len(projects) != 1 || projects[0].Path != api {
+		t.Fatalf("projects = %#v, want only api", projects)
 	}
 }
 

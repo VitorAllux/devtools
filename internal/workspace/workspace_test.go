@@ -116,7 +116,9 @@ func TestWorkspacesSkipInvalidUTF8Names(t *testing.T) {
 		'w', 'o', 'r', 'k', 's', 'p', 'a', 'c', 'e', '-', 't', 'a', 's', 'k', '_', 0xc2, '6', '0', '0', '_', '7', '6', '5', '6',
 	}))
 	mustMkdir(t, validPath)
-	mustMkdir(t, invalidPath)
+	if err := os.MkdirAll(invalidPath, 0o755); err != nil {
+		t.Skipf("filesystem does not allow invalid UTF-8 filenames: %v", err)
+	}
 
 	manager := NewManager(testWorkspaceConfig(root), newWorkspaceRunner())
 	workspaces, err := manager.Workspaces()

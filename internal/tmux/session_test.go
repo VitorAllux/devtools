@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -70,8 +71,9 @@ func TestSelectDirectoryBuildsReloadingFZFCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SelectDirectory returned error: %v", err)
 	}
-	if got != selected {
-		t.Fatalf("selected = %q, want %q", got, selected)
+	wantSelected := realDirOrFallback(selected, selected)
+	if got != wantSelected {
+		t.Fatalf("selected = %q, want %q", got, wantSelected)
 	}
 	if !runner.hasArgPrefix("--bind=start:reload:") || !runner.hasArgPrefix("--bind=change:reload:") {
 		t.Fatalf("fzf args missing reload bindings: %#v", runner.fzfArgs)
@@ -104,7 +106,7 @@ func TestSessionSearchRootFallsBackToAPIWebCommonAncestor(t *testing.T) {
 	manager := NewManager(cfg, &fakeRunner{})
 
 	got := manager.sessionSearchRoot()
-	want := filepath.Join(root, "saas")
+	want := realDirOrFallback(filepath.Join(root, "saas"), filepath.Join(root, "saas"))
 	if got != want {
 		t.Fatalf("session search root = %q, want %q", got, want)
 	}
@@ -115,9 +117,10 @@ func TestOpenSessionCreatesUniqueDetachedSessionAndAttaches(t *testing.T) {
 	root := t.TempDir()
 	selected := filepath.Join(root, "my.project")
 	mustMkdir(t, selected)
+	selectedReal := realDirOrFallback(selected, selected)
 
 	runner := &fakeRunner{
-		paths:            map[string]bool{"tmux": true, "x-terminal-emulator": true},
+		paths:            terminalLauncherTestPaths(),
 		existingSessions: map[string]bool{"space": true, "space_1": true},
 	}
 	manager := NewManager(testConfig(root), runner)
@@ -126,13 +129,13 @@ func TestOpenSessionCreatesUniqueDetachedSessionAndAttaches(t *testing.T) {
 		t.Fatalf("OpenSession returned error: %v", err)
 	}
 
-	if !runner.hasRun("tmux new-session -ds space_2 -n my_project -c " + selected) {
+	if !runner.hasRun("tmux new-session -ds space_2 -n my_project -c " + selectedReal) {
 		t.Fatalf("new-session was not executed as expected: %#v", runner.runs)
 	}
 	if !runner.hasRun("tmux set-option -gq default-terminal tmux-256color") {
 		t.Fatalf("default terminal option missing: %#v", runner.runs)
 	}
-	if !runner.hasStart("x-terminal-emulator -e env COLORTERM=truecolor tmux attach -t space_2") {
+	if !runner.hasTerminalAttachStart("space_2") {
 		t.Fatalf("terminal attach was not executed as expected: %#v", runner.starts)
 	}
 }
@@ -142,8 +145,9 @@ func TestOpenHomeSessionUsesConfiguredDirectoryAndSessionName(t *testing.T) {
 	root := t.TempDir()
 	selected := filepath.Join(root, "terminal-home")
 	mustMkdir(t, selected)
+	selectedReal := realDirOrFallback(selected, selected)
 
-	runner := &fakeRunner{paths: map[string]bool{"tmux": true, "x-terminal-emulator": true}}
+	runner := &fakeRunner{paths: terminalLauncherTestPaths()}
 	cfg := testConfig(root)
 	cfg.Project.Tmux.Home.Directory = selected
 	cfg.Project.Tmux.Home.SessionName = "home"
@@ -153,10 +157,10 @@ func TestOpenHomeSessionUsesConfiguredDirectoryAndSessionName(t *testing.T) {
 		t.Fatalf("OpenHomeSession returned error: %v", err)
 	}
 
-	if !runner.hasRun("tmux new-session -ds home -n terminal_home -c " + selected) {
+	if !runner.hasRun("tmux new-session -ds home -n terminal_home -c " + selectedReal) {
 		t.Fatalf("new-session was not executed as expected: %#v", runner.runs)
 	}
-	if !runner.hasStart("x-terminal-emulator -e env COLORTERM=truecolor tmux attach -t home") {
+	if !runner.hasTerminalAttachStart("home") {
 		t.Fatalf("terminal attach was not executed as expected: %#v", runner.starts)
 	}
 }
@@ -330,6 +334,30 @@ func (r *fakeRunner) hasStart(command string) bool {
 		}
 	}
 	return false
+}
+
+func (r *fakeRunner) hasTerminalAttachStart(session string) bool {
+	for _, start := range r.starts {
+		if runtime.GOOS == "darwin" {
+			if strings.HasPrefix(start, "osascript -e tell application \"Terminal\"") &&
+				strings.Contains(start, "do script \"'env' 'COLORTERM=truecolor' 'tmux' 'attach' '-t' '"+session+"'\"") {
+				return true
+			}
+			continue
+		}
+		if start == "x-terminal-emulator -e env COLORTERM=truecolor tmux attach -t "+session {
+			return true
+		}
+	}
+	return false
+}
+
+func terminalLauncherTestPaths() map[string]bool {
+	paths := map[string]bool{"tmux": true, "x-terminal-emulator": true}
+	if runtime.GOOS == "darwin" {
+		paths["osascript"] = true
+	}
+	return paths
 }
 
 func (r *fakeRunner) hasArgPrefix(prefix string) bool {
