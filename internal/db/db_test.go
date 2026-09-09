@@ -129,6 +129,57 @@ func TestSanitizeSQLReaderRemovesStandaloneDashLines(t *testing.T) {
 	}
 }
 
+func TestDetectSQLTableNames(t *testing.T) {
+	tests := map[string]string{
+		"-- Table structure for table `users`":              "users",
+		"-- Dumping data for table `audit_logs`":            "audit_logs",
+		"CREATE TABLE IF NOT EXISTS `app`.`orders` (":       "orders",
+		"CREATE TABLE `weird``name` (`id` int);":            "weird`name",
+		"INSERT IGNORE INTO plain_table (`id`) VALUES (1);": "plain_table",
+		"REPLACE INTO `tenant_users` VALUES (1);":           "tenant_users",
+		"ALTER TABLE \"events\" ADD KEY `idx` (`id`);":      "events",
+		"/*!40000 ALTER TABLE `events` DISABLE KEYS */;":    "events",
+		"DROP TABLE IF EXISTS 'old_table';":                 "old_table",
+		"LOCK TABLES `user.sessions` WRITE;":                "user.sessions",
+		"select * from users;":                              "",
+	}
+
+	for input, expected := range tests {
+		if got := detectSQLTable(input); got != expected {
+			t.Fatalf("detectSQLTable(%q) = %q, want %q", input, got, expected)
+		}
+	}
+}
+
+func TestTableTrackingReaderReportsTableChanges(t *testing.T) {
+	reported := []string{}
+	reader := newTableTrackingReader(strings.NewReader(strings.Join([]string{
+		"-- Table structure for table `users`",
+		"CREATE TABLE `users` (`id` int);",
+		"INSERT INTO `orders` (`id`) VALUES (1);",
+		"INSERT INTO `orders` (`id`) VALUES (2);",
+		"ALTER TABLE `invoices` ADD KEY `id` (`id`);",
+	}, "\n")), func(table string) {
+		reported = append(reported, table)
+	})
+
+	buffer := make([]byte, 7)
+	for {
+		_, err := reader.Read(buffer)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("Read returned error: %v", err)
+		}
+	}
+
+	want := []string{"users", "orders", "invoices"}
+	if !reflect.DeepEqual(reported, want) {
+		t.Fatalf("reported tables = %#v, want %#v", reported, want)
+	}
+}
+
 func TestEnsureDatabaseRunsExpectedMysqlCommand(t *testing.T) {
 	t.Setenv("DVV_NO_LOADER", "1")
 	runner := &dbFakeRunner{}
@@ -282,6 +333,29 @@ func TestCommandCleanDeletesSelectedDumpAfterConfirmation(t *testing.T) {
 	}
 	if _, err := os.Stat(kept); err != nil {
 		t.Fatalf("kept dump should remain, stat err = %v", err)
+	}
+}
+
+func TestDownloadDumpRejectsUnknownRcloneRemote(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	t.Setenv("DVV_NO_LOADER", "1")
+	withDBStdin(t, "gm\n")
+
+	cfg := &config.Config{Project: config.DefaultProjectConfig()}
+	cfg.Project.DB.DumpsDir = t.TempDir()
+	runner := &dbFakeRunner{outputs: []string{"gdrive:\nbackup:\n"}}
+	manager := &Manager{Config: cfg, Runner: runner}
+
+	_, err := manager.downloadDump(context.Background())
+	if err == nil {
+		t.Fatal("downloadDump should reject unknown rclone remote")
+	}
+	want := `rclone remote "gm" is not configured; available remotes: backup, gdrive`
+	if err.Error() != want {
+		t.Fatalf("error = %q, want %q", err.Error(), want)
+	}
+	if len(runner.calls) != 1 || runner.calls[0].name != "rclone" || !reflect.DeepEqual(runner.calls[0].args, []string{"listremotes"}) {
+		t.Fatalf("calls = %#v, want only rclone listremotes", runner.calls)
 	}
 }
 
@@ -439,4 +513,22 @@ func (r *dbFakeRunner) LookPath(name string) (string, error) {
 		return "", errors.New("not found")
 	}
 	return "/usr/bin/" + name, nil
+}
+
+func withDBStdin(t *testing.T, input string) {
+	t.Helper()
+	stdinReader, stdinWriter, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Pipe failed: %v", err)
+	}
+	originalStdin := os.Stdin
+	os.Stdin = stdinReader
+	t.Cleanup(func() {
+		os.Stdin = originalStdin
+		stdinReader.Close()
+	})
+	if _, err := stdinWriter.WriteString(input); err != nil {
+		t.Fatalf("WriteString stdin failed: %v", err)
+	}
+	stdinWriter.Close()
 }
