@@ -324,22 +324,12 @@ func (m *Manager) createInteractive(ctx context.Context) (Workspace, error) {
 		return Workspace{}, fmt.Errorf("workspace creation cancelled")
 	}
 	var result CreateResult
-	createErr := ui.RunWithRoyalProgress(ui.ProgressOptions{
-		Action:        "creating",
-		Subject:       "workspace",
-		Detail:        plan.WorkspaceDir,
-		Total:         workspaceProgressTotal(len(plan.Items)),
-		SuccessAction: "created",
-		FailureAction: "failed",
-	}, func(progress *ui.RoyalProgressLoader) error {
-		result = m.executeCreatePlan(ctx, plan, func(CreatePlanItem) {
-			progress.Add(1)
+	createErr := ui.RunWithRoyalStatusLoader(workspaceLoaderOptions("creating", "workspace", plan.WorkspaceDir, "created", false), func(loader *ui.RoyalStatusLoader) error {
+		result = m.executeCreatePlan(ctx, plan, func(step OperationStep) {
+			updateWorkspaceOperationLoader(loader, "creating", step)
 		})
-		if len(plan.Items) == 0 {
-			progress.Set(1)
-		}
 		if result.Failed > 0 {
-			return fmt.Errorf("workspace created with %d failure(s)", result.Failed)
+			return fmt.Errorf("workspace creation failed with %d failure(s)", result.Failed)
 		}
 		return nil
 	})
@@ -431,20 +421,10 @@ func (m *Manager) manageInteractive(ctx context.Context, ws Workspace) error {
 	}
 	printAddPlan(plan)
 	var result AddResult
-	addErr := ui.RunWithRoyalProgress(ui.ProgressOptions{
-		Action:        "adding",
-		Subject:       "workspace",
-		Detail:        ws.DirName,
-		Total:         workspaceProgressTotal(len(plan.Items)),
-		SuccessAction: "added",
-		FailureAction: "failed",
-	}, func(progress *ui.RoyalProgressLoader) error {
-		result = m.executeAddPlan(ctx, plan, func(AddPlanItem) {
-			progress.Add(1)
+	addErr := ui.RunWithRoyalStatusLoader(workspaceLoaderOptions("adding", "workspace", ws.DirName, "added", false), func(loader *ui.RoyalStatusLoader) error {
+		result = m.executeAddPlan(ctx, plan, func(step OperationStep) {
+			updateWorkspaceOperationLoader(loader, "adding", step)
 		})
-		if len(plan.Items) == 0 {
-			progress.Set(1)
-		}
 		if result.Failed > 0 {
 			return fmt.Errorf("project management completed with %d failure(s)", result.Failed)
 		}
@@ -1009,8 +989,11 @@ func reportCreateResult(result CreateResult) {
 	if result.Skipped > 0 {
 		ui.Warn("Skipped %d workspace project(s)", result.Skipped)
 	}
+	if result.Failed > 0 {
+		ui.Error("Failed %d workspace step(s)", result.Failed)
+	}
 	for _, err := range result.Errors {
-		ui.Warn("%s", err)
+		ui.Error("%s", err)
 	}
 }
 
@@ -1021,8 +1004,11 @@ func reportAddResult(result AddResult) {
 	if result.Skipped > 0 {
 		ui.Warn("Skipped %d workspace project(s)", result.Skipped)
 	}
+	if result.Failed > 0 {
+		ui.Error("Failed %d workspace step(s)", result.Failed)
+	}
 	for _, err := range result.Errors {
-		ui.Warn("%s", err)
+		ui.Error("%s", err)
 	}
 }
 
@@ -1186,11 +1172,24 @@ func workspaceLoaderOptions(action string, subject string, detail string, succes
 	}
 }
 
-func workspaceProgressTotal(items int) int64 {
-	if items <= 0 {
-		return 1
+func updateWorkspaceOperationLoader(loader *ui.RoyalStatusLoader, action string, step OperationStep) {
+	subject := strings.TrimSpace(step.Subject)
+	if subject == "" {
+		subject = "workspace"
 	}
-	return int64(items)
+	detail := strings.TrimSpace(strings.Join(compactStrings(step.Stage, step.Detail), " "))
+	loader.Set(action, subject, detail)
+}
+
+func compactStrings(values ...string) []string {
+	compact := []string{}
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			compact = append(compact, value)
+		}
+	}
+	return compact
 }
 
 func shellQuote(value string) string {

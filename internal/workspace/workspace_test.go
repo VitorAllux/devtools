@@ -714,7 +714,7 @@ func TestExecuteCreatePlanWritesMetadataAndAgentsFile(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(plan.WorkspacePath, ".agents", "manifest.json")); err != nil {
 		t.Fatalf(".agents/manifest.json missing: %v", err)
 	}
-	if !runner.hasRun("git -C " + source + " worktree add -b issue-42 " + filepath.Join(plan.WorkspacePath, "api") + " origin/master") {
+	if !runner.hasRun("git -C " + source + " worktree add --quiet -b issue-42 " + filepath.Join(plan.WorkspacePath, "api") + " origin/master") {
 		t.Fatalf("git worktree add was not executed, runs = %#v", runner.runs)
 	}
 }
@@ -738,16 +738,40 @@ func TestExecuteCreatePlanReportsProgressForEachProject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildCreatePlan returned error: %v", err)
 	}
-	progress := []string{}
-	result := manager.executeCreatePlan(ctx, plan, func(item CreatePlanItem) {
-		progress = append(progress, item.Project.Name)
+	steps := []string{}
+	result := manager.executeCreatePlan(ctx, plan, func(step OperationStep) {
+		steps = append(steps, operationStepKey(step))
 	})
 
 	if result.Failed != 0 || result.Created != 2 {
 		t.Fatalf("result = %#v", result)
 	}
-	if strings.Join(progress, ",") != "api,web" {
-		t.Fatalf("progress = %#v, want api,web", progress)
+	for _, want := range []string{
+		"directory:workspace-bug-99:prepare workspace root",
+		"worktree:api:prune remove stale worktree refs",
+		"worktree:api:checkout create branch bug-99 from origin/prod",
+		"worktree:web:prune remove stale worktree refs",
+		"worktree:web:checkout create branch bug-99 from origin/prod",
+		"metadata:workspace-bug-99:write workspace config",
+		"agent harness:workspace-bug-99:write AGENTS.md and skills",
+	} {
+		if !containsString(steps, want) {
+			t.Fatalf("steps missing %q in %#v", want, steps)
+		}
+	}
+}
+
+func TestCreateItemStageErrorIncludesActionContext(t *testing.T) {
+	err := createItemStageError("git worktree", CreatePlanItem{
+		Project:    discovery.Project{Name: "api-eloverde"},
+		Action:     CreateBranchAction,
+		BaseBranch: "prod",
+	}, errors.New("branch already checked out"))
+
+	for _, want := range []string{"git worktree", "api-eloverde", "create-branch", "base=prod", "branch already checked out"} {
+		if !strings.Contains(err, want) {
+			t.Fatalf("error missing %q in %q", want, err)
+		}
 	}
 }
 
@@ -813,23 +837,38 @@ func TestExecuteAddPlanReportsProgressForEachProject(t *testing.T) {
 	runner := newWorkspaceRunner()
 	runner.refs[sourceAPI] = map[string]bool{"origin/master": true}
 	runner.refs[sourceWeb] = map[string]bool{"origin/master": true}
-	manager := NewManager(testWorkspaceConfig(workspacesRoot), runner)
+	cfg := testWorkspaceConfig(workspacesRoot)
+	cfg.Project.Workspace.Bootstrap.Commands = []config.WorkspaceBootstrapCommand{
+		{Name: "npm-install", Command: "npm", Args: []string{"i"}},
+	}
+	manager := NewManager(cfg, runner)
 	ws := Workspace{Name: "release", DirName: "workspace-release", Path: workspacePath}
 
 	plan, err := manager.BuildAddPlan(ctx, ws, []discovery.Project{{Name: "api", Path: sourceAPI}, {Name: "web", Path: sourceWeb}}, AddPlanOptions{Mode: AddBaseWorkspace})
 	if err != nil {
 		t.Fatalf("BuildAddPlan returned error: %v", err)
 	}
-	progress := []string{}
-	result := manager.executeAddPlan(ctx, plan, func(item AddPlanItem) {
-		progress = append(progress, item.Project.Name)
+	steps := []string{}
+	result := manager.executeAddPlan(ctx, plan, func(step OperationStep) {
+		steps = append(steps, operationStepKey(step))
 	})
 
 	if result.Failed != 0 || result.Created != 2 {
 		t.Fatalf("result = %#v", result)
 	}
-	if strings.Join(progress, ",") != "api,web" {
-		t.Fatalf("progress = %#v, want api,web", progress)
+	for _, want := range []string{
+		"worktree:api:prune remove stale worktree refs",
+		"worktree:api:checkout create branch release from origin/master",
+		"bootstrap:api:copy .env copy to .env",
+		"bootstrap:api:command npm-install npm i",
+		"worktree:web:prune remove stale worktree refs",
+		"worktree:web:checkout create branch release from origin/master",
+		"metadata:workspace-release:update workspace config",
+		"agent harness:workspace-release:sync AGENTS.md and skills",
+	} {
+		if !containsString(steps, want) {
+			t.Fatalf("steps missing %q in %#v", want, steps)
+		}
 	}
 }
 
@@ -1013,6 +1052,19 @@ func mustMkdir(t *testing.T, path string) {
 	}
 }
 
+func operationStepKey(step OperationStep) string {
+	return step.Stage + ":" + step.Subject + ":" + step.Detail
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
 func withPromptInput(t *testing.T, lines ...string) {
 	t.Helper()
 	reader, writer, err := os.Pipe()
@@ -1087,10 +1139,7 @@ func (r *workspaceRunner) Run(_ context.Context, _ string, name string, args ...
 		return nil
 	}
 	if len(args) >= 5 && args[2] == "worktree" && args[3] == "add" {
-		destination := args[4]
-		if args[4] == "-b" {
-			destination = args[6]
-		}
+		destination := worktreeAddDestination(args)
 		if err := os.MkdirAll(destination, 0o755); err != nil {
 			return err
 		}
@@ -1113,7 +1162,7 @@ func (r *workspaceRunner) Output(_ context.Context, _ string, name string, args 
 	}
 	r.outputs = append(r.outputs, strings.Join(append([]string{name}, args...), " "))
 	if name != "git" {
-		return nil, errors.New("unexpected command")
+		return nil, nil
 	}
 	projectPath := gitCommandPath(args)
 	if len(args) >= 5 && args[2] == "rev-parse" {
@@ -1162,12 +1211,9 @@ func (r *workspaceRunner) handleQuietGitMutation(args []string) (bool, error) {
 	case "prune":
 		return true, nil
 	case "add":
-		if len(args) < 5 {
+		destination := worktreeAddDestination(args)
+		if destination == "" {
 			return true, nil
-		}
-		destination := args[4]
-		if args[4] == "-b" && len(args) >= 7 {
-			destination = args[6]
 		}
 		if err := os.MkdirAll(destination, 0o755); err != nil {
 			return true, err
@@ -1181,6 +1227,24 @@ func (r *workspaceRunner) handleQuietGitMutation(args []string) (bool, error) {
 	default:
 		return false, nil
 	}
+}
+
+func worktreeAddDestination(args []string) string {
+	if len(args) < 5 {
+		return ""
+	}
+	for index := 4; index < len(args); index++ {
+		switch args[index] {
+		case "--quiet", "-q":
+			continue
+		case "-b", "-B":
+			index++
+			continue
+		default:
+			return args[index]
+		}
+	}
+	return ""
 }
 
 func (r *workspaceRunner) OutputWithInput(_ context.Context, _ string, input []byte, _ string, args ...string) ([]byte, error) {

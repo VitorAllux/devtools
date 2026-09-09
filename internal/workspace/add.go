@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -107,7 +108,7 @@ func (m *Manager) ExecuteAddPlan(ctx context.Context, plan AddPlan) AddResult {
 	return m.executeAddPlan(ctx, plan, nil)
 }
 
-func (m *Manager) executeAddPlan(ctx context.Context, plan AddPlan, onItemDone func(AddPlanItem)) AddResult {
+func (m *Manager) executeAddPlan(ctx context.Context, plan AddPlan, onStep func(OperationStep)) AddResult {
 	cfg := m.Config.Project.Workspace
 	result := AddResult{Plan: plan}
 	workspaceContext := addWorkspaceHookContext(plan)
@@ -115,21 +116,20 @@ func (m *Manager) executeAddPlan(ctx context.Context, plan AddPlan, onItemDone f
 	for _, item := range plan.Items {
 		switch item.Action {
 		case SkipNoBaseAction, SkipDestExistsAction, SkipBranchExistsAction, SkipBranchMissingAction:
+			notifyOperationStep(onStep, OperationStep{Stage: "skipping", Subject: item.Project.Name, Detail: string(item.Action)})
 			result.Skipped++
-			notifyAddProgress(onItemDone, item)
 			continue
 		}
 		projectContext := addProjectHookContext(plan, item)
+		notifyOperationStep(onStep, OperationStep{Stage: "hook", Subject: item.Project.Name, Detail: "project.adding"})
 		if _, err := hooks.Run(ctx, m.Runner, cfg.Hooks, hooks.ProjectAdding, hooks.Context{Workspace: workspaceContext, Project: projectContext}, false); err != nil {
 			result.Failed++
-			result.Errors = append(result.Errors, err.Error())
-			notifyAddProgress(onItemDone, item)
+			result.Errors = append(result.Errors, addItemStageError("project.adding hook", item, err))
 			continue
 		}
-		if err := m.executeAddWorktreeAction(ctx, item); err != nil {
+		if err := m.executeAddWorktreeAction(ctx, item, onStep); err != nil {
 			result.Failed++
-			result.Errors = append(result.Errors, err.Error())
-			notifyAddProgress(onItemDone, item)
+			result.Errors = append(result.Errors, addItemStageError("git worktree", item, err))
 			continue
 		}
 		result.Created++
@@ -141,44 +141,52 @@ func (m *Manager) executeAddPlan(ctx context.Context, plan AddPlan, onItemDone f
 			WorkBranch: item.WorkBranch,
 		}
 		result.AddedProjects = append(result.AddedProjects, project)
+		notifyOperationStep(onStep, OperationStep{Stage: "hook", Subject: item.Project.Name, Detail: "project.added"})
 		if _, err := hooks.Run(ctx, m.Runner, cfg.Hooks, hooks.ProjectAdded, hooks.Context{Workspace: workspaceContext, Project: projectContext}, false); err != nil {
 			result.Failed++
-			result.Errors = append(result.Errors, err.Error())
+			result.Errors = append(result.Errors, addItemStageError("project.added hook", item, err))
 		}
 		if shouldBootstrapOnAdd(cfg, plan.WorkspacePath) {
-			bootstrapResult := bootstrap.RunProject(ctx, cfg.Bootstrap, m.Runner, bootstrap.Project{Name: project.Name, Path: project.Path, Source: project.Source}, false)
+			bootstrapResult := bootstrap.RunProjectWithSteps(ctx, cfg.Bootstrap, m.Runner, bootstrap.Project{Name: project.Name, Path: project.Path, Source: project.Source}, false, func(step bootstrap.ProjectStep) {
+				notifyOperationStep(onStep, bootstrapOperationStep(project.Name, step))
+			})
 			result.BootstrapResults = append(result.BootstrapResults, bootstrapResult)
 			result.Failed += bootstrapResult.Failures
+			result.Errors = append(result.Errors, bootstrapStageErrors(project.Name, bootstrapResult)...)
 			_, _ = hooks.Run(ctx, m.Runner, cfg.Hooks, hooks.ProjectBootstrap, hooks.Context{Workspace: workspaceContext, Project: projectContext}, false)
 		}
-		notifyAddProgress(onItemDone, item)
 	}
+	notifyOperationStep(onStep, OperationStep{Stage: "metadata", Subject: plan.WorkspaceDir, Detail: "update workspace config"})
 	if err := updateAddMetadata(cfg, plan, result.AddedProjects); err != nil {
 		result.Failed++
-		result.Errors = append(result.Errors, err.Error())
+		result.Errors = append(result.Errors, workspaceStageError("workspace metadata", plan.WorkspaceDir, err))
 	}
+	notifyOperationStep(onStep, OperationStep{Stage: "agent harness", Subject: plan.WorkspaceDir, Detail: "sync AGENTS.md and skills"})
 	if _, err := bootstrap.WriteWorkspaceHarness(*m.Config, plan.WorkspacePath); err != nil {
 		result.Failed++
-		result.Errors = append(result.Errors, err.Error())
+		result.Errors = append(result.Errors, workspaceStageError("agent harness", plan.WorkspaceDir, err))
 	}
 	return result
 }
 
-func notifyAddProgress(onItemDone func(AddPlanItem), item AddPlanItem) {
-	if onItemDone != nil {
-		onItemDone(item)
-	}
-}
-
-func (m *Manager) executeAddWorktreeAction(ctx context.Context, item AddPlanItem) error {
+func (m *Manager) executeAddWorktreeAction(ctx context.Context, item AddPlanItem, onStep func(OperationStep)) error {
 	switch item.Action {
 	case ReuseBranchAction:
-		return m.Git.AddWorktree(ctx, item.Project.Path, item.Destination, item.WorkBranch)
+		return m.Git.AddWorktreeWithSteps(ctx, item.Project.Path, item.Destination, item.WorkBranch, func(step gitclient.WorktreeStep) {
+			notifyOperationStep(onStep, gitWorktreeOperationStep(item.Project.Name, step))
+		})
 	case CreateBranchAction:
-		return m.Git.AddWorktreeNewBranch(ctx, item.Project.Path, item.Destination, item.WorkBranch, m.Git.BaseRef(ctx, item.Project.Path, m.Config.Project.Workspace.Git.RemoteName, item.BaseBranch))
+		baseRef := m.Git.BaseRef(ctx, item.Project.Path, m.Config.Project.Workspace.Git.RemoteName, item.BaseBranch)
+		return m.Git.AddWorktreeNewBranchWithSteps(ctx, item.Project.Path, item.Destination, item.WorkBranch, baseRef, func(step gitclient.WorktreeStep) {
+			notifyOperationStep(onStep, gitWorktreeOperationStep(item.Project.Name, step))
+		})
 	default:
 		return nil
 	}
+}
+
+func addItemStageError(stage string, item AddPlanItem, err error) string {
+	return fmt.Sprintf("%s failed for %s (%s, base=%s): %v", stage, item.Project.Name, item.Action, item.BaseBranch, err)
 }
 
 func updateAddMetadata(cfg config.WorkspaceConfig, plan AddPlan, added []metadata.Project) error {
