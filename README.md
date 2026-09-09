@@ -589,6 +589,7 @@ Common cases:
 | `dvv workspace` does not show a workspace | Confirm it is a direct child of `workspace.root`, starts with `workspace-`, and has a valid UTF-8 name. |
 | SSH list is empty | Run `dvv bootstrap` or check `~/.config/devv/servers.list`. |
 | Database import fails with `ASCII '\\0'` | The file is probably compressed without a `.gz` suffix. Rebuild with `dvv build`; current imports detect gzip by content. |
+| Database import fails with `ERROR 6125` / `Missing unique key` | The MySQL server is enforcing unique referenced keys. Rebuild with `dvv build`; imports automatically enable `restrict_fk_on_non_standard_key=OFF` when that server variable exists. |
 | Database import fails at SQL line | The dump reached MySQL; inspect the SQL/version compatibility at the reported line. |
 
 Inspect suspicious workspace names:

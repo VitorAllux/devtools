@@ -407,6 +407,50 @@ func TestImportDumpUsesMysqlBinaryModeAndSanitizer(t *testing.T) {
 	}
 }
 
+func TestMysqlImportArgsEnablesNonStandardFKCompatibilityWhenSupported(t *testing.T) {
+	runner := &dbFakeRunner{outputs: []string{"restrict_fk_on_non_standard_key\tON\n"}}
+	manager := &Manager{
+		Config:       &config.Config{Project: config.DefaultProjectConfig()},
+		Runner:       runner,
+		defaultsFile: "/tmp/client.cnf",
+	}
+
+	got := manager.mysqlImportArgs(context.Background(), "client_db")
+	want := []string{
+		"--defaults-extra-file=/tmp/client.cnf",
+		"--binary-mode=1",
+		"--default-character-set=utf8mb4",
+		"--init-command=SET @@session.restrict_fk_on_non_standard_key=OFF",
+		"client_db",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("mysql import args = %#v, want %#v", got, want)
+	}
+	if len(runner.calls) != 1 || runner.calls[0].name != "mysql" {
+		t.Fatalf("compatibility probe calls = %#v, want one mysql call", runner.calls)
+	}
+}
+
+func TestMysqlImportArgsSkipsNonStandardFKCompatibilityWhenUnsupported(t *testing.T) {
+	runner := &dbFakeRunner{}
+	manager := &Manager{
+		Config:       &config.Config{Project: config.DefaultProjectConfig()},
+		Runner:       runner,
+		defaultsFile: "/tmp/client.cnf",
+	}
+
+	got := manager.mysqlImportArgs(context.Background(), "client_db")
+	want := []string{
+		"--defaults-extra-file=/tmp/client.cnf",
+		"--binary-mode=1",
+		"--default-character-set=utf8mb4",
+		"client_db",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("mysql import args = %#v, want %#v", got, want)
+	}
+}
+
 func TestSelectionParsingHelpers(t *testing.T) {
 	values := []string{"one", "two", "three"}
 	if got := valuesByIndexes(values, "1, 3 bad 9"); !reflect.DeepEqual(got, []string{"one", "three"}) {
@@ -465,6 +509,10 @@ func TestSummarizeCommandErrorUsesLastStderrLine(t *testing.T) {
 	}
 	if fallback := summarizeCommandError(err, ""); fallback != "exit status 1" {
 		t.Fatalf("fallback = %q", fallback)
+	}
+	fkError := summarizeCommandError(err, "ERROR 6125 (HY000): Failed to add the foreign key constraint. Missing unique key for constraint 'twilio_messages_conversation_id_foreign' in the referenced table 'twilio_conversations'\n")
+	if !strings.Contains(fkError, "restrict_fk_on_non_standard_key=OFF") {
+		t.Fatalf("foreign key compatibility hint missing: %q", fkError)
 	}
 }
 

@@ -600,13 +600,7 @@ func (m *Manager) importDump(ctx context.Context, dump string, dbName string) er
 		progress.SetDetail("table " + table)
 	})
 
-	cmd := exec.CommandContext(ctx,
-		"mysql",
-		"--defaults-extra-file="+m.defaultsFile,
-		"--binary-mode=1",
-		"--default-character-set=utf8mb4",
-		dbName,
-	)
+	cmd := exec.CommandContext(ctx, "mysql", m.mysqlImportArgs(ctx, dbName)...)
 	cmd.Stdin = sqlReader
 	cmd.Stdout = os.Stdout
 	var stderr bytes.Buffer
@@ -628,6 +622,26 @@ func (m *Manager) importDump(ctx context.Context, dump string, dbName string) er
 	}
 	ui.OK("Imported %s into %s", filepath.Base(dump), dbName)
 	return nil
+}
+
+func (m *Manager) mysqlImportArgs(ctx context.Context, dbName string) []string {
+	args := []string{
+		"--defaults-extra-file=" + m.defaultsFile,
+		"--binary-mode=1",
+		"--default-character-set=utf8mb4",
+	}
+	if m.supportsNonStandardFKCompatibility(ctx) {
+		args = append(args, "--init-command=SET @@session.restrict_fk_on_non_standard_key=OFF")
+	}
+	return append(args, dbName)
+}
+
+func (m *Manager) supportsNonStandardFKCompatibility(ctx context.Context) bool {
+	out, err := m.mysqlOutput(ctx, "-N", "-s", "-e", "SHOW VARIABLES LIKE 'restrict_fk_on_non_standard_key';")
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(out), "restrict_fk_on_non_standard_key")
 }
 
 func (m *Manager) dumpFiles() ([]string, error) {
@@ -920,6 +934,9 @@ func summarizeCommandError(err error, stderr string) string {
 	last := strings.TrimSpace(lines[len(lines)-1])
 	if last == "" {
 		return err.Error()
+	}
+	if strings.Contains(last, "ERROR 6125") || strings.Contains(last, "Missing unique key") {
+		return last + "; MySQL is rejecting a foreign key that references a non-unique key. dvv enables restrict_fk_on_non_standard_key=OFF when the server supports it."
 	}
 	return last
 }
