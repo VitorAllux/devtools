@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -143,14 +144,44 @@ type LoaderOptions struct {
 	FailureAction string
 }
 
+type RoyalStatusLoader struct {
+	mu      sync.RWMutex
+	options LoaderOptions
+}
+
+func NewRoyalStatusLoader(options LoaderOptions) *RoyalStatusLoader {
+	return &RoyalStatusLoader{options: options}
+}
+
+func (l *RoyalStatusLoader) Set(action string, subject string, detail string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.options.Action = action
+	l.options.Subject = subject
+	l.options.Detail = detail
+}
+
+func (l *RoyalStatusLoader) snapshot() LoaderOptions {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.options
+}
+
 type loaderRunResult struct {
 	err       error
 	panicData any
 }
 
 func RunWithRoyalLoader(options LoaderOptions, fn func() error) error {
-	if !LoaderEnabled() {
+	return RunWithRoyalStatusLoader(options, func(*RoyalStatusLoader) error {
 		return fn()
+	})
+}
+
+func RunWithRoyalStatusLoader(options LoaderOptions, fn func(*RoyalStatusLoader) error) error {
+	loader := NewRoyalStatusLoader(options)
+	if !LoaderEnabled() {
+		return fn(loader)
 	}
 
 	done := make(chan loaderRunResult, 1)
@@ -163,7 +194,7 @@ func RunWithRoyalLoader(options LoaderOptions, fn func() error) error {
 			}
 			done <- result
 		}()
-		result.err = fn()
+		result.err = fn(loader)
 	}()
 
 	start := time.Now()
@@ -173,19 +204,24 @@ func RunWithRoyalLoader(options LoaderOptions, fn func() error) error {
 	clearWidth := 160
 	render := func() {
 		elapsed := time.Since(start).Truncate(100 * time.Millisecond)
-		fmt.Fprintf(os.Stderr, "\r%s", renderRoyalLoaderFrame(options, index, elapsed))
+		clearTerminalLine()
+		fmt.Fprintf(os.Stderr, "\r%s", renderRoyalLoaderFrame(loader.snapshot(), index, elapsed))
 		index++
 	}
 	clear := func() {
-		fmt.Fprint(os.Stderr, "\r\033[2K")
+		clearTerminalLine()
 		if !useColor() {
 			fmt.Fprint(os.Stderr, "\r"+strings.Repeat(" ", clearWidth)+"\r")
 		}
 	}
 	finish := func(err error) {
 		clear()
-		if options.ShowResult || err != nil {
-			fmt.Fprintln(os.Stderr, renderRoyalLoaderResult(options, err == nil))
+		finishOptions := options
+		if err != nil {
+			finishOptions = loader.snapshot()
+		}
+		if finishOptions.ShowResult || err != nil {
+			fmt.Fprintln(os.Stderr, renderRoyalLoaderResult(finishOptions, err == nil))
 		}
 	}
 
@@ -218,6 +254,10 @@ func RunWithRoyalLoader(options LoaderOptions, fn func() error) error {
 			}
 		}
 	}
+}
+
+func clearTerminalLine() {
+	fmt.Fprint(os.Stderr, "\r\033[2K")
 }
 
 var terminalCheck = isTerminal
