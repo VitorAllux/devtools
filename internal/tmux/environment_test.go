@@ -178,19 +178,20 @@ func TestTargetsIncludeConfiguredTmuxEnvironments(t *testing.T) {
 func TestStartEnvironmentCreatesLayoutAndOpensTerminal(t *testing.T) {
 	t.Setenv("DVV_NO_LOADER", "1")
 	root := t.TempDir()
+	rootReal := realDirOrFallback(root, root)
 	apiDir := filepath.Join(root, "api")
 	webDir := filepath.Join(root, "web")
 	mustMkdir(t, apiDir)
 	mustMkdir(t, webDir)
 
-	runner := &fakeRunner{paths: map[string]bool{"tmux": true, "x-terminal-emulator": true}}
+	runner := &fakeRunner{paths: terminalLauncherTestPaths()}
 	manager := NewManager(testConfig(root), runner)
 	target := Target{Label: "Default config", Status: "stopped", Session: "dev", Window: "main", APIDir: apiDir, WebDir: webDir}
 
 	if err := manager.StartEnvironment(context.Background(), target); err != nil {
 		t.Fatalf("StartEnvironment returned error: %v", err)
 	}
-	if !runner.hasRun("tmux new-session -d -s dev -c " + root) {
+	if !runner.hasRun("tmux new-session -d -s dev -c " + rootReal) {
 		t.Fatalf("new session command missing: %#v", runner.runs)
 	}
 	if !runner.hasRun("tmux set-option -gq default-terminal tmux-256color") {
@@ -202,7 +203,7 @@ func TestStartEnvironmentCreatesLayoutAndOpensTerminal(t *testing.T) {
 	if !runner.hasRun("tmux send-keys -t dev:main.2 cd '" + webDir + "' && npm run serve Enter") {
 		t.Fatalf("web command missing: %#v", runner.runs)
 	}
-	if !runner.hasStart("x-terminal-emulator -e env COLORTERM=truecolor tmux attach -t dev") {
+	if !runner.hasTerminalAttachStart("dev") {
 		t.Fatalf("terminal attach missing: %#v", runner.starts)
 	}
 }
@@ -240,6 +241,7 @@ func TestResetCurrentAPIUsesCurrentTmuxWindowAndSkipsWeb(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(apiDir, "artisan"), []byte("#!/usr/bin/env php\n"), 0o755); err != nil {
 		t.Fatalf("WriteFile artisan failed: %v", err)
 	}
+	apiDir = realDirOrFallback(apiDir, apiDir)
 
 	runner := &fakeRunner{
 		paths:            map[string]bool{"tmux": true},
@@ -281,6 +283,7 @@ func TestResetCurrentAPIFindsLaravelPaneOutsidePaneZero(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(apiDir, "artisan"), []byte("#!/usr/bin/env php\n"), 0o755); err != nil {
 		t.Fatalf("WriteFile artisan failed: %v", err)
 	}
+	apiDir = realDirOrFallback(apiDir, apiDir)
 
 	runner := &fakeRunner{
 		paths:            map[string]bool{"tmux": true},
@@ -355,6 +358,7 @@ func TestResetCurrentAPIFallsBackToSingleLaravelWindow(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(apiDir, "artisan"), []byte("#!/usr/bin/env php\n"), 0o755); err != nil {
 		t.Fatalf("WriteFile artisan failed: %v", err)
 	}
+	apiDir = realDirOrFallback(apiDir, apiDir)
 
 	runner := &fakeRunner{
 		paths:            map[string]bool{"tmux": true},
@@ -396,6 +400,8 @@ func TestResetCurrentAPIUsesCachedTargetBeforeAmbiguousGlobalWindows(t *testing.
 			t.Fatalf("WriteFile artisan failed: %v", err)
 		}
 	}
+	apiOne = realDirOrFallback(apiOne, apiOne)
+	apiTwo = realDirOrFallback(apiTwo, apiTwo)
 
 	runner := &fakeRunner{
 		paths:            map[string]bool{"tmux": true},
@@ -436,6 +442,8 @@ func TestResetCurrentAPIRefusesAmbiguousGlobalWindows(t *testing.T) {
 			t.Fatalf("WriteFile artisan failed: %v", err)
 		}
 	}
+	apiOne = realDirOrFallback(apiOne, apiOne)
+	apiTwo = realDirOrFallback(apiTwo, apiTwo)
 
 	runner := &fakeRunner{
 		paths:            map[string]bool{"tmux": true},
@@ -477,6 +485,8 @@ func TestRunResetAPISelectsAmbiguousGlobalWindow(t *testing.T) {
 			t.Fatalf("WriteFile artisan failed: %v", err)
 		}
 	}
+	apiOne = realDirOrFallback(apiOne, apiOne)
+	apiTwo = realDirOrFallback(apiTwo, apiTwo)
 
 	selected := resetAPICandidate{Session: "space", Window: "api-two", Pane: "0", APIDir: apiTwo}
 	runner := &fakeRunner{
@@ -513,6 +523,7 @@ func TestResetCurrentAPIOutsideTmuxFallsBackToSingleLaravelWindow(t *testing.T) 
 	if err := os.WriteFile(filepath.Join(apiDir, "artisan"), []byte("#!/usr/bin/env php\n"), 0o755); err != nil {
 		t.Fatalf("WriteFile artisan failed: %v", err)
 	}
+	apiDir = realDirOrFallback(apiDir, apiDir)
 	runner := &fakeRunner{
 		paths:            map[string]bool{"tmux": true},
 		currentWindowErr: true,

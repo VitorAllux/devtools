@@ -194,6 +194,7 @@ type WorkspaceConfig struct {
 	Projects           []WorkspaceProject      `json:"projects"`
 	Templates          []WorkspaceTemplate     `json:"templates"`
 	ProjectSearchRoots []string                `json:"projectSearchRoots"`
+	ProjectExcludeDirs []string                `json:"projectExcludeDirs"`
 	ProjectSearchDepth int                     `json:"projectSearchDepth"`
 	Git                WorkspaceGitConfig      `json:"git"`
 	Interactive        WorkspaceInteractive    `json:"interactive"`
@@ -628,6 +629,7 @@ func defaultWorkspaceConfig() WorkspaceConfig {
 			"~/Work/Development",
 			"~/Development",
 		},
+		ProjectExcludeDirs: []string{},
 		ProjectSearchDepth: 4,
 		Git: WorkspaceGitConfig{
 			RemoteName:            "origin",
@@ -1073,6 +1075,9 @@ func mergeWorkspaceConfigDefaults(target WorkspaceConfig, defaults WorkspaceConf
 	if target.ProjectSearchRoots == nil {
 		target.ProjectSearchRoots = defaults.ProjectSearchRoots
 	}
+	if target.ProjectExcludeDirs == nil {
+		target.ProjectExcludeDirs = defaults.ProjectExcludeDirs
+	}
 	if target.ProjectSearchDepth <= 0 {
 		target.ProjectSearchDepth = defaults.ProjectSearchDepth
 	}
@@ -1280,6 +1285,13 @@ func resolveWorkspaceConfig(cfg WorkspaceConfig) WorkspaceConfig {
 		cfg.ProjectSearchRoots[index] = ExpandPath(root)
 	}
 	cfg.ProjectSearchRoots = uniquePaths(cfg.ProjectSearchRoots)
+	if excludes := firstSetEnv("DVV_WORKSPACE_PROJECT_EXCLUDE_DIRS", "DEVT_WORKSPACE_PROJECT_EXCLUDE_DIRS"); excludes != "" {
+		cfg.ProjectExcludeDirs = splitPathList(excludes)
+	}
+	for index, exclude := range cfg.ProjectExcludeDirs {
+		cfg.ProjectExcludeDirs[index] = ExpandPath(exclude)
+	}
+	cfg.ProjectExcludeDirs = uniquePaths(cfg.ProjectExcludeDirs)
 	for index, project := range cfg.Projects {
 		cfg.Projects[index].Path = ExpandPath(project.Path)
 	}

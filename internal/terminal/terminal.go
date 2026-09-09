@@ -98,7 +98,13 @@ func (l Launcher) openDarwin(ctx context.Context, preferred string, command stri
 		return l.Runner.Start(ctx, "", "osascript",
 			"-e", `tell application "Terminal"`,
 			"-e", `activate`,
+			"-e", `if (count of windows) = 0 then`,
 			"-e", `do script "`+shell+`"`,
+			"-e", `else`,
+			"-e", `tell application "System Events" to keystroke "t" using command down`,
+			"-e", `delay 0.1`,
+			"-e", `do script "`+shell+`" in selected tab of front window`,
+			"-e", `end if`,
 			"-e", `end tell`,
 		)
 	case "iterm", "iterm2":

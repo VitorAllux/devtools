@@ -139,6 +139,7 @@
       "~/Work/Development",
       "~/Development"
     ],
+    "projectExcludeDirs": [],
     "projectSearchDepth": 4,
     "git": {
       "remoteName": "origin",

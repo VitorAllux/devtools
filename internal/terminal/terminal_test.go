@@ -82,6 +82,12 @@ func TestLauncherUsesTerminalAppOnDarwin(t *testing.T) {
 	if !strings.HasPrefix(runner.started, "osascript -e tell application \"Terminal\"") {
 		t.Fatalf("started = %q, want Terminal.app osascript", runner.started)
 	}
+	if !strings.Contains(runner.started, "keystroke \"t\" using command down") {
+		t.Fatalf("started = %q, want Terminal.app new tab shortcut", runner.started)
+	}
+	if !strings.Contains(runner.started, "selected tab of front window") {
+		t.Fatalf("started = %q, want command to run in selected tab", runner.started)
+	}
 	if !strings.Contains(runner.started, "do script \"'env' 'COLORTERM=truecolor' 'tmux' 'attach' '-t' 'space'\"") {
 		t.Fatalf("started = %q, want escaped shell command", runner.started)
 	}

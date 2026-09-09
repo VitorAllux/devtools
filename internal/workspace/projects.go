@@ -22,7 +22,7 @@ func (m *Manager) DiscoverProjects(ctx context.Context) ([]discovery.Project, er
 		}
 		configured = append(configured, discovery.Project{Name: project.Name, Path: project.Path})
 	}
-	return discovery.Discover(ctx, m.Git, configured, cfg.ProjectSearchRoots, cfg.ProjectSearchDepth)
+	return discovery.Discover(ctx, m.Git, configured, cfg.ProjectSearchRoots, cfg.ProjectExcludeDirs, cfg.ProjectSearchDepth)
 }
 
 func (m *Manager) ManageProjects(ctx context.Context, ws Workspace) ([]ManageProject, error) {

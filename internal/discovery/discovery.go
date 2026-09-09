@@ -15,7 +15,7 @@ type Project struct {
 	Path string `json:"path"`
 }
 
-func Discover(ctx context.Context, git gitclient.Client, configured []Project, roots []string, maxDepth int) ([]Project, error) {
+func Discover(ctx context.Context, git gitclient.Client, configured []Project, roots []string, excludeDirs []string, maxDepth int) ([]Project, error) {
 	seen := map[string]bool{}
 	projects := make([]Project, 0, len(configured))
 
@@ -32,15 +32,16 @@ func Discover(ctx context.Context, git gitclient.Client, configured []Project, r
 		projects = append(projects, project)
 	}
 
-	discovered, err := discoverRoots(ctx, git, roots, maxDepth, seen)
+	discovered, err := discoverRoots(ctx, git, roots, excludeDirs, maxDepth, seen)
 	if err != nil {
 		return nil, err
 	}
 	return append(projects, discovered...), nil
 }
 
-func discoverRoots(ctx context.Context, git gitclient.Client, roots []string, maxDepth int, seen map[string]bool) ([]Project, error) {
+func discoverRoots(ctx context.Context, git gitclient.Client, roots []string, excludeDirs []string, maxDepth int, seen map[string]bool) ([]Project, error) {
 	discovered := map[string]Project{}
+	excludes := newExcluder(excludeDirs)
 	for _, root := range roots {
 		root = strings.TrimSpace(root)
 		if root == "" {
@@ -50,7 +51,7 @@ func discoverRoots(ctx context.Context, git gitclient.Client, roots []string, ma
 		if err != nil || !info.IsDir() {
 			continue
 		}
-		if err := walkRoot(ctx, git, root, maxDepth, seen, discovered); err != nil {
+		if err := walkRoot(ctx, git, root, maxDepth, excludes, seen, discovered); err != nil {
 			return nil, err
 		}
 	}
@@ -68,7 +69,7 @@ func discoverRoots(ctx context.Context, git gitclient.Client, roots []string, ma
 	return projects, nil
 }
 
-func walkRoot(ctx context.Context, git gitclient.Client, root string, maxDepth int, seen map[string]bool, discovered map[string]Project) error {
+func walkRoot(ctx context.Context, git gitclient.Client, root string, maxDepth int, excludes excluder, seen map[string]bool, discovered map[string]Project) error {
 	return filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -78,6 +79,9 @@ func walkRoot(ctx context.Context, git gitclient.Client, root string, maxDepth i
 		}
 		if path == root {
 			return nil
+		}
+		if excludes.matches(path, entry.Name()) {
+			return filepath.SkipDir
 		}
 		depth := pathDepth(root, path)
 		if maxDepth > 0 && depth > maxDepth {
@@ -96,6 +100,37 @@ func walkRoot(ctx context.Context, git gitclient.Client, root string, maxDepth i
 		discovered[key] = Project{Name: filepath.Base(projectPath), Path: projectPath}
 		return filepath.SkipDir
 	})
+}
+
+type excluder struct {
+	names map[string]bool
+	paths map[string]bool
+}
+
+func newExcluder(values []string) excluder {
+	result := excluder{names: map[string]bool{}, paths: map[string]bool{}}
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if filepath.IsAbs(value) || strings.ContainsRune(value, filepath.Separator) {
+			if key, ok := projectKey(value); ok {
+				result.paths[key] = true
+			}
+			continue
+		}
+		result.names[value] = true
+	}
+	return result
+}
+
+func (e excluder) matches(path string, name string) bool {
+	if e.names[name] {
+		return true
+	}
+	key, ok := projectKey(path)
+	return ok && e.paths[key]
 }
 
 func cleanProject(project Project) Project {
