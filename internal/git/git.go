@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/VitorAllux/devtools/internal/run"
 )
@@ -80,7 +82,8 @@ func (c Client) RefExists(ctx context.Context, projectPath string, ref string) b
 	if ref == "" {
 		return false
 	}
-	return c.Runner.Run(ctx, "", "git", "-C", projectPath, "rev-parse", "--verify", "--quiet", ref+"^{commit}") == nil
+	_, err := c.Runner.Output(ctx, "", "git", "-C", projectPath, "rev-parse", "--verify", "--quiet", ref+"^{commit}")
+	return err == nil
 }
 
 func (c Client) BaseBranchExists(ctx context.Context, projectPath string, remoteName string, branch string) bool {
@@ -132,6 +135,18 @@ func (c Client) DetectBaseBranch(ctx context.Context, projectPath string, remote
 		return branch
 	}
 	return ""
+}
+
+func (c Client) LastCommitTime(ctx context.Context, path string) (time.Time, bool) {
+	out, err := c.Runner.Output(ctx, "", "git", "-C", path, "log", "-1", "--format=%ct")
+	if err != nil {
+		return time.Time{}, false
+	}
+	seconds, err := strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
+	if err != nil || seconds <= 0 {
+		return time.Time{}, false
+	}
+	return time.Unix(seconds, 0), true
 }
 
 func (c Client) AddWorktree(ctx context.Context, projectPath string, destination string, branch string) error {

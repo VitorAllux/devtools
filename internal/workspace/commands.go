@@ -63,7 +63,7 @@ func (m *Manager) CommandList(ctx context.Context) error {
 		return nil
 	}
 	for _, detail := range details {
-		fmt.Printf("%s %s projects=%d dirty=%d\n", detail.Workspace.DirName, detail.Workspace.Path, detail.ProjectCount, detail.DirtyCount)
+		fmt.Printf("%s %s projects=%d dirty=%d active=%s\n", detail.Workspace.DirName, detail.Workspace.Path, detail.ProjectCount, detail.DirtyCount, relativeActivityNow(detail.LastActivity))
 		for _, project := range detail.Projects {
 			status := "clean"
 			if project.Dirty {

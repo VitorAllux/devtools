@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDetectBaseBranchUsesPriority(t *testing.T) {
@@ -97,6 +98,35 @@ func TestBranchExistsAndBaseBranchChecks(t *testing.T) {
 	}
 }
 
+func TestRefExistsCapturesRevParseOutput(t *testing.T) {
+	runner := &gitRunner{ok: map[string]bool{
+		"git -C /repo rev-parse --verify --quiet origin/main^{commit}": true,
+	}}
+	client := New(runner)
+
+	if !client.RefExists(context.Background(), "/repo", "origin/main") {
+		t.Fatal("RefExists should detect existing refs")
+	}
+	if len(runner.runs) != 0 {
+		t.Fatalf("RefExists should capture command output instead of using Run, runs = %#v", runner.runs)
+	}
+}
+
+func TestLastCommitTimeReadsUnixTimestamp(t *testing.T) {
+	runner := &gitRunner{outputs: map[string][]byte{
+		"git -C /repo log -1 --format=%ct": []byte("1720000000\n"),
+	}}
+	client := New(runner)
+
+	got, ok := client.LastCommitTime(context.Background(), "/repo")
+	if !ok {
+		t.Fatal("LastCommitTime should parse git timestamp")
+	}
+	if !got.Equal(time.Unix(1720000000, 0)) {
+		t.Fatalf("LastCommitTime = %s", got)
+	}
+}
+
 func TestAddWorktreeNewBranchPrunesBeforeAdding(t *testing.T) {
 	runner := &gitRunner{}
 	client := New(runner)
@@ -162,6 +192,12 @@ func (r *gitRunner) Run(_ context.Context, _ string, name string, args ...string
 
 func (r *gitRunner) Output(_ context.Context, _ string, name string, args ...string) ([]byte, error) {
 	command := strings.Join(append([]string{name}, args...), " ")
+	if name == "git" && isQuietGitProbe(args) && r.ok != nil {
+		if r.ok[command] {
+			return []byte("abc123\n"), nil
+		}
+		return nil, errors.New("command failed")
+	}
 	if name == "git" && isQuietGitMutation(args) {
 		r.runs = append(r.runs, command)
 		return nil, nil
@@ -175,6 +211,10 @@ func (r *gitRunner) Output(_ context.Context, _ string, name string, args ...str
 func isQuietGitMutation(args []string) bool {
 	return len(args) >= 4 && args[0] == "-C" && args[2] == "worktree" &&
 		(args[3] == "add" || args[3] == "remove" || args[3] == "prune")
+}
+
+func isQuietGitProbe(args []string) bool {
+	return len(args) >= 6 && args[0] == "-C" && args[2] == "rev-parse" && args[3] == "--verify" && args[4] == "--quiet"
 }
 
 func (r *gitRunner) OutputWithInput(context.Context, string, []byte, string, ...string) ([]byte, error) {

@@ -57,6 +57,9 @@ run("script-friendly workspace list", bin, ["workspace:list"]);
 
 assertFile(path.join(completionDir, "_dvv"), "zsh completion");
 const zshrc = readFile(path.join(home, ".zshrc"));
+const shellShortcuts = readFile(path.join(xdgConfigHome, "devv", "shell-shortcuts.zsh"));
+assertIncludes(zshrc, "__dvv_reload_shell_shortcuts", "managed zsh live shortcut reload helper");
+assertIncludes(zshrc, "dvv() {", "managed dvv zsh wrapper");
 assertIncludes(zshrc, "dvv\\n", "managed Alt+G main hub shortcut");
 assertIncludes(zshrc, "\\eg", "managed Alt+G sequence");
 assertIncludes(zshrc, "dvv workspace\\n", "managed Alt+W workspace shortcut");
@@ -71,6 +74,9 @@ assertIncludes(zshrc, "dvv tmux:reset-api\\n", "managed Alt+R shell fallback");
 assertIncludes(zshrc, "\\er", "managed Alt+R sequence");
 assertIncludes(zshrc, "dvv ssh\\n", "managed Alt+S shortcut");
 assertExcludes(zshrc, "devv ", "legacy devv shortcut");
+assertIncludes(shellShortcuts, "__dvv_managed_shortcut_sequences", "sourceable shortcut sequence registry");
+assertIncludes(shellShortcuts, "dvv tmux:session\\n", "sourceable directory picker shortcut");
+assertIncludes(shellShortcuts, "\\ep", "sourceable Alt+P sequence");
 
 const tmuxConf = readFile(path.join(home, ".tmux.conf"));
 assertIncludes(tmuxConf, "dvv tmux:reset-api", "managed tmux reset shortcut");

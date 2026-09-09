@@ -351,6 +351,20 @@ func checkZshShortcutBlock(cfg *config.Config) {
 }
 
 func zshShortcutsStale(content string, cfg *config.Config) bool {
+	if !strings.Contains(content, "__dvv_reload_shell_shortcuts") || !strings.Contains(content, "dvv() {") {
+		return true
+	}
+	if zshShortcutBindingsStale(content, cfg) {
+		return true
+	}
+	source, err := os.ReadFile(zshShortcutSourcePath())
+	if err != nil {
+		return true
+	}
+	return zshShortcutBindingsStale(string(source), cfg)
+}
+
+func zshShortcutBindingsStale(content string, cfg *config.Config) bool {
 	for _, expectation := range zshShortcutExpectations(cfg) {
 		if len(shortcutToZshSequences(expectation.shortcut)) == 0 {
 			continue
@@ -368,6 +382,13 @@ func zshShortcutsStale(content string, cfg *config.Config) bool {
 		}
 	}
 	return strings.Contains(content, "devv ")
+}
+
+func zshShortcutSourcePath() string {
+	if value := os.Getenv("XDG_CONFIG_HOME"); strings.TrimSpace(value) != "" {
+		return filepath.Join(config.ExpandPath(value), "devv", "shell-shortcuts.zsh")
+	}
+	return filepath.Join(homeDir(), ".config", "devv", "shell-shortcuts.zsh")
 }
 
 type zshShortcutExpectation struct {

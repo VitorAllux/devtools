@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/VitorAllux/devtools/internal/config"
@@ -33,6 +34,7 @@ type Details struct {
 	ProjectCount int
 	DirtyCount   int
 	DirtyKnown   bool
+	LastActivity time.Time
 	Projects     []Project
 	Metadata     metadata.Workspace
 	HasMetadata  bool
@@ -114,7 +116,7 @@ func (m *Manager) List(ctx context.Context) ([]Details, error) {
 	return details, nil
 }
 
-func (m *Manager) ListFast(_ context.Context) ([]Details, error) {
+func (m *Manager) ListFast(ctx context.Context) ([]Details, error) {
 	workspaces, err := m.Workspaces()
 	if err != nil {
 		return nil, err
@@ -132,6 +134,7 @@ func (m *Manager) ListFast(_ context.Context) ([]Details, error) {
 		details = append(details, Details{
 			Workspace:    ws,
 			ProjectCount: projectCount,
+			LastActivity: m.workspaceLastActivity(ctx, ws, meta, exists, false),
 			Metadata:     meta,
 			HasMetadata:  exists,
 		})
@@ -206,10 +209,76 @@ func (m *Manager) Inspect(ctx context.Context, ws Workspace) (Details, error) {
 		ProjectCount: len(projects),
 		DirtyCount:   dirty,
 		DirtyKnown:   true,
+		LastActivity: m.workspaceLastActivity(ctx, ws, meta, exists, true),
 		Projects:     projects,
 		Metadata:     meta,
 		HasMetadata:  exists,
 	}, nil
+}
+
+func (m *Manager) workspaceLastActivity(ctx context.Context, ws Workspace, meta metadata.Workspace, hasMetadata bool, includeGit bool) time.Time {
+	latest := pathModTime(ws.Path)
+	if hasMetadata {
+		latest = laterTime(latest, parseMetadataCreatedAt(meta.CreatedAt))
+		for _, project := range meta.Projects {
+			projectPath := strings.TrimSpace(project.Path)
+			if projectPath == "" && strings.TrimSpace(project.Name) != "" {
+				projectPath = filepath.Join(ws.Path, project.Name)
+			}
+			if projectPath == "" {
+				continue
+			}
+			latest = laterTime(latest, pathModTime(projectPath))
+			if includeGit {
+				commitTime, ok := m.Git.LastCommitTime(ctx, projectPath)
+				if !ok {
+					continue
+				}
+				latest = laterTime(latest, commitTime)
+			}
+		}
+		return latest
+	}
+
+	entries, err := os.ReadDir(ws.Path)
+	if err != nil {
+		return latest
+	}
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err == nil {
+			latest = laterTime(latest, info.ModTime())
+		}
+	}
+	return latest
+}
+
+func pathModTime(path string) time.Time {
+	info, err := os.Stat(path)
+	if err != nil {
+		return time.Time{}
+	}
+	return info.ModTime()
+}
+
+func parseMetadataCreatedAt(value string) time.Time {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}
+	}
+	for _, layout := range []string{"2006-01-02T15:04:05-0700", time.RFC3339} {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			return parsed
+		}
+	}
+	return time.Time{}
+}
+
+func laterTime(left time.Time, right time.Time) time.Time {
+	if right.After(left) {
+		return right
+	}
+	return left
 }
 
 func (m *Manager) WorktreeProjects(ctx context.Context, ws Workspace) ([]Project, error) {

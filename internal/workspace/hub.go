@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/VitorAllux/devtools/internal/bootstrap"
 	"github.com/VitorAllux/devtools/internal/config"
@@ -712,19 +713,25 @@ const (
 	workspaceNameColumnWidth    = 32
 	workspaceProjectColumnWidth = 8
 	workspaceStatusColumnWidth  = 8
+	workspaceActiveColumnWidth  = 8
 )
 
 func workspaceRow(index int, detail Details) string {
+	return workspaceRowAt(index, detail, time.Now())
+}
+
+func workspaceRowAt(index int, detail Details, now time.Time) string {
 	status := workspaceStatus(detail)
 	projectCount := fmt.Sprintf("%d", detail.ProjectCount)
 	if detail.ProjectCount < 0 {
 		projectCount = "?"
 	}
-	return fmt.Sprintf("%s  %s  %s  %s  %s",
+	return fmt.Sprintf("%s  %s  %s  %s  %s  %s",
 		styledFixedWidth(fmt.Sprintf("%02d", index+1), 2, ui.Muted),
 		styledFixedWidth(detail.Workspace.DirName, workspaceNameColumnWidth, ui.Accent),
 		styledFixedWidth(projectCount, workspaceProjectColumnWidth, ui.Gold),
 		styledFixedWidth(status, workspaceStatusColumnWidth, ui.Muted),
+		styledFixedWidth(relativeActivity(now, detail.LastActivity), workspaceActiveColumnWidth, ui.Muted),
 		ui.Muted(detail.Workspace.Path),
 	)
 }
@@ -743,23 +750,58 @@ func workspaceStatus(detail Details) string {
 }
 
 func workspaceEmptyRow() string {
-	return fmt.Sprintf("%s  %s  %s  %s  %s",
+	return fmt.Sprintf("%s  %s  %s  %s  %s  %s",
 		styledFixedWidth("--", 2, ui.Muted),
 		styledFixedWidth("No workspaces yet", workspaceNameColumnWidth, ui.Accent),
 		styledFixedWidth("0", workspaceProjectColumnWidth, ui.Gold),
 		styledFixedWidth("empty", workspaceStatusColumnWidth, ui.Muted),
+		styledFixedWidth("unknown", workspaceActiveColumnWidth, ui.Muted),
 		ui.Muted("Use create shortcut to start"),
 	)
 }
 
 func workspaceTableHeader() string {
-	return fmt.Sprintf(" %s  %s  %s  %s  %s",
+	return fmt.Sprintf(" %s  %s  %s  %s  %s  %s",
 		styledFixedWidth("NO", 2, ui.Crown),
 		styledFixedWidth("WORKSPACE", workspaceNameColumnWidth, ui.Crown),
 		styledFixedWidth("PROJECTS", workspaceProjectColumnWidth, ui.Crown),
 		styledFixedWidth("STATUS", workspaceStatusColumnWidth, ui.Crown),
+		styledFixedWidth("ACTIVE", workspaceActiveColumnWidth, ui.Crown),
 		ui.Crown("PATH"),
 	)
+}
+
+func relativeActivity(now time.Time, value time.Time) string {
+	if value.IsZero() {
+		return "unknown"
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+	duration := now.Sub(value)
+	if duration < 0 {
+		duration = 0
+	}
+	switch {
+	case duration < time.Minute:
+		return "now"
+	case duration < time.Hour:
+		return fmt.Sprintf("%dm", int(duration.Minutes()))
+	case duration < 24*time.Hour:
+		return fmt.Sprintf("%dh", int(duration.Hours()))
+	case duration < 14*24*time.Hour:
+		return fmt.Sprintf("%dd", int(duration.Hours()/24))
+	case duration < 10*7*24*time.Hour:
+		return fmt.Sprintf("%dw", int(duration.Hours()/(24*7)))
+	case duration < 730*24*time.Hour:
+		return fmt.Sprintf("%dmo", int(duration.Hours()/(24*30)))
+	default:
+		return fmt.Sprintf("%dy", int(duration.Hours()/(24*365)))
+	}
+}
+
+func relativeActivityNow(value time.Time) string {
+	return relativeActivity(time.Now(), value)
 }
 
 func projectRows(projects []discovery.Project) string {
@@ -901,6 +943,7 @@ fi
 workspace_name=$(basename "$raw")
 project_count=$(printf "%s" "$display" | awk "{print \$3}")
 status=$(printf "%s" "$display" | awk "{print \$4}")
+last_active=$(printf "%s" "$display" | awk "{print \$5}")
 printf "%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
 print_commands
 printf "\n%s--------------------------------%s\n" "$dvv_muted" "$dvv_reset"
@@ -908,6 +951,7 @@ printf "%sWorkspace profile%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-9s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$workspace_name"
 printf "  %s%-9s%s %s\n" "$dvv_label" "Projects" "$dvv_reset" "$project_count"
 printf "  %s%-9s%s %s\n" "$dvv_label" "Status" "$dvv_reset" "$status"
+printf "  %s%-9s%s %s\n" "$dvv_label" "Activity" "$dvv_reset" "$last_active"
 printf "  %s%-9s%s %s\n" "$dvv_label" "Path" "$dvv_reset" "$raw"
 ' sh {}`
 }
@@ -944,7 +988,7 @@ func printWorkspaceList(details []Details) {
 		return
 	}
 	for index, detail := range details {
-		fmt.Printf("  %2d. %-28s %d projects, %d dirty %s\n", index+1, detail.Workspace.DirName, detail.ProjectCount, detail.DirtyCount, ui.Dim(detail.Workspace.Path))
+		fmt.Printf("  %2d. %-28s %d projects, %d dirty, active %s %s\n", index+1, detail.Workspace.DirName, detail.ProjectCount, detail.DirtyCount, relativeActivityNow(detail.LastActivity), ui.Dim(detail.Workspace.Path))
 	}
 }
 

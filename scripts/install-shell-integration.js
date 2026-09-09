@@ -16,6 +16,8 @@ if (!home) {
 }
 
 const zshrc = path.join(home, ".zshrc");
+const configHome = process.env.XDG_CONFIG_HOME || path.join(home, ".config");
+const shellShortcutsFile = path.join(configHome, "devv", "shell-shortcuts.zsh");
 const config = readProjectConfig(path.join(root, "dvv.config.json"));
 const mainHubShortcut = shortcutToZshSequences(
   shortcutValue("DVV_SHELL_MAIN_SHORTCUT", undefined, config?.shell?.shortcuts?.mainHub, "alt+g"),
@@ -54,11 +56,27 @@ if (bindings.length === 0) {
 
 const begin = "# >>> dvv shell shortcuts >>>";
 const end = "# <<< dvv shell shortcuts <<<";
+writeShellShortcutsFile(shellShortcutsFile, bindings);
 const block = [
   begin,
   "# Managed by dvv. Edit dvv.config.json or set DVV_SKIP_SHELL_INTEGRATION=1 before setup.",
+  `__dvv_reload_shell_shortcuts() {`,
+  `  local file="\${XDG_CONFIG_HOME:-$HOME/.config}/devv/shell-shortcuts.zsh"`,
+  `  [[ -r "$file" ]] && source "$file"`,
+  `}`,
+  `__dvv_reload_shell_shortcuts`,
   `[[ -d "$HOME/.zfunc" && ":${"$"}{fpath[*]}:" != *":$HOME/.zfunc:"* ]] && fpath=("$HOME/.zfunc" $fpath)`,
   ...bindings,
+  `dvv() {`,
+  `  command dvv "$@"`,
+  `  local __dvv_status=$?`,
+  `  if [[ $__dvv_status -eq 0 ]]; then`,
+  `    case "$1" in`,
+  `      config|setup) __dvv_reload_shell_shortcuts ;;`,
+  `    esac`,
+  `  fi`,
+  `  return $__dvv_status`,
+  `}`,
   end,
 ].join("\n");
 
@@ -108,6 +126,34 @@ function shortcutValue(primaryEnv, legacyEnv, configured, fallback) {
 function addBindings(bindings, sequences, command) {
   for (const sequence of sequences) {
     bindings.push(`bindkey -s "${sequence}" "${command}\\n"`);
+  }
+}
+
+function writeShellShortcutsFile(file, bindings) {
+  const sequences = bindings
+    .map((binding) => binding.match(/^bindkey -s "(.+)" "/)?.[1])
+    .filter(Boolean);
+  const lines = [
+    "# Managed by dvv. Source this file from ~/.zshrc; do not edit.",
+    `if (( \${+__dvv_managed_shortcut_sequences} )); then`,
+    `  for __dvv_sequence in "\${__dvv_managed_shortcut_sequences[@]}"; do`,
+    `    bindkey -r "$__dvv_sequence" 2>/dev/null || true`,
+    `  done`,
+    `fi`,
+    `typeset -ga __dvv_managed_shortcut_sequences`,
+    `__dvv_managed_shortcut_sequences=(${sequences.map((sequence) => `"${sequence}"`).join(" ")})`,
+    `unset __dvv_sequence`,
+    `[[ -d "$HOME/.zfunc" && ":${"$"}{fpath[*]}:" != *":$HOME/.zfunc:"* ]] && fpath=("$HOME/.zfunc" $fpath)`,
+    ...bindings,
+    "",
+  ];
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(file, lines.join("\n"), { encoding: "utf8", mode: 0o600 });
+  } catch (error) {
+    if (process.env.DVV_VERBOSE_SETUP === "1") {
+      console.error(`dvv shell shortcut source skipped: ${error.message}`);
+    }
   }
 }
 

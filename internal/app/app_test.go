@@ -49,6 +49,12 @@ func TestMainHubRowsListPrimaryCommands(t *testing.T) {
 			t.Fatalf("main hub visual field should not contain tabs: %q", fields[5])
 		}
 	}
+	header := strings.Split(strings.Split(strings.TrimSpace(rows), "\n")[0], "\t")[5]
+	commandIndex := strings.Index(header, "COMMAND")
+	areaIndex := strings.Index(header, "AREA")
+	if commandIndex < 0 || areaIndex < 0 || commandIndex > areaIndex {
+		t.Fatalf("main hub header should show COMMAND before AREA: %q", header)
+	}
 }
 
 func TestRunSpecialBrowseFeedDoesNotNeedProjectConfig(t *testing.T) {

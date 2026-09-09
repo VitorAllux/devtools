@@ -124,8 +124,8 @@ func mainHubRows(cfg *config.Config) string {
 func mainHubHeader() string {
 	return mainHubVisualLine(
 		ui.Crown("NO"),
-		ui.Crown(mainHubFixed("AREA", 12)),
 		ui.Crown(mainHubFixed("COMMAND", 14)),
+		ui.Crown(mainHubFixed("AREA", 12)),
 		ui.Crown(mainHubFixed("STATUS", 10)),
 		ui.Crown(mainHubFixed("SHORTCUT", 10)),
 	)
@@ -134,8 +134,8 @@ func mainHubHeader() string {
 func mainHubRow(index int, item mainHubItem) string {
 	return mainHubVisualLine(
 		ui.Muted(fmt.Sprintf("%02d", index+1)),
-		ui.Gold(mainHubFixed(item.Category, 12)),
 		ui.Accent(mainHubFixed(item.Command, 14)),
+		ui.Gold(mainHubFixed(item.Category, 12)),
 		ui.Muted(mainHubFixed(item.Status, 10)),
 		ui.Gold(mainHubFixed(item.Shortcut, 10)),
 	)

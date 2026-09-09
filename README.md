@@ -142,13 +142,13 @@ Compatibility routes such as `dvv ssh:list`, `dvv workspace:list`, `dvv db impor
 | `Alt+R` | `dvv tmux:reset-api` fallback outside tmux |
 | `Alt+S` | `dvv ssh` |
 
-The managed block is written to `~/.zshrc`. Global dvv shortcuts use `Alt+letter`; interactive hub actions use `Shift+letter`. The `Alt+R` zsh binding is a fallback: inside tmux, the tmux binding handles the reset; outside tmux, it runs the command and prints a normal error instead of a terminal bell. Set `DVV_SKIP_SHELL_INTEGRATION=1` before setup to skip shortcut installation. Windows Terminal reserves `Ctrl+Shift+F` for Find, so dvv avoids it by default.
+The managed block is written to `~/.zshrc` and sources `~/.config/devv/shell-shortcuts.zsh` for live shortcut reloads after `dvv config` or `dvv setup`. Global dvv shortcuts use `Alt+letter`; interactive hub actions use `Shift+letter`. The `Alt+R` zsh binding is a fallback: inside tmux, the tmux binding handles the reset; outside tmux, it runs the command and prints a normal error instead of a terminal bell. Set `DVV_SKIP_SHELL_INTEGRATION=1` before setup to skip shortcut installation. Windows Terminal reserves `Ctrl+Shift+F` for Find, so dvv avoids it by default.
 
 ## Tmux Integration
 
 `dvv setup` also manages tmux shortcut and theme blocks in `~/.tmux.conf`.
 
-The tmux theme follows the active CLI theme by default. When `DVV_THEME=tokyo-night`, setup writes Tokyo Night status, window, pane border, message, and copy-mode colors. The status bar remains a full-width visible bar and uses the theme status color as its background. Change the CLI theme in `dvv config` -> `Theme`, then run `dvv setup` to refresh tmux.
+The tmux theme follows the active CLI theme by default. When `DVV_THEME=tokyo-night`, setup writes Tokyo Night status, window, pane border, message, and copy-mode colors. The status bar remains a full-width visible bar and uses the theme status color as its background. Changing managed shortcuts or theme values through `dvv config` refreshes shell and tmux integration automatically.
 
 Theme controls:
 
@@ -224,6 +224,7 @@ workspace-<name>
 ```
 
 Each workspace contains git worktrees for selected base repositories. The real repositories are not moved or copied.
+The workspace hub shows a compact `ACTIVE` column based on workspace/project activity; full workspace listing also considers the latest git commit time.
 
 Creation rules:
 
@@ -393,6 +394,8 @@ The configuration hub edits persisted runtime values in:
 `dvv config` opens a category hub first. Use `Theme` to switch the CLI theme, `Profiles` to select the active runtime profile, `All Keys` for the complete raw key editor, or choose a focused area such as `Paths`, `Shortcuts`, `Workspace`, `Database`, `Tmux`, `Resources`, `Integrations`, or `Safety`.
 
 Every known config key shows a short explanation in the preview panel. `dvv config list` also prints a `DESCRIPTION` column for non-interactive review. Custom keys saved through the hub are kept visible in `All Keys` under the `Custom` group.
+
+Changing managed zsh or tmux integration keys through `dvv config` automatically rewrites the managed integration files. Shells that have loaded the managed wrapper also reload shortcuts in the current session; older open shells may still need `exec zsh` once.
 
 Shortcuts:
 

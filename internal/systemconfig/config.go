@@ -48,7 +48,7 @@ func Run(ctx context.Context, cfg *config.Config, runner run.Runner, args []stri
 	case "list":
 		return manager.List()
 	case "set":
-		return manager.Set(args[1:])
+		return manager.Set(ctx, args[1:])
 	default:
 		return fmt.Errorf("unknown config action: %s", args[0])
 	}
@@ -110,7 +110,7 @@ func (m Manager) keyHub(ctx context.Context, category Category, initial []Entry)
 			return fmt.Errorf("config category has no editable values: %s", category.Label)
 		}
 		if _, err := m.Runner.LookPath("fzf"); err != nil {
-			return m.basicHub(entries)
+			return m.basicHub(ctx, entries)
 		}
 		keys := m.Config.SystemConfigHubKeys()
 		output, err := m.Runner.OutputWithInput(ctx, "", []byte(configRows(entries)), "fzf", configFZFArgs(category, keys)...)
@@ -122,7 +122,7 @@ func (m Manager) keyHub(ctx context.Context, category Category, initial []Entry)
 		}
 		key, selected := ui.ParseFZFExpectOutput(string(output))
 		if key == keys.Add.FZFKey {
-			if err := m.addCustom(); err != nil {
+			if err := m.addCustom(ctx); err != nil {
 				ui.Error("%v", err)
 			}
 			entries = nil
@@ -138,14 +138,14 @@ func (m Manager) keyHub(ctx context.Context, category Category, initial []Entry)
 		if !ok {
 			continue
 		}
-		if err := m.handleEntryAction(key, entry, keys); err != nil {
+		if err := m.handleEntryAction(ctx, key, entry, keys); err != nil {
 			ui.Error("%v", err)
 		}
 		entries = nil
 	}
 }
 
-func (m Manager) handleEntryAction(key string, entry Entry, keys config.SystemConfigHubKeyBindings) error {
+func (m Manager) handleEntryAction(ctx context.Context, key string, entry Entry, keys config.SystemConfigHubKeyBindings) error {
 	switch key {
 	case keys.Clear.FZFKey:
 		return m.Unset(entry.Key)
@@ -154,7 +154,7 @@ func (m Manager) handleEntryAction(key string, entry Entry, keys config.SystemCo
 		_, _ = ui.Prompt("Press Enter to return")
 		return nil
 	default:
-		return m.edit(entry)
+		return m.edit(ctx, entry)
 	}
 }
 
@@ -382,7 +382,7 @@ func (m Manager) themeHub(ctx context.Context) error {
 	for {
 		themes := ui.Themes()
 		if _, err := m.Runner.LookPath("fzf"); err != nil {
-			return m.basicThemeHub(themes)
+			return m.basicThemeHub(ctx, themes)
 		}
 		output, err := m.Runner.OutputWithInput(ctx, "", []byte(themeRows(themes, m.Config.Project.Theme.Name)), "fzf", themeFZFArgs()...)
 		if err != nil && len(output) == 0 {
@@ -395,7 +395,7 @@ func (m Manager) themeHub(ctx context.Context) error {
 		if raw == "" {
 			return nil
 		}
-		if err := m.setTheme(raw); err != nil {
+		if err := m.setTheme(ctx, raw); err != nil {
 			ui.Error("%v", err)
 			continue
 		}
@@ -403,7 +403,7 @@ func (m Manager) themeHub(ctx context.Context) error {
 	}
 }
 
-func (m Manager) basicThemeHub(themes []ui.Theme) error {
+func (m Manager) basicThemeHub(ctx context.Context, themes []ui.Theme) error {
 	ui.Title("Theme")
 	for index, theme := range themes {
 		status := ""
@@ -420,17 +420,20 @@ func (m Manager) basicThemeHub(themes []ui.Theme) error {
 		return nil
 	}
 	if index, ok := parseIndex(value, len(themes)); ok {
-		return m.setTheme(themes[index].Name)
+		return m.setTheme(ctx, themes[index].Name)
 	}
-	return m.setTheme(value)
+	return m.setTheme(ctx, value)
 }
 
-func (m Manager) setTheme(name string) error {
+func (m Manager) setTheme(ctx context.Context, name string) error {
 	theme, ok := ui.ThemeByName(name)
 	if !ok {
 		return fmt.Errorf("unknown theme: %s", name)
 	}
 	if err := m.writeValue("DVV_THEME", theme.Name); err != nil {
+		return err
+	}
+	if err := m.refreshManagedIntegrationIfNeeded(ctx, "DVV_THEME"); err != nil {
 		return err
 	}
 	m.Config.Project.Theme.Name = theme.Name
@@ -446,7 +449,7 @@ func (m Manager) profileHub(ctx context.Context) error {
 			profiles = config.DefaultProjectConfig().Profiles.Items
 		}
 		if _, err := m.Runner.LookPath("fzf"); err != nil {
-			return m.basicProfileHub(profiles)
+			return m.basicProfileHub(ctx, profiles)
 		}
 		output, err := m.Runner.OutputWithInput(ctx, "", []byte(profileRows(profiles, m.Config.Project.Profiles.Active)), "fzf", profileFZFArgs()...)
 		if err != nil && len(output) == 0 {
@@ -459,7 +462,7 @@ func (m Manager) profileHub(ctx context.Context) error {
 		if raw == "" {
 			return nil
 		}
-		if err := m.setProfile(raw); err != nil {
+		if err := m.setProfile(ctx, raw); err != nil {
 			ui.Error("%v", err)
 			continue
 		}
@@ -467,7 +470,7 @@ func (m Manager) profileHub(ctx context.Context) error {
 	}
 }
 
-func (m Manager) basicProfileHub(profiles []config.ProfileConfig) error {
+func (m Manager) basicProfileHub(ctx context.Context, profiles []config.ProfileConfig) error {
 	ui.Title("Profiles")
 	for index, profile := range profiles {
 		status := ""
@@ -484,12 +487,12 @@ func (m Manager) basicProfileHub(profiles []config.ProfileConfig) error {
 		return nil
 	}
 	if index, ok := parseIndex(value, len(profiles)); ok {
-		return m.setProfile(profiles[index].Name)
+		return m.setProfile(ctx, profiles[index].Name)
 	}
-	return m.setProfile(value)
+	return m.setProfile(ctx, value)
 }
 
-func (m Manager) setProfile(name string) error {
+func (m Manager) setProfile(ctx context.Context, name string) error {
 	name = strings.ToLower(strings.TrimSpace(name))
 	if name == "" {
 		return fmt.Errorf("profile name is empty")
@@ -498,6 +501,9 @@ func (m Manager) setProfile(name string) error {
 		return fmt.Errorf("unknown profile: %s", name)
 	}
 	if err := m.writeValue("DVV_PROFILE", name); err != nil {
+		return err
+	}
+	if err := m.refreshManagedIntegrationIfNeeded(ctx, "DVV_PROFILE"); err != nil {
 		return err
 	}
 	m.Config.Project.Profiles.Active = name
@@ -719,7 +725,7 @@ func themePreviewCaseScript() string {
 	return builder.String()
 }
 
-func (m Manager) basicHub(entries []Entry) error {
+func (m Manager) basicHub(ctx context.Context, entries []Entry) error {
 	m.print(entries)
 	key, err := ui.Prompt("Config key")
 	if err != nil {
@@ -732,7 +738,7 @@ func (m Manager) basicHub(entries []Entry) error {
 	if !ok {
 		return fmt.Errorf("unknown config key: %s", key)
 	}
-	return m.edit(entry)
+	return m.edit(ctx, entry)
 }
 
 func (m Manager) List() error {
@@ -744,7 +750,7 @@ func (m Manager) List() error {
 	return nil
 }
 
-func (m Manager) Set(args []string) error {
+func (m Manager) Set(ctx context.Context, args []string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("usage: dvv config set <KEY> <VALUE>")
 	}
@@ -757,7 +763,7 @@ func (m Manager) Set(args []string) error {
 		return err
 	}
 	ui.OK("Set %s in %s", key, m.Config.ConfigFile)
-	return nil
+	return m.refreshManagedIntegrationIfNeeded(ctx, key)
 }
 
 func (m Manager) Unset(key string) error {
@@ -813,7 +819,7 @@ func (m Manager) Entries() ([]Entry, error) {
 	return entries, nil
 }
 
-func (m Manager) edit(entry Entry) error {
+func (m Manager) edit(ctx context.Context, entry Entry) error {
 	value, err := promptValue(entry)
 	if err != nil {
 		return err
@@ -821,10 +827,13 @@ func (m Manager) edit(entry Entry) error {
 	if !validKey(entry.Key) {
 		return fmt.Errorf("invalid config key: %s", entry.Key)
 	}
-	return m.writeValue(entry.Key, value)
+	if err := m.writeValue(entry.Key, value); err != nil {
+		return err
+	}
+	return m.refreshManagedIntegrationIfNeeded(ctx, entry.Key)
 }
 
-func (m Manager) addCustom() error {
+func (m Manager) addCustom(ctx context.Context) error {
 	key, err := ui.Prompt("Config key")
 	if err != nil {
 		return err
@@ -836,7 +845,10 @@ func (m Manager) addCustom() error {
 	if err != nil {
 		return err
 	}
-	return m.writeValue(key, value)
+	if err := m.writeValue(key, value); err != nil {
+		return err
+	}
+	return m.refreshManagedIntegrationIfNeeded(ctx, key)
 }
 
 func (m Manager) writeValue(key string, value string) error {
@@ -848,8 +860,52 @@ func (m Manager) writeValue(key string, value string) error {
 	if err := writeConfigFile(m.Config.ConfigFile, values); err != nil {
 		return err
 	}
+	if err := os.Setenv(key, value); err != nil {
+		return err
+	}
 	m.applyRuntimeValue(key, value)
 	return nil
+}
+
+func (m Manager) refreshManagedIntegrationIfNeeded(ctx context.Context, key string) error {
+	if !requiresManagedIntegrationRefresh(key, m.Config) {
+		return nil
+	}
+	if m.Runner == nil || strings.TrimSpace(m.Config.RootDir) == "" {
+		return nil
+	}
+	if err := run.Quiet(ctx, m.Runner, m.Config.RootDir, "node", "scripts/setup.js"); err != nil {
+		return fmt.Errorf("saved %s, but managed integration refresh failed: %w", key, err)
+	}
+	ui.OK("Managed integration refreshed. Managed zsh shells reload shortcuts automatically; otherwise run `exec zsh` or open a new terminal.")
+	return nil
+}
+
+func requiresManagedIntegrationRefresh(key string, cfg *config.Config) bool {
+	switch key {
+	case "DVV_SHELL_MAIN_SHORTCUT",
+		"DVV_SHELL_WORKSPACE_SHORTCUT",
+		"DVV_SHELL_TMUX_SHORTCUT",
+		"DVV_SHELL_SSH_SHORTCUT",
+		"DVV_TMUX_SESSION_SHORTCUT",
+		"DVV_TMUX_HOME_SHORTCUT",
+		"DVV_TMUX_RESET_SHORTCUT",
+		"DVV_TMUX_THEME_ENABLED",
+		"DVV_TMUX_THEME_FOLLOW_CLI":
+		return true
+	case "DVV_THEME":
+		if cfg == nil {
+			return true
+		}
+		return config.BoolValue(cfg.Project.Tmux.Theme.Enabled, true) && config.BoolValue(cfg.Project.Tmux.Theme.FollowCLITheme, true)
+	case "DVV_TMUX_THEME_NAME":
+		if cfg == nil {
+			return true
+		}
+		return config.BoolValue(cfg.Project.Tmux.Theme.Enabled, true) && !config.BoolValue(cfg.Project.Tmux.Theme.FollowCLITheme, true)
+	default:
+		return false
+	}
 }
 
 func (m Manager) applyRuntimeValue(key string, value string) {
@@ -1052,7 +1108,7 @@ func (m Manager) print(entries []Entry) {
 			keyWidth = len(entry.Key)
 		}
 	}
-	fmt.Printf("  %-3s %-12s %-*s %-26s %s\n", "SET", "GROUP", keyWidth, "KEY", "VALUE", "DESCRIPTION")
+	fmt.Printf("  %-3s %-*s %-26s %-12s %s\n", "SET", keyWidth, "KEY", "VALUE", "GROUP", "DESCRIPTION")
 	for _, entry := range entries {
 		status := "[ ]"
 		if entry.Default != "" {
@@ -1061,7 +1117,7 @@ func (m Manager) print(entries []Entry) {
 		if entry.Persisted {
 			status = "[x]"
 		}
-		fmt.Printf("  %-3s %-12s %-*s %-26s %s\n", status, entry.Category, keyWidth, entry.Key, compactField(maskValue(entry), 26), entry.Description)
+		fmt.Printf("  %-3s %-*s %-26s %-12s %s\n", status, keyWidth, entry.Key, compactField(maskValue(entry), 26), entry.Category, entry.Description)
 	}
 }
 
@@ -1096,7 +1152,7 @@ func configFZFArgs(category Category, keys config.SystemConfigHubKeyBindings) []
 		ExtraArgs: []string{
 			"--delimiter=\t",
 			"--with-nth=2,3,4,5",
-			"--nth=1,3,4,5,10",
+			"--nth=1,2,3,4,5,10",
 			"--header-lines=1",
 		},
 	}.Args()
@@ -1116,9 +1172,9 @@ func configRows(entries []Entry) string {
 func configHeader() string {
 	return strings.Join([]string{
 		ui.Crown("SET"),
+		ui.Crown(fixedWidth("KEY", 40)),
+		ui.Crown(fixedWidth("VALUE", 24)),
 		ui.Crown(fixedWidth("GROUP", 12)),
-		ui.Crown(fixedWidth("KEY", 34)),
-		ui.Crown(fixedWidth("VALUE", 26)),
 		"",
 		"",
 		"",
@@ -1137,9 +1193,9 @@ func configRow(entry Entry) string {
 	value := maskValue(entry)
 	return strings.Join([]string{
 		ui.Gold(status),
+		ui.Accent(fixedWidth(entry.Key, 40)),
+		ui.Muted(fixedWidth(compactField(value, 24), 24)),
 		ui.Muted(fixedWidth(entry.Category, 12)),
-		ui.Accent(fixedWidth(entry.Key, 34)),
-		ui.Muted(compactField(value, 26)),
 		cleanField(entry.Kind),
 		cleanField(entrySource(entry)),
 		cleanField(defaultPreviewValue(entry)),
@@ -1152,7 +1208,7 @@ func configPreviewCommand(shortcuts []ui.FZFShortcut) string {
 	commandDeck := ui.FZFPreviewCommandDeck(shortcuts)
 	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
-category=$(printf "%s" "$line" | cut -f3)
+category=$(printf "%s" "$line" | cut -f5)
 value=$(printf "%s" "$line" | cut -f9)
 description=$(printf "%s" "$line" | cut -f10-)
 kind=$(printf "%s" "$line" | cut -f6)

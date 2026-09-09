@@ -303,14 +303,16 @@ func TestWorkspaceRowsShowsEmptyState(t *testing.T) {
 func TestWorkspaceRowKeepsColumnsAligned(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 
-	row := workspaceRow(7, Details{
+	now := time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
+	row := workspaceRowAt(7, Details{
 		Workspace: Workspace{
 			DirName: "workspace-task_600_7656",
 			Path:    "/root/workspace/workspace-task_600_7656",
 		},
 		ProjectCount: 0,
+		LastActivity: now.Add(-21 * 24 * time.Hour),
 		HasMetadata:  true,
-	})
+	}, now)
 
 	nameColumn := strings.Index(row, "workspace-task_600_7656")
 	if nameColumn < 0 {
@@ -332,6 +334,16 @@ func TestWorkspaceRowKeepsColumnsAligned(t *testing.T) {
 	}
 	if statusColumn <= projectsColumn {
 		t.Fatalf("status should stay after project count: %q", row)
+	}
+	if !strings.Contains(row, "3w") {
+		t.Fatalf("row missing relative activity: %q", row)
+	}
+	header := workspaceTableHeader()
+	if !strings.Contains(header, "ACTIVE") {
+		t.Fatalf("workspace header missing ACTIVE column: %q", header)
+	}
+	if got := relativeActivity(now, time.Time{}); got != "unknown" {
+		t.Fatalf("zero activity = %q, want unknown", got)
 	}
 }
 
@@ -1167,6 +1179,19 @@ func (r *workspaceRunner) Output(_ context.Context, _ string, name string, args 
 		return nil, nil
 	}
 	projectPath := gitCommandPath(args)
+	if len(args) >= 6 && args[2] == "rev-parse" && args[3] == "--verify" && args[4] == "--quiet" {
+		ref := strings.TrimSuffix(args[5], "^{commit}")
+		if r.refs[projectPath][ref] {
+			return []byte("abc123\n"), nil
+		}
+		return nil, errors.New("ref not found")
+	}
+	if len(args) >= 5 && args[2] == "log" && args[3] == "-1" && args[4] == "--format=%ct" {
+		if r.branches[projectPath] != "" {
+			return []byte("1720000000\n"), nil
+		}
+		return nil, errors.New("no commits")
+	}
 	if len(args) >= 5 && args[2] == "rev-parse" {
 		last := args[len(args)-1]
 		source, linked := r.linked[projectPath]

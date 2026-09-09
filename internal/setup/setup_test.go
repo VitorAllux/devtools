@@ -61,9 +61,9 @@ func TestSetupRunsScriptFromProjectRoot(t *testing.T) {
 }
 
 func TestZshShortcutsStaleDetectsOldHomeBinding(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	cfg := &config.Config{Project: config.DefaultProjectConfig()}
-	current := strings.Join([]string{
-		`# >>> dvv shell shortcuts >>>`,
+	bindings := []string{
 		`bindkey -s "\eg" "dvv\n"`,
 		`bindkey -s "\ew" "dvv workspace\n"`,
 		`bindkey -s "\et" "dvv tmux\n"`,
@@ -71,6 +71,19 @@ func TestZshShortcutsStaleDetectsOldHomeBinding(t *testing.T) {
 		`bindkey -s "\ep" "dvv tmux:session\n"`,
 		`bindkey -s "\ef" "dvv tmux:home\n"`,
 		`bindkey -s "\er" "dvv tmux:reset-api\n"`,
+	}
+	if err := os.MkdirAll(filepath.Dir(zshShortcutSourcePath()), 0o700); err != nil {
+		t.Fatalf("MkdirAll shortcut source dir failed: %v", err)
+	}
+	if err := os.WriteFile(zshShortcutSourcePath(), []byte(strings.Join(bindings, "\n")), 0o600); err != nil {
+		t.Fatalf("WriteFile shortcut source failed: %v", err)
+	}
+	current := strings.Join([]string{
+		`# >>> dvv shell shortcuts >>>`,
+		`__dvv_reload_shell_shortcuts() {`,
+		`}`,
+		`dvv() {`,
+		strings.Join(bindings, "\n"),
 		`# <<< dvv shell shortcuts <<<`,
 	}, "\n")
 

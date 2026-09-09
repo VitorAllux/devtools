@@ -220,7 +220,7 @@ Built-in themes:
 | `solarized-dark` | Classic low-contrast terminal palette. |
 | `one-dark` | Atom-style dark palette with balanced accent colors. |
 
-Theme selection persists `DVV_THEME` in `~/.config/devv/config.env` and updates shared UI helpers, `fzf` colors, loader colors, prompts, status labels, config previews, and the managed tmux theme block from one theme registry. The tmux status bar remains full-width and uses the theme status color as its background. Tmux reads the refreshed colors after `dvv setup` reloads `~/.tmux.conf`.
+Theme selection persists `DVV_THEME` in `~/.config/devv/config.env` and updates shared UI helpers, `fzf` colors, loader colors, prompts, status labels, config previews, and the managed tmux theme block from one theme registry. The tmux status bar remains full-width and uses the theme status color as its background. Managed zsh and tmux integration keys trigger an automatic integration refresh when changed through `dvv config`; shells that loaded the managed wrapper source the refreshed shortcut file in the current session.
 
 ## Profiles Config
 

@@ -1,6 +1,8 @@
 package systemconfig
 
 import (
+	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -129,6 +131,14 @@ func TestConfigRowsKeepDescriptionsForPreviewAndSearch(t *testing.T) {
 	}
 	if raw := ui.FZFSelectedRaw(rows[1]); raw != "DVV_THEME" {
 		t.Fatalf("first config raw key = %q, want DVV_THEME", raw)
+	}
+	headerFields := strings.Split(rows[0], "\t")
+	if len(headerFields) < 5 || !strings.Contains(headerFields[2], "KEY") || !strings.Contains(headerFields[3], "VALUE") || !strings.Contains(headerFields[4], "GROUP") {
+		t.Fatalf("config header should show KEY, VALUE, GROUP after SET: %#v", headerFields)
+	}
+	rowFields := strings.Split(rows[1], "\t")
+	if len(rowFields) < 5 || !strings.Contains(rowFields[2], "DVV_THEME") || !strings.Contains(rowFields[4], "Theme") {
+		t.Fatalf("config row should keep KEY before GROUP: %#v", rowFields)
 	}
 	if !strings.Contains(rows[1], "Selects the CLI color theme.") {
 		t.Fatalf("config row should keep description in hidden fields: %q", rows[1])
@@ -317,7 +327,7 @@ func TestSetThemePersistsAndAppliesRuntimeTheme(t *testing.T) {
 	}
 	manager := Manager{Config: cfg}
 
-	if err := manager.setTheme("tokyo night"); err != nil {
+	if err := manager.setTheme(context.Background(), "tokyo night"); err != nil {
 		t.Fatalf("setTheme returned error: %v", err)
 	}
 
@@ -333,6 +343,55 @@ func TestSetThemePersistsAndAppliesRuntimeTheme(t *testing.T) {
 	}
 	if ui.ActiveTheme().Name != "tokyo-night" {
 		t.Fatalf("active UI theme = %q, want tokyo-night", ui.ActiveTheme().Name)
+	}
+}
+
+func TestSetShortcutRefreshesManagedIntegration(t *testing.T) {
+	t.Setenv("DVV_TMUX_SESSION_SHORTCUT", "alt+p")
+	cfg := &config.Config{
+		RootDir:    "/repo/devtools",
+		ConfigFile: filepath.Join(t.TempDir(), "config.env"),
+		Project:    config.DefaultProjectConfig(),
+	}
+	runner := &configFakeRunner{}
+	manager := Manager{Config: cfg, Runner: runner}
+
+	if err := manager.Set(context.Background(), []string{"DVV_TMUX_SESSION_SHORTCUT", "ctrl+f"}); err != nil {
+		t.Fatalf("Set returned error: %v", err)
+	}
+
+	values, err := readConfigFile(cfg.ConfigFile)
+	if err != nil {
+		t.Fatalf("readConfigFile returned error: %v", err)
+	}
+	if values["DVV_TMUX_SESSION_SHORTCUT"] != "ctrl+f" {
+		t.Fatalf("persisted shortcut = %q, want ctrl+f", values["DVV_TMUX_SESSION_SHORTCUT"])
+	}
+	if got := os.Getenv("DVV_TMUX_SESSION_SHORTCUT"); got != "ctrl+f" {
+		t.Fatalf("process env shortcut = %q, want ctrl+f", got)
+	}
+	if cfg.Project.Tmux.Session.Shortcut != "ctrl+f" {
+		t.Fatalf("runtime shortcut = %q, want ctrl+f", cfg.Project.Tmux.Session.Shortcut)
+	}
+	if runner.outputCalls != 1 || runner.outputDir != cfg.RootDir || runner.outputCommand != "node scripts/setup.js" {
+		t.Fatalf("setup refresh call = count %d dir %q command %q", runner.outputCalls, runner.outputDir, runner.outputCommand)
+	}
+}
+
+func TestSetRuntimeOnlyValueDoesNotRefreshManagedIntegration(t *testing.T) {
+	cfg := &config.Config{
+		RootDir:    "/repo/devtools",
+		ConfigFile: filepath.Join(t.TempDir(), "config.env"),
+		Project:    config.DefaultProjectConfig(),
+	}
+	runner := &configFakeRunner{}
+	manager := Manager{Config: cfg, Runner: runner}
+
+	if err := manager.Set(context.Background(), []string{"DVV_RESOURCES_LOG_TAIL", "500"}); err != nil {
+		t.Fatalf("Set returned error: %v", err)
+	}
+	if runner.outputCalls != 0 {
+		t.Fatalf("runtime-only config should not refresh setup; got %d call(s)", runner.outputCalls)
 	}
 }
 
@@ -536,4 +595,33 @@ func entryKeys(entries []Entry) []string {
 		keys[index] = entry.Key
 	}
 	return keys
+}
+
+type configFakeRunner struct {
+	outputCalls   int
+	outputDir     string
+	outputCommand string
+}
+
+func (r *configFakeRunner) Run(context.Context, string, string, ...string) error {
+	return nil
+}
+
+func (r *configFakeRunner) Output(_ context.Context, dir string, name string, args ...string) ([]byte, error) {
+	r.outputCalls++
+	r.outputDir = dir
+	r.outputCommand = strings.TrimSpace(name + " " + strings.Join(args, " "))
+	return nil, nil
+}
+
+func (r *configFakeRunner) OutputWithInput(context.Context, string, []byte, string, ...string) ([]byte, error) {
+	return nil, nil
+}
+
+func (r *configFakeRunner) Start(context.Context, string, string, ...string) error {
+	return nil
+}
+
+func (r *configFakeRunner) LookPath(name string) (string, error) {
+	return name, nil
 }
