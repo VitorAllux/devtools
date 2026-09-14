@@ -192,9 +192,15 @@ Shortcuts:
 | `Shift+N` | Add an SSH entry. |
 | `Shift+D` | Remove the selected SSH entry. |
 | `Shift+T` | Open selected SSH entry in a new terminal tab. |
+| `Shift+U` | Upload a local file or directory to the selected SSH entry with SCP. |
+| `Shift+G` | Download a remote file or directory from the selected SSH entry with SCP. |
+| `Shift+O` | Open the SCP downloads directory in a new tmux/terminal tab. |
+| `Shift+C` | Clean all files inside the SCP downloads directory after confirmation. |
 | `Esc` | Exit. |
 
 SSH entries are stored in `~/.config/devv/servers.list`. The path is preserved for compatibility with existing local setups.
+
+SCP downloads default to `~/Downloads/dvv-scp`. Downloads are grouped by SSH entry and date, such as `~/Downloads/dvv-scp/prod-api/2026-09-14/app.log`. `dvv setup`, `dvv doctor --fix`, and SCP actions create the directory when needed.
 
 ## Workspace Hub
 
@@ -414,7 +420,7 @@ The configuration hub edits persisted runtime values in:
 ~/.config/devv/config.env
 ```
 
-`dvv config` opens a category hub first. Use `Theme` to switch the CLI theme, `Profiles` to select the active runtime profile, `All Keys` for the complete raw key editor, or choose a focused area such as `Paths`, `Shortcuts`, `Workspace`, `Database`, `Tmux`, `Resources`/ports, `Integrations`, or `Safety`.
+`dvv config` opens a category hub first. Use `Theme` to switch the CLI theme, `Profiles` to select the active runtime profile, `All Keys` for the complete raw key editor, or choose a focused area such as `Paths`, `Shortcuts`, `Workspace`, `SSH`, `Database`, `Tmux`, `Resources`/ports, `Integrations`, or `Safety`.
 
 Every known config key shows a short explanation in the preview panel. `dvv config list` also prints a `DESCRIPTION` column for non-interactive review. Custom keys saved through the hub are kept visible in `All Keys` under the `Custom` group.
 
@@ -450,6 +456,7 @@ Runtime/local data lives outside the repository:
 | AGE private key | `~/.config/devv/keys/age.key` |
 | Encrypted SSH backup | `secrets/servers.list.age` or `~/.config/devv/servers.list.age` |
 | AGE recipients | `secrets/age-recipients.txt` or `~/.config/devv/age-recipients.txt` |
+| SCP downloads | `~/Downloads/dvv-scp` |
 | Workspace metadata | `<workspace>/.workspace/config.json` |
 
 Do not commit private local data, dump files, `.env`, real SSH targets, AGE private keys, or encrypted backups.
@@ -545,6 +552,11 @@ DVV_SERVERS_FILE=~/.config/devv/servers.list
 DVV_AGE_KEY_FILE=~/.config/devv/keys/age.key
 DVV_BW_AGE_KEY_ITEM=<bitwarden-item-name-or-id>
 DVV_SECRETS_SYNC_SHORTCUT=shift+s
+DVV_SCP_DOWNLOADS_DIR=~/Downloads/dvv-scp
+DVV_SCP_UPLOAD_SHORTCUT=shift+u
+DVV_SCP_DOWNLOAD_SHORTCUT=shift+g
+DVV_SCP_OPEN_DOWNLOADS_SHORTCUT=shift+o
+DVV_SCP_CLEAN_DOWNLOADS_SHORTCUT=shift+c
 ```
 
 Resources:
@@ -574,6 +586,7 @@ DVV_PORTS_KILL_SHORTCUT=shift+k
 | Tmux reset target | `dvv tmux` stores the last opened or manually selected reset target in `~/.cache/devv/tmux-reset-target.json` for the global `Alt+R` fallback. |
 | Workspace agent harness | Workspace create/add flows and `Shift+H` write `AGENTS.md`, `.agents/manifest.json`, guides, and skill lookup paths inside the workspace. |
 | Workspace size | `dvv workspace` and `dvv workspace:list` show workspace disk usage without following symlink targets. |
+| SCP transfers | `dvv ssh` can upload/download with `scp`, open `~/Downloads/dvv-scp`, and clean its contents after confirmation. |
 | Port manager | `dvv ports` inspects listening TCP ports with `ss` or `lsof`, opens likely local URLs, copies URLs, and confirms before killing a PID. |
 | Database size | Database selection lists show user database sizes from `information_schema.tables`; empty databases show `0 B`. |
 | Resource logs | `dvv resources` opens service, Docker, or Compose logs in a new terminal tab. |

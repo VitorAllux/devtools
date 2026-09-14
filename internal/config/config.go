@@ -91,7 +91,8 @@ type DBConfig struct {
 }
 
 type SSHConfig struct {
-	Hub SSHHubConfig `json:"hub"`
+	Hub      SSHHubConfig      `json:"hub"`
+	Transfer SSHTransferConfig `json:"transfer"`
 }
 
 type ResourcesConfig struct {
@@ -135,6 +136,18 @@ type SSHHubShortcuts struct {
 	Add         string `json:"add"`
 	Remove      string `json:"remove"`
 	NewTerminal string `json:"newTerminal"`
+}
+
+type SSHTransferConfig struct {
+	DownloadsDir string               `json:"downloadsDir"`
+	Shortcuts    SSHTransferShortcuts `json:"shortcuts"`
+}
+
+type SSHTransferShortcuts struct {
+	Upload         string `json:"upload"`
+	Download       string `json:"download"`
+	OpenDownloads  string `json:"openDownloads"`
+	CleanDownloads string `json:"cleanDownloads"`
 }
 
 type SecretsConfig struct {
@@ -581,6 +594,15 @@ func DefaultProjectConfig() ProjectConfig {
 					NewTerminal: "shift+t",
 				},
 			},
+			Transfer: SSHTransferConfig{
+				DownloadsDir: "~/Downloads/dvv-scp",
+				Shortcuts: SSHTransferShortcuts{
+					Upload:         "shift+u",
+					Download:       "shift+g",
+					OpenDownloads:  "shift+o",
+					CleanDownloads: "shift+c",
+				},
+			},
 		},
 		Secrets: SecretsConfig{
 			Hub: SecretsHubConfig{
@@ -776,17 +798,37 @@ func mergeProjectConfigDefaults(target *ProjectConfig) {
 	target.DB = mergeDBConfigDefaults(target.DB, defaults.DB)
 	target.Resources = mergeResourcesConfigDefaults(target.Resources, defaults.Resources)
 	target.Secrets = mergeSecretsConfigDefaults(target.Secrets, defaults.Secrets)
-	if strings.TrimSpace(target.SSH.Hub.Shortcuts.Add) == "" {
-		target.SSH.Hub.Shortcuts.Add = defaults.SSH.Hub.Shortcuts.Add
-	}
-	if strings.TrimSpace(target.SSH.Hub.Shortcuts.Remove) == "" {
-		target.SSH.Hub.Shortcuts.Remove = defaults.SSH.Hub.Shortcuts.Remove
-	}
-	if strings.TrimSpace(target.SSH.Hub.Shortcuts.NewTerminal) == "" {
-		target.SSH.Hub.Shortcuts.NewTerminal = defaults.SSH.Hub.Shortcuts.NewTerminal
-	}
+	target.SSH = mergeSSHConfigDefaults(target.SSH, defaults.SSH)
 	target.Tmux = mergeTmuxConfigDefaults(target.Tmux, defaults.Tmux)
 	target.Workspace = mergeWorkspaceConfigDefaults(target.Workspace, defaults.Workspace)
+}
+
+func mergeSSHConfigDefaults(target SSHConfig, defaults SSHConfig) SSHConfig {
+	if strings.TrimSpace(target.Hub.Shortcuts.Add) == "" {
+		target.Hub.Shortcuts.Add = defaults.Hub.Shortcuts.Add
+	}
+	if strings.TrimSpace(target.Hub.Shortcuts.Remove) == "" {
+		target.Hub.Shortcuts.Remove = defaults.Hub.Shortcuts.Remove
+	}
+	if strings.TrimSpace(target.Hub.Shortcuts.NewTerminal) == "" {
+		target.Hub.Shortcuts.NewTerminal = defaults.Hub.Shortcuts.NewTerminal
+	}
+	if strings.TrimSpace(target.Transfer.DownloadsDir) == "" {
+		target.Transfer.DownloadsDir = defaults.Transfer.DownloadsDir
+	}
+	if strings.TrimSpace(target.Transfer.Shortcuts.Upload) == "" {
+		target.Transfer.Shortcuts.Upload = defaults.Transfer.Shortcuts.Upload
+	}
+	if strings.TrimSpace(target.Transfer.Shortcuts.Download) == "" {
+		target.Transfer.Shortcuts.Download = defaults.Transfer.Shortcuts.Download
+	}
+	if strings.TrimSpace(target.Transfer.Shortcuts.OpenDownloads) == "" {
+		target.Transfer.Shortcuts.OpenDownloads = defaults.Transfer.Shortcuts.OpenDownloads
+	}
+	if strings.TrimSpace(target.Transfer.Shortcuts.CleanDownloads) == "" {
+		target.Transfer.Shortcuts.CleanDownloads = defaults.Transfer.Shortcuts.CleanDownloads
+	}
+	return target
 }
 
 func mergeShellConfigDefaults(target ShellConfig, defaults ShellConfig) ShellConfig {
@@ -1005,7 +1047,34 @@ func resolveSSHConfig(cfg SSHConfig) SSHConfig {
 	if value := firstSetEnv("DVV_SSH_NEW_TERMINAL_SHORTCUT"); value != "" {
 		cfg.Hub.Shortcuts.NewTerminal = value
 	}
+	if value := firstSetEnv("DVV_SCP_DOWNLOADS_DIR"); value != "" {
+		cfg.Transfer.DownloadsDir = value
+	}
+	if value := firstSetEnv("DVV_SCP_UPLOAD_SHORTCUT"); value != "" {
+		cfg.Transfer.Shortcuts.Upload = value
+	}
+	if value := firstSetEnv("DVV_SCP_DOWNLOAD_SHORTCUT"); value != "" {
+		cfg.Transfer.Shortcuts.Download = value
+	}
+	if value := firstSetEnv("DVV_SCP_OPEN_DOWNLOADS_SHORTCUT"); value != "" {
+		cfg.Transfer.Shortcuts.OpenDownloads = value
+	}
+	if value := firstSetEnv("DVV_SCP_CLEAN_DOWNLOADS_SHORTCUT"); value != "" {
+		cfg.Transfer.Shortcuts.CleanDownloads = value
+	}
+	cfg.Transfer.DownloadsDir = resolveUserDataPath(cfg.Transfer.DownloadsDir)
 	return cfg
+}
+
+func resolveUserDataPath(value string) string {
+	value = ExpandPath(value)
+	if filepath.IsAbs(value) {
+		return value
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		return filepath.Join(home, value)
+	}
+	return value
 }
 
 func resolveResourcesConfig(cfg ResourcesConfig) ResourcesConfig {

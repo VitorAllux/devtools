@@ -110,7 +110,7 @@ Final indeterminate loader labels should be action-specific, such as `ready`, `c
 
 | Area | Loader points |
 | --- | --- |
-| SSH | Connection probe before tmux/terminal handoff, encrypted backup sync. |
+| SSH | Connection probe before tmux/terminal handoff, SCP upload/download helpers, encrypted backup sync. |
 | Workspace | Initial hub load, project discovery, create planning, create execution, project add/remove, workspace deletion. |
 | Tmux | Target scanning, environment open/start/stop/restart, directory picker session open. |
 | Database | Database fetch, create, drop, truncate, Google Drive download, import progress, dump cleaning. |
@@ -134,6 +134,7 @@ Final indeterminate loader labels should be action-specific, such as `ready`, `c
 | --- | --- | --- |
 | Runtime config | Stored in `~/.config/devv/config.env`. | Keep this path for compatibility until a migration explicitly changes it. |
 | SSH list | Stored in `~/.config/devv/servers.list`. | Do not commit real SSH targets. |
+| SCP downloads | Stored in `~/Downloads/dvv-scp` by default. | `dvv setup`, `dvv doctor --fix`, and SCP actions create it; clean removes only contents after confirmation. |
 | AGE key | Stored in `~/.config/devv/keys/age.key`. | Never commit private keys. |
 | Encrypted SSH backup | Uses repo `secrets/servers.list.age` when `secrets/` exists, otherwise `~/.config/devv/servers.list.age`. | Keep `secrets/` out of git history. |
 | Bitwarden | `dvv bootstrap` can restore the AGE key from Bitwarden. | Configure `DVV_BW_AGE_KEY_ITEM` when needed. |

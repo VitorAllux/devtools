@@ -83,6 +83,24 @@ func TestPortsHubKeysUseDefaults(t *testing.T) {
 	}
 }
 
+func TestSSHHubKeysUseTransferDefaults(t *testing.T) {
+	cfg := Config{Project: DefaultProjectConfig()}
+	keys := cfg.SSHHubKeys()
+
+	if keys.Upload.FZFKey != "U" || keys.Upload.Label != "Shift+U" {
+		t.Fatalf("upload key = %#v", keys.Upload)
+	}
+	if keys.Download.FZFKey != "G" || keys.Download.Label != "Shift+G" {
+		t.Fatalf("download key = %#v", keys.Download)
+	}
+	if keys.OpenDownloads.FZFKey != "O" || keys.OpenDownloads.Label != "Shift+O" {
+		t.Fatalf("open downloads key = %#v", keys.OpenDownloads)
+	}
+	if keys.CleanDownloads.FZFKey != "C" || keys.CleanDownloads.Label != "Shift+C" {
+		t.Fatalf("clean downloads key = %#v", keys.CleanDownloads)
+	}
+}
+
 func TestShellShortcutKeysUseDefaults(t *testing.T) {
 	cfg := Config{Project: DefaultProjectConfig()}
 	keys := cfg.ShellShortcutKeys()

@@ -52,10 +52,14 @@ func showHelp(cfg *config.Config) {
 	helpEntry(keys.Add.Label, "Add SSH entry")
 	helpEntry(keys.Remove.Label, "Remove selected SSH entry")
 	helpEntry(keys.NewTerminal.Label, "Open selected SSH entry in a new terminal tab")
+	helpEntry(keys.Upload.Label, "Upload a local file or directory to the selected SSH entry")
+	helpEntry(keys.Download.Label, "Download a remote file or directory from the selected SSH entry")
+	helpEntry(keys.OpenDownloads.Label, "Open the SCP downloads directory")
+	helpEntry(keys.CleanDownloads.Label, "Clean all SCP downloads")
 	helpEntry("Esc", "Exit")
 	fmt.Println()
 	helpSection("Shortcut Config")
-	helpEntry("dvv.config.json", "Edit ssh.hub.shortcuts to change hub keys")
+	helpEntry("dvv.config.json", "Edit ssh.hub.shortcuts and ssh.transfer.shortcuts")
 }
 
 func helpSection(title string) {
