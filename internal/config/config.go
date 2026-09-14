@@ -29,6 +29,7 @@ type ProjectConfig struct {
 	System    SystemConfig    `json:"system"`
 	DB        DBConfig        `json:"db"`
 	Resources ResourcesConfig `json:"resources"`
+	Ports     PortsConfig     `json:"ports"`
 	Secrets   SecretsConfig   `json:"secrets"`
 	SSH       SSHConfig       `json:"ssh"`
 	Tmux      TmuxConfig      `json:"tmux"`
@@ -96,6 +97,19 @@ type SSHConfig struct {
 type ResourcesConfig struct {
 	Hub  ResourcesHubConfig  `json:"hub"`
 	Logs ResourcesLogsConfig `json:"logs"`
+}
+
+type PortsConfig struct {
+	Hub PortsHubConfig `json:"hub"`
+}
+
+type PortsHubConfig struct {
+	Shortcuts PortsHubShortcuts `json:"shortcuts"`
+}
+
+type PortsHubShortcuts struct {
+	Kill string `json:"kill"`
+	Copy string `json:"copy"`
 }
 
 type ResourcesHubConfig struct {
@@ -369,6 +383,7 @@ func Load() (*Config, error) {
 	cfg.Project.SSH = resolveSSHConfig(cfg.Project.SSH)
 	cfg.Project.Secrets = resolveSecretsConfig(cfg.Project.Secrets)
 	cfg.Project.Resources = resolveResourcesConfig(cfg.Project.Resources)
+	cfg.Project.Ports = resolvePortsConfig(cfg.Project.Ports)
 	cfg.Project.Workspace = resolveWorkspaceConfig(cfg.Project.Workspace)
 	cfg.Project.Tmux = resolveTmuxConfig(cfg.Project.Tmux)
 	cfg.Project.DB = resolveDBConfig(cfg.Project.DB, root)
@@ -549,6 +564,14 @@ func DefaultProjectConfig() ProjectConfig {
 				},
 			},
 			Logs: ResourcesLogsConfig{Tail: 200},
+		},
+		Ports: PortsConfig{
+			Hub: PortsHubConfig{
+				Shortcuts: PortsHubShortcuts{
+					Kill: "shift+k",
+					Copy: "shift+c",
+				},
+			},
 		},
 		SSH: SSHConfig{
 			Hub: SSHHubConfig{
@@ -1002,6 +1025,16 @@ func resolveResourcesConfig(cfg ResourcesConfig) ResourcesConfig {
 		if parsed := parsePositiveInt(value); parsed > 0 {
 			cfg.Logs.Tail = parsed
 		}
+	}
+	return cfg
+}
+
+func resolvePortsConfig(cfg PortsConfig) PortsConfig {
+	if value := firstSetEnv("DVV_PORTS_KILL_SHORTCUT"); value != "" {
+		cfg.Hub.Shortcuts.Kill = value
+	}
+	if value := firstSetEnv("DVV_PORTS_COPY_SHORTCUT"); value != "" {
+		cfg.Hub.Shortcuts.Copy = value
 	}
 	return cfg
 }

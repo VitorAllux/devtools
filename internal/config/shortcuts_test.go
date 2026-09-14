@@ -71,6 +71,18 @@ func TestResourcesHubKeysUseDefaults(t *testing.T) {
 	}
 }
 
+func TestPortsHubKeysUseDefaults(t *testing.T) {
+	cfg := Config{Project: DefaultProjectConfig()}
+	keys := cfg.PortsHubKeys()
+
+	if keys.Kill.FZFKey != "K" || keys.Kill.Label != "Shift+K" {
+		t.Fatalf("kill key = %#v", keys.Kill)
+	}
+	if keys.Copy.FZFKey != "C" || keys.Copy.Label != "Shift+C" {
+		t.Fatalf("copy key = %#v", keys.Copy)
+	}
+}
+
 func TestShellShortcutKeysUseDefaults(t *testing.T) {
 	cfg := Config{Project: DefaultProjectConfig()}
 	keys := cfg.ShellShortcutKeys()

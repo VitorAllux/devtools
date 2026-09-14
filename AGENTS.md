@@ -132,6 +132,7 @@ dvv workspace
 ```text
 dvv tmux
 dvv db
+dvv ports
 dvv config
 dvv secrets
 ```

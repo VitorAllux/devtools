@@ -14,7 +14,7 @@ import (
 type mainHubItem struct {
 	Command     string
 	Category    string
-	Status      string
+	Type        string
 	Shortcut    string
 	Description string
 }
@@ -52,7 +52,18 @@ func runMainHub(ctx context.Context, cfg *config.Config, runner run.Runner) erro
 			_, _ = ui.Prompt("Press Enter to return")
 			continue
 		}
-		code := runCommand(ctx, cfg, runner, command, nil)
+		commandArgs := []string(nil)
+		if command == "maintenance" {
+			var ok bool
+			command, commandArgs, ok, err = selectMaintenanceCommand(ctx, runner)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				continue
+			}
+		}
+		code := runCommand(ctx, cfg, runner, command, commandArgs)
 		if code != 0 || mainHubCommandNeedsPause(command) {
 			_, _ = ui.Prompt("Press Enter to return")
 		}
@@ -99,15 +110,65 @@ func mainHubItems(cfg *config.Config) []mainHubItem {
 		{"tmux", "Tmux", "hub", keys.Tmux.Label, "Open API/Web environments, manage targets, and restart panes."},
 		{"ssh", "Network", "hub", keys.SSH.Label, "Open saved SSH targets in dedicated terminal tabs."},
 		{"db", "Database", "hub", "", "Create, import, truncate, drop, and clean local database dumps."},
+		{"ports", "Development", "hub", "", "Inspect local listening ports, open URLs, copy URLs, and kill stuck processes."},
 		{"resources", "Resources", "hub", "", "Inspect local services, containers, state, logs, and service actions."},
 		{"secrets", "Secrets", "hub", "", "Prepare AGE keys and sync encrypted SSH backup files."},
 		{"config", "System", "hub", "", "Change themes, profiles, paths, shortcuts, safety, and integrations."},
+		{"maintenance", "System", "menu", "", "Run doctor, build, check, setup, repair, and bootstrap actions."},
+		{"help", "System", "help", "", "Show the command-oriented help screen."},
+	}
+}
+
+func selectMaintenanceCommand(ctx context.Context, runner run.Runner) (string, []string, bool, error) {
+	items := []mainHubItem{
 		{"doctor", "System", "check", "", "Check local dependencies, runtime files, and shell/tmux integration."},
-		{"setup", "System", "install", "", "Install zsh completion, shell shortcuts, and tmux integration."},
 		{"build", "System", "build", "", "Rebuild the local dvv binary from any working directory."},
 		{"check", "System", "test", "", "Run build, tests, go vet, and smoke validation."},
-		{"help", "System", "text", "", "Show the command-oriented help screen."},
+		{"setup", "System", "install", "", "Install zsh completion, shell shortcuts, and tmux integration."},
+		{"doctor --fix", "System", "repair", "", "Create safe runtime files, rebuild, and reinstall integration."},
+		{"bootstrap", "System", "restore", "", "Restore AGE/Bitwarden secrets and SSH backup files."},
 	}
+	args := ui.FZFHub{
+		Prompt:        ui.Crown("maintenance") + ui.Muted("> "),
+		BorderLabel:   "dvv maintenance",
+		BorderTag:     "system tools",
+		Preview:       mainHubPreviewCommand(),
+		PreviewLabel:  "tool panel",
+		PreviewWindow: "right,42%,border-rounded,wrap",
+		Shortcuts: []ui.FZFShortcut{
+			{Label: "Enter", Description: "run selected tool"},
+			{Label: "Esc", Description: "back"},
+		},
+		ExtraArgs: []string{
+			"--delimiter=\t",
+			"--with-nth=6",
+			"--nth=1,2,3,4,5,6",
+			"--header-lines=1",
+		},
+	}.Args()
+	var builder strings.Builder
+	builder.WriteString(mainHubLine("__dvv_header__", "", "", "", "", mainHubHeader()))
+	builder.WriteByte('\n')
+	for index, item := range items {
+		builder.WriteString(mainHubLine(item.Command, item.Category, item.Type, item.Shortcut, item.Description, mainHubRow(index, item)))
+		builder.WriteByte('\n')
+	}
+	output, err := runner.OutputWithInput(ctx, "", []byte(builder.String()), "fzf", args...)
+	if err != nil && len(output) == 0 {
+		return "", nil, false, nil
+	}
+	if err != nil {
+		return "", nil, false, err
+	}
+	selection := ui.FZFSelectedRaw(strings.TrimSpace(string(output)))
+	if selection == "" {
+		return "", nil, false, nil
+	}
+	fields := strings.Fields(selection)
+	if len(fields) == 0 {
+		return "", nil, false, nil
+	}
+	return fields[0], fields[1:], true, nil
 }
 
 func mainHubRows(cfg *config.Config) string {
@@ -115,7 +176,7 @@ func mainHubRows(cfg *config.Config) string {
 	builder.WriteString(mainHubLine("__dvv_header__", "", "", "", "", mainHubHeader()))
 	builder.WriteByte('\n')
 	for index, item := range mainHubItems(cfg) {
-		builder.WriteString(mainHubLine(item.Command, item.Category, item.Status, item.Shortcut, item.Description, mainHubRow(index, item)))
+		builder.WriteString(mainHubLine(item.Command, item.Category, item.Type, item.Shortcut, item.Description, mainHubRow(index, item)))
 		builder.WriteByte('\n')
 	}
 	return builder.String()
@@ -126,7 +187,7 @@ func mainHubHeader() string {
 		ui.Crown("NO"),
 		ui.Crown(mainHubFixed("COMMAND", 14)),
 		ui.Crown(mainHubFixed("AREA", 12)),
-		ui.Crown(mainHubFixed("STATUS", 10)),
+		ui.Crown(mainHubFixed("TYPE", 10)),
 		ui.Crown(mainHubFixed("SHORTCUT", 10)),
 	)
 }
@@ -136,7 +197,7 @@ func mainHubRow(index int, item mainHubItem) string {
 		ui.Muted(fmt.Sprintf("%02d", index+1)),
 		ui.Accent(mainHubFixed(item.Command, 14)),
 		ui.Gold(mainHubFixed(item.Category, 12)),
-		ui.Muted(mainHubFixed(item.Status, 10)),
+		ui.Muted(mainHubFixed(item.Type, 10)),
 		ui.Gold(mainHubFixed(item.Shortcut, 10)),
 	)
 }
@@ -160,13 +221,13 @@ func mainHubPreviewCommand() string {
 	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 command=$(printf "%s" "$line" | cut -f1)
 category=$(printf "%s" "$line" | cut -f2)
-status=$(printf "%s" "$line" | cut -f3)
+type=$(printf "%s" "$line" | cut -f3)
 shortcut=$(printf "%s" "$line" | cut -f4)
 description=$(printf "%s" "$line" | cut -f5)
 printf "%sMain hub%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-10s%s %s\n" "$dvv_label" "Command" "$dvv_reset" "$command"
 printf "  %s%-10s%s %s\n" "$dvv_label" "Area" "$dvv_reset" "$category"
-printf "  %s%-10s%s %s\n" "$dvv_label" "Status" "$dvv_reset" "$status"
+printf "  %s%-10s%s %s\n" "$dvv_label" "Type" "$dvv_reset" "$type"
 if [ -n "$shortcut" ]; then
   printf "  %s%-10s%s %s\n" "$dvv_label" "Shortcut" "$dvv_reset" "$shortcut"
 fi

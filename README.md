@@ -16,6 +16,7 @@ The current `main` branch contains the Go implementation:
 | Workspace | Ready | `dvv workspace` |
 | Tmux | Ready | `dvv tmux`, `Alt+P`, and `Alt+R` |
 | Database | Ready | `dvv db` |
+| Ports | Ready | `dvv ports` |
 | System config | Ready | `dvv config` |
 | Resources | Ready | `dvv resources` |
 | Secrets | Ready | `dvv secrets` and `dvv bootstrap` |
@@ -116,6 +117,7 @@ dvv check
 | `dvv tmux:home` | Open the configured home tmux tab used by `Alt+F`. |
 | `dvv tmux:reset-api` | Reset or select API/Horizon tmux target. |
 | `dvv db` | Open the database hub. |
+| `dvv ports` | Inspect listening local ports, open URLs, copy URLs, and kill stuck processes. |
 | `dvv resources` | Open the local resources hub. |
 | `dvv secrets` | Open the local secrets hub. |
 | `dvv config` | Open the configuration hub. |
@@ -125,6 +127,8 @@ dvv check
 | `dvv check` | Run build, tests, `go vet`, and smoke from the project root. |
 | `dvv doctor` | Check dependencies, paths, shortcuts, and known local edge cases. |
 | `dvv doctor --fix` | Create safe local files, rebuild, and reinstall shell/tmux integration. |
+
+The main hub keeps daily destinations visible and groups `doctor`, `build`, `check`, `setup`, `doctor --fix`, and `bootstrap` under `maintenance`. Those commands still work directly from the CLI.
 
 Compatibility routes such as `dvv ssh:list`, `dvv workspace:list`, `dvv db import`, and `dvv config set` exist for scripts and migration support, but they are not the primary user surface.
 
@@ -224,7 +228,7 @@ workspace-<name>
 ```
 
 Each workspace contains git worktrees for selected base repositories. The real repositories are not moved or copied.
-The workspace hub shows a compact `ACTIVE` column based on workspace/project activity; full workspace listing also considers the latest git commit time.
+The workspace hub shows compact `SIZE` and `ACTIVE` columns based on workspace disk usage and workspace/project activity; full workspace listing also considers the latest git commit time.
 
 Creation rules:
 
@@ -328,6 +332,8 @@ The database hub supports:
 - Dropping databases.
 - Cleaning local dump files.
 
+Database pickers show each user database size from `information_schema.tables`; empty databases are shown as `0 B`.
+
 When downloading from Google Drive, a local name without extension is saved as `.sql.gz`. The import step detects gzip by file content, so older extensionless downloads can still be listed and imported when they contain a valid gzip or SQL dump.
 
 Database config can come from `dvv.config.json`, `.env`, or `~/.config/devv/config.env`.
@@ -341,6 +347,23 @@ DVV_DB_USER=root
 DVV_DUMPS_DIR=~/workspace/personal/devtools/dumps
 DVV_RCLONE_REMOTE=gdrive
 ```
+
+## Port Manager
+
+```bash
+dvv ports
+```
+
+The port manager lists local listening TCP ports, detects common local web URLs, and can copy URLs or kill stuck processes after confirmation.
+
+Shortcuts:
+
+| Shortcut | Action |
+| --- | --- |
+| `Enter` | Open the detected URL, or show process details when no URL is known. |
+| `Shift+C` | Copy the detected URL. |
+| `Shift+K` | Kill the selected process after confirmation. |
+| `Esc` | Exit. |
 
 ## Resources
 
@@ -391,7 +414,7 @@ The configuration hub edits persisted runtime values in:
 ~/.config/devv/config.env
 ```
 
-`dvv config` opens a category hub first. Use `Theme` to switch the CLI theme, `Profiles` to select the active runtime profile, `All Keys` for the complete raw key editor, or choose a focused area such as `Paths`, `Shortcuts`, `Workspace`, `Database`, `Tmux`, `Resources`, `Integrations`, or `Safety`.
+`dvv config` opens a category hub first. Use `Theme` to switch the CLI theme, `Profiles` to select the active runtime profile, `All Keys` for the complete raw key editor, or choose a focused area such as `Paths`, `Shortcuts`, `Workspace`, `Database`, `Tmux`, `Resources`/ports, `Integrations`, or `Safety`.
 
 Every known config key shows a short explanation in the preview panel. `dvv config list` also prints a `DESCRIPTION` column for non-interactive review. Custom keys saved through the hub are kept visible in `All Keys` under the `Custom` group.
 
@@ -529,6 +552,8 @@ Resources:
 ```bash
 DVV_RESOURCES_LOGS_SHORTCUT=shift+l
 DVV_RESOURCES_LOG_TAIL=200
+DVV_PORTS_COPY_SHORTCUT=shift+c
+DVV_PORTS_KILL_SHORTCUT=shift+k
 ```
 
 ## Operational Details
@@ -548,6 +573,9 @@ DVV_RESOURCES_LOG_TAIL=200
 | Tmux theme | `dvv setup` writes tmux status, window, pane, message, and copy-mode colors from the active CLI theme by default. The status bar stays full-width and visible. |
 | Tmux reset target | `dvv tmux` stores the last opened or manually selected reset target in `~/.cache/devv/tmux-reset-target.json` for the global `Alt+R` fallback. |
 | Workspace agent harness | Workspace create/add flows and `Shift+H` write `AGENTS.md`, `.agents/manifest.json`, guides, and skill lookup paths inside the workspace. |
+| Workspace size | `dvv workspace` and `dvv workspace:list` show workspace disk usage without following symlink targets. |
+| Port manager | `dvv ports` inspects listening TCP ports with `ss` or `lsof`, opens likely local URLs, copies URLs, and confirms before killing a PID. |
+| Database size | Database selection lists show user database sizes from `information_schema.tables`; empty databases show `0 B`. |
 | Resource logs | `dvv resources` opens service, Docker, or Compose logs in a new terminal tab. |
 | Secrets | `dvv secrets` manages local AGE/SSH backup state; `dvv bootstrap` restores AGE/Bitwarden-backed SSH data without committing private files. |
 | Doctor fix | `dvv doctor --fix` creates safe local runtime files, rebuilds, and reinstalls managed shell/tmux integration. |
@@ -625,6 +653,9 @@ Main packages:
 | `internal/workspace` | Workspace hub, worktree plans, metadata, openers, adoption, and deletion. |
 | `internal/tmux` | Environment hub and directory session picker. |
 | `internal/db` | Database hub and import/create/drop/truncate/clean flows. |
+| `internal/ports` | Listening port discovery, port manager hub, URL actions, and safe kill flow. |
+| `internal/desktop` | Cross-platform browser opener and clipboard helpers. |
+| `internal/human` | Shared human-readable formatting helpers. |
 | `internal/systemconfig` | Configuration hub. |
 | `internal/resources` | Local services, Docker, and Compose resource hub. |
 | `internal/secrets` | Secrets hub, AGE key preparation, encrypted SSH backup, and Bitwarden bootstrap. |
@@ -635,6 +666,9 @@ Before adding a new hub, use `internal/ui.FZFHub`, keep shortcuts configurable, 
 
 `2.0.0-alpha.3`:
 
+- Added `dvv ports` for local listening port inspection, URL actions, and safe process kill.
+- Added workspace and database size columns in the relevant hubs/listings.
+- Kept the main hub focused by grouping build/check/setup repair actions under maintenance.
 - Added runtime profiles in the config hub.
 - Added the secrets hub for AGE and SSH backup state/actions.
 - Added resource log handoff for services, containers, and Compose projects.

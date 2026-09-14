@@ -6,6 +6,7 @@ import (
 
 	"github.com/VitorAllux/devtools/internal/config"
 	dbcmd "github.com/VitorAllux/devtools/internal/db"
+	portscmd "github.com/VitorAllux/devtools/internal/ports"
 	resourcescmd "github.com/VitorAllux/devtools/internal/resources"
 	"github.com/VitorAllux/devtools/internal/run"
 	secretscmd "github.com/VitorAllux/devtools/internal/secrets"
@@ -131,6 +132,12 @@ func Run(args []string) int {
 			return 1
 		}
 		return 0
+	case "ports":
+		if err := portscmd.Run(ctx, cfg, runner, commandArgs); err != nil {
+			ui.Error("%v", err)
+			return 1
+		}
+		return 0
 	case "ssh":
 		if err := sshcmd.Run(ctx, cfg, runner, commandArgs); err != nil {
 			ui.Error("%v", err)
@@ -215,6 +222,8 @@ func runCommand(ctx context.Context, cfg *config.Config, runner run.Runner, comm
 		err = dbcmd.Run(ctx, cfg, runner, args)
 	case "resources":
 		err = resourcescmd.Run(ctx, cfg, runner, args)
+	case "ports":
+		err = portscmd.Run(ctx, cfg, runner, args)
 	case "setup":
 		err = setupcmd.RunSetup(ctx, cfg, runner, args)
 	case "build":
@@ -271,6 +280,7 @@ func showHelp(cfg *config.Config) {
 	fmt.Println()
 	helpSection("Resources")
 	helpEntry("resources", ">", "Open the local resources hub")
+	helpEntry("ports", ">", "Inspect listening local ports")
 	fmt.Println()
 	helpSection("Tmux")
 	helpEntry("tmux", ">", "Open the tmux environment hub")

@@ -18,6 +18,7 @@ _dvv() {
         "db:Open the database hub"
         "doctor:Check local dependencies and integration"
         "help:Show command help"
+        "ports:Inspect listening local ports"
         "resources:Open the local resources hub"
         "secrets:Open the local secrets hub"
         "setup:Install zsh completion, shell shortcuts, and tmux shortcuts"
@@ -133,6 +134,11 @@ _dvv() {
             )
           fi
           _describe -t resources-actions 'resources actions' resources_actions
+          ;;
+        ports)
+          local -a ports_actions
+          ports_actions=("help:Show port manager help")
+          _describe -t ports-actions 'ports actions' ports_actions
           ;;
         secrets)
           local -a secrets_actions

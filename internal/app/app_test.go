@@ -32,7 +32,7 @@ func TestMainHubRowsListPrimaryCommands(t *testing.T) {
 	cfg := &config.Config{Project: config.DefaultProjectConfig()}
 	rows := mainHubRows(cfg)
 
-	for _, want := range []string{"workspace", "tmux", "ssh", "db", "resources", "config", "doctor", "help"} {
+	for _, want := range []string{"workspace", "tmux", "ssh", "db", "ports", "resources", "config", "maintenance", "help"} {
 		if !strings.Contains(rows, want) {
 			t.Fatalf("main hub rows missing %q: %s", want, rows)
 		}
@@ -48,12 +48,26 @@ func TestMainHubRowsListPrimaryCommands(t *testing.T) {
 		if strings.Contains(fields[5], "\t") {
 			t.Fatalf("main hub visual field should not contain tabs: %q", fields[5])
 		}
+		for _, hidden := range []string{"doctor", "setup", "build", "check"} {
+			if fields[0] == hidden {
+				t.Fatalf("main hub rows should keep %s under maintenance: %s", hidden, rows)
+			}
+		}
 	}
 	header := strings.Split(strings.Split(strings.TrimSpace(rows), "\n")[0], "\t")[5]
 	commandIndex := strings.Index(header, "COMMAND")
 	areaIndex := strings.Index(header, "AREA")
+	typeIndex := strings.Index(header, "TYPE")
 	if commandIndex < 0 || areaIndex < 0 || commandIndex > areaIndex {
 		t.Fatalf("main hub header should show COMMAND before AREA: %q", header)
+	}
+	if typeIndex < 0 || typeIndex < areaIndex {
+		t.Fatalf("main hub header should show TYPE after AREA: %q", header)
+	}
+	for _, unexpected := range []string{"STATUS", "tools", "text"} {
+		if strings.Contains(header, unexpected) {
+			t.Fatalf("main hub header should not contain old label %q: %q", unexpected, header)
+		}
 	}
 }
 
@@ -76,6 +90,7 @@ func TestRunHelpRoutesForPublicCommands(t *testing.T) {
 	commands := [][]string{
 		{"config", "help"},
 		{"db", "help"},
+		{"ports", "help"},
 		{"resources", "help"},
 		{"secrets", "help"},
 		{"ssh", "help"},

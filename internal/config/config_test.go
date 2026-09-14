@@ -193,6 +193,8 @@ func TestResolveShortcutConfigsUseEnvOverrides(t *testing.T) {
 	t.Setenv("DVV_RESOURCES_STOP_SHORTCUT", "shift+x")
 	t.Setenv("DVV_RESOURCES_LOGS_SHORTCUT", "shift+l")
 	t.Setenv("DVV_RESOURCES_LOG_TAIL", "500")
+	t.Setenv("DVV_PORTS_KILL_SHORTCUT", "shift+k")
+	t.Setenv("DVV_PORTS_COPY_SHORTCUT", "shift+c")
 	t.Setenv("DVV_SECRETS_PREPARE_SHORTCUT", "alt-k")
 	t.Setenv("DVV_SECRETS_RESTORE_SHORTCUT", "alt-b")
 	t.Setenv("DVV_SECRETS_SYNC_SHORTCUT", "alt-y")
@@ -209,6 +211,7 @@ func TestResolveShortcutConfigsUseEnvOverrides(t *testing.T) {
 	system := resolveSystemConfig(DefaultProjectConfig().System)
 	ssh := resolveSSHConfig(DefaultProjectConfig().SSH)
 	resources := resolveResourcesConfig(DefaultProjectConfig().Resources)
+	ports := resolvePortsConfig(DefaultProjectConfig().Ports)
 	secrets := resolveSecretsConfig(DefaultProjectConfig().Secrets)
 	tmux := resolveTmuxConfig(DefaultProjectConfig().Tmux)
 
@@ -226,6 +229,9 @@ func TestResolveShortcutConfigsUseEnvOverrides(t *testing.T) {
 	}
 	if resources.Logs.Tail != 500 {
 		t.Fatalf("resource log tail = %d", resources.Logs.Tail)
+	}
+	if ports.Hub.Shortcuts.Kill != "shift+k" || ports.Hub.Shortcuts.Copy != "shift+c" {
+		t.Fatalf("ports shortcuts = %#v", ports.Hub.Shortcuts)
 	}
 	if secrets.Hub.Shortcuts.Prepare != "alt-k" || secrets.Hub.Shortcuts.Restore != "alt-b" || secrets.Hub.Shortcuts.Sync != "alt-y" {
 		t.Fatalf("secrets shortcuts = %#v", secrets.Hub.Shortcuts)

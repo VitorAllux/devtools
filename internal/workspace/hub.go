@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/VitorAllux/devtools/internal/bootstrap"
 	"github.com/VitorAllux/devtools/internal/config"
 	"github.com/VitorAllux/devtools/internal/discovery"
+	"github.com/VitorAllux/devtools/internal/human"
 	"github.com/VitorAllux/devtools/internal/ui"
 )
 
@@ -138,6 +140,8 @@ func (m *Manager) fzfHub(ctx context.Context, details []Details, hubError string
 		ExtraArgs: append(ui.FZFHiddenRowArgs(),
 			"--header-lines=1",
 			"--multi",
+			"--track",
+			workspaceRowsReloadBind(),
 		),
 	}.Args()
 	output, err := m.Runner.OutputWithInput(ctx, "", []byte(workspaceRows(details)), "fzf", args...)
@@ -506,6 +510,9 @@ func (m *Manager) openInteractive(ctx context.Context, ws Workspace) error {
 		if err != nil {
 			return err
 		}
+		if selected == "" {
+			return nil
+		}
 		opener = selected
 	}
 	return m.Open(ctx, ws, opener)
@@ -671,11 +678,11 @@ func (m *Manager) selectOne(ctx context.Context, prompt string, borderLabel stri
 		}.Args()
 		output, err := m.Runner.OutputWithInput(ctx, "", []byte(builder.String()), "fzf", args...)
 		if err != nil && len(output) == 0 {
-			return "", fmt.Errorf("selection cancelled")
+			return "", nil
 		}
 		selected := ui.FZFSelectedRaw(strings.TrimSpace(string(output)))
 		if selected == "" {
-			return "", fmt.Errorf("selection cancelled")
+			return "", nil
 		}
 		return selected, nil
 	}
@@ -685,6 +692,9 @@ func (m *Manager) selectOne(ctx context.Context, prompt string, borderLabel stri
 	value, err := ui.Prompt("Selection")
 	if err != nil {
 		return "", err
+	}
+	if strings.TrimSpace(value) == "" || strings.EqualFold(strings.TrimSpace(value), "q") || strings.EqualFold(strings.TrimSpace(value), "quit") {
+		return "", nil
 	}
 	index, ok := parseSelectionIndex(value, len(options))
 	if !ok {
@@ -713,6 +723,7 @@ const (
 	workspaceNameColumnWidth    = 32
 	workspaceProjectColumnWidth = 8
 	workspaceStatusColumnWidth  = 8
+	workspaceSizeColumnWidth    = 8
 	workspaceActiveColumnWidth  = 8
 )
 
@@ -726,14 +737,22 @@ func workspaceRowAt(index int, detail Details, now time.Time) string {
 	if detail.ProjectCount < 0 {
 		projectCount = "?"
 	}
-	return fmt.Sprintf("%s  %s  %s  %s  %s  %s",
+	return fmt.Sprintf("%s  %s  %s  %s  %s  %s  %s",
 		styledFixedWidth(fmt.Sprintf("%02d", index+1), 2, ui.Muted),
 		styledFixedWidth(detail.Workspace.DirName, workspaceNameColumnWidth, ui.Accent),
 		styledFixedWidth(projectCount, workspaceProjectColumnWidth, ui.Gold),
 		styledFixedWidth(status, workspaceStatusColumnWidth, ui.Muted),
+		styledFixedWidth(workspaceSize(detail), workspaceSizeColumnWidth, ui.Muted),
 		styledFixedWidth(relativeActivity(now, detail.LastActivity), workspaceActiveColumnWidth, ui.Muted),
 		ui.Muted(detail.Workspace.Path),
 	)
+}
+
+func workspaceSize(detail Details) string {
+	if !detail.SizeKnown {
+		return "..."
+	}
+	return strings.ReplaceAll(human.FormatBytes(detail.SizeBytes), " ", "")
 }
 
 func workspaceStatus(detail Details) string {
@@ -744,28 +763,30 @@ func workspaceStatus(detail Details) string {
 		return "clean"
 	}
 	if detail.HasMetadata {
-		return "ready"
+		return "tracked"
 	}
 	return "legacy"
 }
 
 func workspaceEmptyRow() string {
-	return fmt.Sprintf("%s  %s  %s  %s  %s  %s",
+	return fmt.Sprintf("%s  %s  %s  %s  %s  %s  %s",
 		styledFixedWidth("--", 2, ui.Muted),
 		styledFixedWidth("No workspaces yet", workspaceNameColumnWidth, ui.Accent),
 		styledFixedWidth("0", workspaceProjectColumnWidth, ui.Gold),
 		styledFixedWidth("empty", workspaceStatusColumnWidth, ui.Muted),
+		styledFixedWidth("0B", workspaceSizeColumnWidth, ui.Muted),
 		styledFixedWidth("unknown", workspaceActiveColumnWidth, ui.Muted),
 		ui.Muted("Use create shortcut to start"),
 	)
 }
 
 func workspaceTableHeader() string {
-	return fmt.Sprintf(" %s  %s  %s  %s  %s  %s",
+	return fmt.Sprintf(" %s  %s  %s  %s  %s  %s  %s",
 		styledFixedWidth("NO", 2, ui.Crown),
 		styledFixedWidth("WORKSPACE", workspaceNameColumnWidth, ui.Crown),
 		styledFixedWidth("PROJECTS", workspaceProjectColumnWidth, ui.Crown),
-		styledFixedWidth("STATUS", workspaceStatusColumnWidth, ui.Crown),
+		styledFixedWidth("STATE", workspaceStatusColumnWidth, ui.Crown),
+		styledFixedWidth("SIZE", workspaceSizeColumnWidth, ui.Crown),
 		styledFixedWidth("ACTIVE", workspaceActiveColumnWidth, ui.Crown),
 		ui.Crown("PATH"),
 	)
@@ -932,28 +953,38 @@ print_commands() {
 ` + commandDeck + `
 }
 if [ "$raw" = "__dvv_empty__" ]; then
-  printf "%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
-  print_commands
-  printf "\n%s--------------------------------%s\n" "$dvv_muted" "$dvv_reset"
   printf "%sWorkspace hub%s\n" "$dvv_heading" "$dvv_reset"
   printf "  %sNo workspaces yet%s\n" "$dvv_label" "$dvv_reset"
   printf "  %sUse the create shortcut to start one.%s\n" "$dvv_muted" "$dvv_reset"
+  printf "\n%s--------------------------------%s\n" "$dvv_muted" "$dvv_reset"
+  printf "%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
+  print_commands
   exit 0
 fi
 workspace_name=$(basename "$raw")
 project_count=$(printf "%s" "$display" | awk "{print \$3}")
 status=$(printf "%s" "$display" | awk "{print \$4}")
-last_active=$(printf "%s" "$display" | awk "{print \$5}")
-printf "%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
-print_commands
-printf "\n%s--------------------------------%s\n" "$dvv_muted" "$dvv_reset"
+row_size=$(printf "%s" "$display" | awk "{print \$5}")
+last_active=$(printf "%s" "$display" | awk "{print \$6}")
 printf "%sWorkspace profile%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-9s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$workspace_name"
 printf "  %s%-9s%s %s\n" "$dvv_label" "Projects" "$dvv_reset" "$project_count"
-printf "  %s%-9s%s %s\n" "$dvv_label" "Status" "$dvv_reset" "$status"
+printf "  %s%-9s%s %s\n" "$dvv_label" "State" "$dvv_reset" "$status"
+printf "  %s%-9s%s %s\n" "$dvv_label" "Size" "$dvv_reset" "$row_size"
 printf "  %s%-9s%s %s\n" "$dvv_label" "Activity" "$dvv_reset" "$last_active"
 printf "  %s%-9s%s %s\n" "$dvv_label" "Path" "$dvv_reset" "$raw"
+printf "\n%s--------------------------------%s\n" "$dvv_muted" "$dvv_reset"
+printf "%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
+print_commands
 ' sh {}`
+}
+
+func workspaceRowsReloadBind() string {
+	executable, err := os.Executable()
+	if err != nil || strings.TrimSpace(executable) == "" {
+		executable = "dvv"
+	}
+	return "--bind=load:reload-sync(" + shellQuote(executable) + " workspace __hub-rows)+unbind(load)"
 }
 
 func projectPreviewCommand() string {
@@ -988,7 +1019,7 @@ func printWorkspaceList(details []Details) {
 		return
 	}
 	for index, detail := range details {
-		fmt.Printf("  %2d. %-28s %d projects, %d dirty, active %s %s\n", index+1, detail.Workspace.DirName, detail.ProjectCount, detail.DirtyCount, relativeActivityNow(detail.LastActivity), ui.Dim(detail.Workspace.Path))
+		fmt.Printf("  %2d. %-28s %d projects, %d dirty, size %s, active %s %s\n", index+1, detail.Workspace.DirName, detail.ProjectCount, detail.DirtyCount, workspaceSize(detail), relativeActivityNow(detail.LastActivity), ui.Dim(detail.Workspace.Path))
 	}
 }
 

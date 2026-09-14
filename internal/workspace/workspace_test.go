@@ -45,6 +45,9 @@ func TestListInspectsOnlyWorkspaceWorktrees(t *testing.T) {
 	mustMkdir(t, worktreePath)
 	mustMkdir(t, filepath.Join(workspacePath, "notes"))
 	mustMkdir(t, filepath.Join(root, "not-a-workspace"))
+	if err := os.WriteFile(filepath.Join(workspacePath, "notes", "todo.md"), []byte("hello"), 0o644); err != nil {
+		t.Fatalf("write workspace file failed: %v", err)
+	}
 
 	runner := newWorkspaceRunner()
 	runner.linked[worktreePath] = source
@@ -65,6 +68,9 @@ func TestListInspectsOnlyWorkspaceWorktrees(t *testing.T) {
 	}
 	if details[0].ProjectCount != 1 || details[0].Projects[0].Name != "api" {
 		t.Fatalf("projects = %#v", details[0].Projects)
+	}
+	if !details[0].SizeKnown || details[0].SizeBytes < 5 {
+		t.Fatalf("workspace size = known %v bytes %d", details[0].SizeKnown, details[0].SizeBytes)
 	}
 }
 
@@ -100,8 +106,29 @@ func TestListFastUsesMetadataWithoutGitInspection(t *testing.T) {
 	if details[0].ProjectCount != 2 || !details[0].HasMetadata || details[0].DirtyKnown {
 		t.Fatalf("details = %#v", details[0])
 	}
+	if details[0].SizeKnown {
+		t.Fatalf("ListFast should not calculate workspace size: %#v", details[0])
+	}
 	if len(runner.outputs) != 0 {
 		t.Fatalf("ListFast should not run git inspection commands: %#v", runner.outputs)
+	}
+}
+
+func TestWorkspaceSizeShowsPendingIndicator(t *testing.T) {
+	if got := workspaceSize(Details{}); got != "..." {
+		t.Fatalf("workspaceSize pending = %q, want ...", got)
+	}
+}
+
+func TestSelectOneTreatsFZFCancelAsSilentCancel(t *testing.T) {
+	runner := newWorkspaceRunner()
+	runner.paths["fzf"] = true
+	runner.fzfErr = errors.New("cancelled")
+	manager := NewManager(testWorkspaceConfig(t.TempDir()), runner)
+
+	selected, err := manager.selectOne(context.Background(), "open> ", "dvv workspace open", []selectionOption{{Raw: "shell", Display: "shell"}})
+	if err != nil || selected != "" {
+		t.Fatalf("selectOne cancel = %q, %v; want empty nil", selected, err)
 	}
 }
 
@@ -310,6 +337,8 @@ func TestWorkspaceRowKeepsColumnsAligned(t *testing.T) {
 			Path:    "/root/workspace/workspace-task_600_7656",
 		},
 		ProjectCount: 0,
+		SizeBytes:    1536,
+		SizeKnown:    true,
 		LastActivity: now.Add(-21 * 24 * time.Hour),
 		HasMetadata:  true,
 	}, now)
@@ -324,23 +353,26 @@ func TestWorkspaceRowKeepsColumnsAligned(t *testing.T) {
 		t.Fatalf("row missing project count: %q", row)
 	}
 	projectsColumn := nameEnd + projectOffset
-	statusOffset := strings.Index(row[projectsColumn:], "ready")
+	statusOffset := strings.Index(row[projectsColumn:], "tracked")
 	if statusOffset < 0 {
-		t.Fatalf("row missing status: %q", row)
+		t.Fatalf("row missing state: %q", row)
 	}
 	statusColumn := projectsColumn + statusOffset
 	if projectsColumn <= nameColumn+len("workspace-task_600_7656") {
 		t.Fatalf("project count should not touch workspace name: %q", row)
 	}
 	if statusColumn <= projectsColumn {
-		t.Fatalf("status should stay after project count: %q", row)
+		t.Fatalf("state should stay after project count: %q", row)
 	}
 	if !strings.Contains(row, "3w") {
 		t.Fatalf("row missing relative activity: %q", row)
 	}
+	if !strings.Contains(row, "1.5KB") {
+		t.Fatalf("row missing workspace size: %q", row)
+	}
 	header := workspaceTableHeader()
-	if !strings.Contains(header, "ACTIVE") {
-		t.Fatalf("workspace header missing ACTIVE column: %q", header)
+	if !strings.Contains(header, "STATE") || !strings.Contains(header, "SIZE") || !strings.Contains(header, "ACTIVE") {
+		t.Fatalf("workspace header missing STATE/SIZE/ACTIVE columns: %q", header)
 	}
 	if got := relativeActivity(now, time.Time{}); got != "unknown" {
 		t.Fatalf("zero activity = %q, want unknown", got)

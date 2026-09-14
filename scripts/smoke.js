@@ -30,6 +30,7 @@ const env = {
   DVV_NO_LOADER: "1",
   DVV_SKIP_TMUX_SOURCE: "1",
   DVV_THEME: "tokyo-night",
+  DVV_TMUX_SESSION_SHORTCUT: "alt+p",
   DVV_ZSH_COMPLETION_DIR: completionDir,
   DVV_WORKSPACES_DIR: workspaceRoot,
   DVV_DUMPS_DIR: dumpsDir,

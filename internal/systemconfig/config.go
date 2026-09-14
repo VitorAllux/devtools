@@ -206,7 +206,7 @@ func configCategories() []Category {
 		{"workspace", "Workspace", "Manage workspace root, discovery, opener, and action keys"},
 		{"database", "Database", "Manage MySQL, dumps, rclone, and DB safety defaults"},
 		{"tmux", "Tmux", "Manage directory picker and home session settings"},
-		{"resources", "Resources", "Manage resource hub action shortcuts"},
+		{"resources", "Resources", "Manage resource and port hub settings"},
 		{"integrations", "Integrations", "Configure terminal, rclone, Bitwarden, and local tool defaults"},
 		{"safety", "Safety", "Manage database and workspace confirmation rules"},
 		{"profiles", "Profiles", "Select a machine or context profile"},
@@ -951,6 +951,10 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		if isNumber(value) {
 			fmt.Sscanf(value, "%d", &m.Config.Project.Resources.Logs.Tail)
 		}
+	case "DVV_PORTS_KILL_SHORTCUT":
+		m.Config.Project.Ports.Hub.Shortcuts.Kill = value
+	case "DVV_PORTS_COPY_SHORTCUT":
+		m.Config.Project.Ports.Hub.Shortcuts.Copy = value
 	case "DVV_TMUX_SESSION_SHORTCUT":
 		m.Config.Project.Tmux.Session.Shortcut = value
 	case "DVV_TMUX_SESSION_SEARCH_ROOTS":
@@ -1347,6 +1351,8 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Resources", "DVV_RESOURCES_STOP_SHORTCUT", "Sets the resources hub shortcut for stop.", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Stop, "", false},
 		{"Resources", "DVV_RESOURCES_LOGS_SHORTCUT", "Sets the resources hub shortcut for opening logs.", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Logs, "", false},
 		{"Resources", "DVV_RESOURCES_LOG_TAIL", "Sets how many lines resource logs show initially.", "number", fmt.Sprintf("%d", cfg.Project.Resources.Logs.Tail), "", false},
+		{"Resources", "DVV_PORTS_KILL_SHORTCUT", "Sets the port manager shortcut for killing a process.", "shortcut", cfg.Project.Ports.Hub.Shortcuts.Kill, "", false},
+		{"Resources", "DVV_PORTS_COPY_SHORTCUT", "Sets the port manager shortcut for copying a URL.", "shortcut", cfg.Project.Ports.Hub.Shortcuts.Copy, "", false},
 		{"Safety", "DVV_DB_SAFETY_CONFIRM", "Requires confirmation for destructive database actions.", "bool", boolValue(cfg.Project.DB.SafetyConfirm), "", false},
 		{"Safety", "DVV_WORKSPACE_REQUIRE_CONFIRMATION", "Requires confirmation before workspace changes.", "bool", boolValue(cfg.Project.Workspace.Safety.RequireConfirmation), "", false},
 		{"Safety", "DVV_WORKSPACE_BLOCK_DIRTY_PROJECTS", "Blocks workspace deletion when projects are dirty.", "bool", boolValue(cfg.Project.Workspace.Safety.BlockRemoveWithDirtyProjects), "", false},
