@@ -74,6 +74,14 @@
       "tail": 200
     }
   },
+  "ports": {
+    "hub": {
+      "shortcuts": {
+        "kill": "shift+k",
+        "copy": "shift+c"
+      }
+    }
+  },
   "ssh": {
     "hub": {
       "shortcuts": {

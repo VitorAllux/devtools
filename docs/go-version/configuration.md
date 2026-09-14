@@ -196,7 +196,7 @@ First-level categories:
 | `Workspace` | Manage workspace root, project discovery, opener, and action keys. |
 | `Database` | Manage MySQL, dump directory, rclone, and database safety defaults. |
 | `Tmux` | Manage directory picker, home session, reset shortcut, and custom API/Web environments. |
-| `Resources` | Manage resource hub action shortcuts and log tail settings. |
+| `Resources` | Manage resource hub settings, port manager shortcuts, and log tail settings. |
 | `Integrations` | Configure rclone, Bitwarden, terminal launcher, and local tool defaults. |
 | `Safety` | Manage database and workspace confirmation rules. |
 | `Profiles` | Select the active runtime profile from project config. |
@@ -255,6 +255,11 @@ The `resources.hub.shortcuts` section configures the local resource hub actions:
 - `logs`: open logs for the selected service/container/Compose project in a new terminal tab.
 
 `resources.logs.tail` controls how many lines are shown initially when logs are opened. Defaults preserve the previous resource action shortcuts and add `shift+l` for logs.
+
+The `ports.hub.shortcuts` section configures the port manager actions:
+
+- `copy`: copy the detected local URL.
+- `kill`: kill the selected process after confirmation.
 
 ## Secrets Config
 
@@ -370,6 +375,19 @@ Generated harness files:
 ```
 
 The generated `AGENTS.md` is written in Portuguese. It tells agents to read workspace metadata, search configured skill paths, prefer project-local rules, and ask concise questions when context or risk is unclear.
+
+The workspace hub and `dvv workspace:list` include workspace disk usage. Size calculation walks the workspace tree and skips symlink targets.
+
+## Port Manager Config
+
+`dvv ports` uses configurable hub shortcuts:
+
+```bash
+DVV_PORTS_COPY_SHORTCUT=shift+c
+DVV_PORTS_KILL_SHORTCUT=shift+k
+```
+
+The hub lists listening TCP ports detected with `ss` or `lsof`, opens likely local web URLs, copies URLs through the platform clipboard command when available, and confirms before killing a process.
 
 Supported lifecycle hook events are `workspace.creating`, `workspace.created`, `workspace.opened`, `workspace.removing`, `workspace.removed`, `project.adding`, `project.added`, `project.bootstrap`, `project.removing`, and `project.removed`.
 

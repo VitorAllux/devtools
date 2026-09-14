@@ -60,6 +60,11 @@ type ResourcesHubKeyBindings struct {
 	Logs    KeyBinding
 }
 
+type PortsHubKeyBindings struct {
+	Kill KeyBinding
+	Copy KeyBinding
+}
+
 type SecretsHubKeyBindings struct {
 	Prepare KeyBinding
 	Restore KeyBinding
@@ -133,6 +138,14 @@ func (c *Config) ResourcesHubKeys() ResourcesHubKeyBindings {
 		Restart: normalizeKeyOrDefault(c.Project.Resources.Hub.Shortcuts.Restart, defaults.Restart),
 		Stop:    normalizeKeyOrDefault(c.Project.Resources.Hub.Shortcuts.Stop, defaults.Stop),
 		Logs:    normalizeKeyOrDefault(c.Project.Resources.Hub.Shortcuts.Logs, defaults.Logs),
+	}
+}
+
+func (c *Config) PortsHubKeys() PortsHubKeyBindings {
+	defaults := DefaultProjectConfig().Ports.Hub.Shortcuts
+	return PortsHubKeyBindings{
+		Kill: normalizeKeyOrDefault(c.Project.Ports.Hub.Shortcuts.Kill, defaults.Kill),
+		Copy: normalizeKeyOrDefault(c.Project.Ports.Hub.Shortcuts.Copy, defaults.Copy),
 	}
 }
 

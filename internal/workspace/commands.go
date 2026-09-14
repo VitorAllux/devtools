@@ -20,6 +20,8 @@ func Run(ctx context.Context, cfg *config.Config, runner run.Runner, args []stri
 		return nil
 	case "list":
 		return manager.CommandList(ctx)
+	case "__hub-rows":
+		return manager.CommandHubRows(ctx)
 	default:
 		return fmt.Errorf("unknown workspace action: %s", args[0])
 	}
@@ -63,7 +65,7 @@ func (m *Manager) CommandList(ctx context.Context) error {
 		return nil
 	}
 	for _, detail := range details {
-		fmt.Printf("%s %s projects=%d dirty=%d active=%s\n", detail.Workspace.DirName, detail.Workspace.Path, detail.ProjectCount, detail.DirtyCount, relativeActivityNow(detail.LastActivity))
+		fmt.Printf("%s %s projects=%d dirty=%d size=%s active=%s\n", detail.Workspace.DirName, detail.Workspace.Path, detail.ProjectCount, detail.DirtyCount, workspaceSize(detail), relativeActivityNow(detail.LastActivity))
 		for _, project := range detail.Projects {
 			status := "clean"
 			if project.Dirty {
@@ -73,4 +75,21 @@ func (m *Manager) CommandList(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func (m *Manager) CommandHubRows(ctx context.Context) error {
+	details, err := m.ListFast(ctx)
+	if err != nil {
+		return err
+	}
+	fillWorkspaceSizes(details)
+	fmt.Print(workspaceRows(details))
+	return nil
+}
+
+func fillWorkspaceSizes(details []Details) {
+	for index := range details {
+		details[index].SizeBytes = directorySize(details[index].Workspace.Path)
+		details[index].SizeKnown = true
+	}
 }

@@ -74,6 +74,42 @@ func TestDumpFilesAreSortedAndFiltered(t *testing.T) {
 	}
 }
 
+func TestDumpFileInfosIncludeSizes(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.sql"), []byte("select 1;"), 0o600); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "b.sql.gz"), []byte("12345"), 0o600); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	cfg := &config.Config{Project: config.DefaultProjectConfig()}
+	cfg.Project.DB.DumpsDir = dir
+	manager := Manager{Config: cfg}
+
+	got, err := manager.dumpFileInfos()
+	if err != nil {
+		t.Fatalf("dumpFileInfos returned error: %v", err)
+	}
+	want := []DumpFile{
+		{Name: "a.sql", SizeBytes: 9, SizeKnown: true},
+		{Name: "b.sql.gz", SizeBytes: 5, SizeKnown: true},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("dumpFileInfos = %#v, want %#v", got, want)
+	}
+}
+
+func TestDumpFileRowsShowSizeColumn(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	dump := DumpFile{Name: "adami.sql.gz", SizeBytes: 1536, SizeKnown: true}
+	if header := dumpFileHeader(); !strings.Contains(header, "DUMP") || !strings.Contains(header, "SIZE") {
+		t.Fatalf("dump header = %q", header)
+	}
+	if row := dumpFileRow(0, dump); !strings.Contains(row, "adami.sql.gz") || !strings.Contains(row, "1.5 KB") {
+		t.Fatalf("dump row = %q", row)
+	}
+}
+
 func TestNormalizeDownloadDumpFileNameAddsDefaultExtension(t *testing.T) {
 	tests := map[string]string{
 		"":             "file-id.sql.gz",
@@ -245,6 +281,42 @@ func TestDatabasesFiltersSystemSchemasAndSorts(t *testing.T) {
 	want := []string{"app", "zeta"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("databases = %#v, want %#v", got, want)
+	}
+}
+
+func TestDatabaseInfosIncludeSizesAndEmptyDatabases(t *testing.T) {
+	runner := &dbFakeRunner{outputs: []string{
+		"zeta\napp\nempty\n",
+		"app\t1536\nzeta\t1048576\n",
+	}}
+	manager := &Manager{
+		Config:       &config.Config{Project: config.DefaultProjectConfig()},
+		Runner:       runner,
+		defaultsFile: "/tmp/client.cnf",
+	}
+
+	got, err := manager.databaseInfos(context.Background())
+	if err != nil {
+		t.Fatalf("databaseInfos returned error: %v", err)
+	}
+	want := []DatabaseInfo{
+		{Name: "app", SizeBytes: 1536, SizeKnown: true},
+		{Name: "empty", SizeBytes: 0, SizeKnown: true},
+		{Name: "zeta", SizeBytes: 1048576, SizeKnown: true},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("databaseInfos = %#v, want %#v", got, want)
+	}
+}
+
+func TestDatabaseInfoRowsShowSizeColumn(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	database := DatabaseInfo{Name: "app", SizeBytes: 1536, SizeKnown: true}
+	if header := databaseInfoHeader(); !strings.Contains(header, "DATABASE") || !strings.Contains(header, "SIZE") {
+		t.Fatalf("database header = %q", header)
+	}
+	if row := databaseInfoRow(0, database); !strings.Contains(row, "app") || !strings.Contains(row, "1.5 KB") {
+		t.Fatalf("database row = %q", row)
 	}
 }
 

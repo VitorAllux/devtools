@@ -34,6 +34,8 @@ type Details struct {
 	ProjectCount int
 	DirtyCount   int
 	DirtyKnown   bool
+	SizeBytes    int64
+	SizeKnown    bool
 	LastActivity time.Time
 	Projects     []Project
 	Metadata     metadata.Workspace
@@ -209,6 +211,8 @@ func (m *Manager) Inspect(ctx context.Context, ws Workspace) (Details, error) {
 		ProjectCount: len(projects),
 		DirtyCount:   dirty,
 		DirtyKnown:   true,
+		SizeBytes:    directorySize(ws.Path),
+		SizeKnown:    true,
 		LastActivity: m.workspaceLastActivity(ctx, ws, meta, exists, true),
 		Projects:     projects,
 		Metadata:     meta,
@@ -259,6 +263,28 @@ func pathModTime(path string) time.Time {
 		return time.Time{}
 	}
 	return info.ModTime()
+}
+
+func directorySize(root string) int64 {
+	var total int64
+	_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return nil
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		total += info.Size()
+		return nil
+	})
+	return total
 }
 
 func parseMetadataCreatedAt(value string) time.Time {

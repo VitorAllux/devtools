@@ -12,11 +12,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"unicode"
 
 	"github.com/VitorAllux/devtools/internal/config"
+	"github.com/VitorAllux/devtools/internal/human"
 	"github.com/VitorAllux/devtools/internal/run"
 	"github.com/VitorAllux/devtools/internal/ui"
 )
@@ -31,6 +33,18 @@ type Action struct {
 	Name        string
 	Label       string
 	Description string
+}
+
+type DatabaseInfo struct {
+	Name      string
+	SizeBytes int64
+	SizeKnown bool
+}
+
+type DumpFile struct {
+	Name      string
+	SizeBytes int64
+	SizeKnown bool
 }
 
 var sqlTablePatterns = []*regexp.Regexp{
@@ -156,15 +170,15 @@ func (m *Manager) CommandTruncate(ctx context.Context) error {
 }
 
 func (m *Manager) CommandClean(ctx context.Context) error {
-	files, err := m.dumpFiles()
+	dumps, err := m.dumpFileInfos()
 	if err != nil {
 		return err
 	}
-	if len(files) == 0 {
+	if len(dumps) == 0 {
 		ui.Info("No dumps found in %s", m.Config.Project.DB.DumpsDir)
 		return nil
 	}
-	selected, err := m.selectValues(ctx, "Delete Dumps", files, true)
+	selected, err := m.selectDumpFiles(ctx, "Delete Dumps", dumps, true)
 	if err != nil || len(selected) == 0 {
 		return err
 	}
@@ -268,10 +282,10 @@ func (m *Manager) selectDatabases(ctx context.Context, multi bool, label string)
 	if err := m.prepareAuth(); err != nil {
 		return nil, err
 	}
-	var databases []string
+	var databases []DatabaseInfo
 	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "fetching", Subject: "databases"}, func() error {
 		var err error
-		databases, err = m.databases(ctx)
+		databases, err = m.databaseInfos(ctx)
 		return err
 	}); err != nil {
 		return nil, err
@@ -279,7 +293,53 @@ func (m *Manager) selectDatabases(ctx context.Context, multi bool, label string)
 	if len(databases) == 0 {
 		return nil, fmt.Errorf("no user databases found")
 	}
-	return m.selectValues(ctx, label, databases, multi)
+	return m.selectDatabaseInfos(ctx, label, databases, multi)
+}
+
+func (m *Manager) selectDatabaseInfos(ctx context.Context, label string, databases []DatabaseInfo, multi bool) ([]string, error) {
+	if _, err := m.Runner.LookPath("fzf"); err != nil {
+		for index, database := range databases {
+			fmt.Printf("  %2d. %-32s %s\n", index+1, database.Name, databaseSize(database))
+		}
+		selected, err := ui.Prompt(label)
+		if err != nil {
+			return nil, err
+		}
+		values := databaseNames(databases)
+		if multi {
+			return valuesByIndexes(values, selected), nil
+		}
+		index, ok := parseIndex(selected, len(databases))
+		if !ok {
+			return nil, fmt.Errorf("invalid selection: %s", selected)
+		}
+		return []string{databases[index].Name}, nil
+	}
+	var builder strings.Builder
+	builder.WriteString(ui.FZFHiddenHeader(databaseInfoHeader()))
+	builder.WriteByte('\n')
+	for index, database := range databases {
+		builder.WriteString(ui.FZFHiddenRow(database.Name, databaseInfoRow(index, database)))
+		builder.WriteByte('\n')
+	}
+	fzf := ui.FZFHub{
+		Prompt:      ui.Crown("database") + ui.Muted("> "),
+		BorderLabel: label,
+		Shortcuts: []ui.FZFShortcut{
+			{Label: "Enter", Description: "confirm"},
+			{Label: "Esc", Description: "cancel"},
+		},
+		ExtraArgs: append(ui.FZFHiddenRowArgs(), "--header-lines=1"),
+	}
+	if multi {
+		fzf.Shortcuts = append([]ui.FZFShortcut{{Label: "Tab", Description: "mark"}}, fzf.Shortcuts...)
+		fzf.ExtraArgs = append(fzf.ExtraArgs, "--multi")
+	}
+	output, err := m.Runner.OutputWithInput(ctx, "", []byte(builder.String()), "fzf", fzf.Args()...)
+	if err != nil && len(output) == 0 {
+		return nil, nil
+	}
+	return nonEmptyRawLines(string(output)), nil
 }
 
 func (m *Manager) selectValues(ctx context.Context, label string, values []string, multi bool) ([]string, error) {
@@ -326,13 +386,13 @@ func (m *Manager) selectValues(ctx context.Context, label string, values []strin
 }
 
 func (m *Manager) selectOrDownloadDump(ctx context.Context) (string, error) {
-	files, err := m.dumpFiles()
+	dumps, err := m.dumpFileInfos()
 	if err != nil {
 		return "", err
 	}
 	download := "[+] Download from Google Drive"
-	options := append([]string{download}, files...)
-	selected, err := m.selectValues(ctx, "Select dump", options, false)
+	options := append([]DumpFile{{Name: download}}, dumps...)
+	selected, err := m.selectDumpFiles(ctx, "Select dump", options, false)
 	if err != nil || len(selected) == 0 {
 		return "", err
 	}
@@ -340,6 +400,60 @@ func (m *Manager) selectOrDownloadDump(ctx context.Context) (string, error) {
 		return filepath.Join(m.Config.Project.DB.DumpsDir, selected[0]), nil
 	}
 	return m.downloadDump(ctx)
+}
+
+func (m *Manager) selectDumpFiles(ctx context.Context, label string, dumps []DumpFile, multi bool) ([]string, error) {
+	if _, err := m.Runner.LookPath("fzf"); err != nil {
+		for index, dump := range dumps {
+			fmt.Printf("  %2d. %-42s %s\n", index+1, dump.Name, dumpFileSize(dump))
+		}
+		selected, err := ui.Prompt(label)
+		if err != nil {
+			return nil, err
+		}
+		values := dumpFileNames(dumps)
+		if multi {
+			return valuesByIndexes(values, selected), nil
+		}
+		index, ok := parseIndex(selected, len(dumps))
+		if !ok {
+			return nil, fmt.Errorf("invalid selection: %s", selected)
+		}
+		return []string{dumps[index].Name}, nil
+	}
+	var builder strings.Builder
+	builder.WriteString(ui.FZFHiddenHeader(dumpFileHeader()))
+	builder.WriteByte('\n')
+	for index, dump := range dumps {
+		builder.WriteString(ui.FZFHiddenRow(dump.Name, dumpFileRow(index, dump)))
+		builder.WriteByte('\n')
+	}
+	fzf := ui.FZFHub{
+		Prompt:      ui.Crown("dump") + ui.Muted("> "),
+		BorderLabel: label,
+		Shortcuts: []ui.FZFShortcut{
+			{Label: "Enter", Description: "confirm"},
+			{Label: "Esc", Description: "cancel"},
+		},
+		ExtraArgs: append(ui.FZFHiddenRowArgs(), "--header-lines=1"),
+	}
+	if multi {
+		fzf.Shortcuts = append([]ui.FZFShortcut{{Label: "Tab", Description: "mark"}}, fzf.Shortcuts...)
+		fzf.ExtraArgs = append(fzf.ExtraArgs, "--multi")
+	}
+	output, err := m.Runner.OutputWithInput(ctx, "", []byte(builder.String()), "fzf", fzf.Args()...)
+	if err != nil && len(output) == 0 {
+		return nil, nil
+	}
+	return nonEmptyRawLines(string(output)), nil
+}
+
+func dumpFileNames(dumps []DumpFile) []string {
+	names := make([]string, 0, len(dumps))
+	for _, dump := range dumps {
+		names = append(names, dump.Name)
+	}
+	return names
 }
 
 func (m *Manager) downloadDump(ctx context.Context) (string, error) {
@@ -440,18 +554,18 @@ func (m *Manager) selectImportDatabase(ctx context.Context) (string, error) {
 	if err := m.prepareAuth(); err != nil {
 		return "", err
 	}
-	var databases []string
+	var databases []DatabaseInfo
 	err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "fetching", Subject: "databases"}, func() error {
 		var listErr error
-		databases, listErr = m.databases(ctx)
+		databases, listErr = m.databaseInfos(ctx)
 		return listErr
 	})
 	if err != nil {
 		return "", err
 	}
 	create := "[+] Create New Database"
-	options := append([]string{create}, databases...)
-	selected, err := m.selectValues(ctx, "Target database", options, false)
+	options := append([]DatabaseInfo{{Name: create, SizeKnown: false}}, databases...)
+	selected, err := m.selectDatabaseInfos(ctx, "Target database", options, false)
 	if err != nil || len(selected) == 0 {
 		return "", err
 	}
@@ -541,6 +655,57 @@ func (m *Manager) databases(ctx context.Context) ([]string, error) {
 	}
 	sort.Strings(values)
 	return values, nil
+}
+
+func (m *Manager) databaseInfos(ctx context.Context) ([]DatabaseInfo, error) {
+	names, err := m.databases(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sizes, err := m.databaseSizeMap(ctx)
+	if err != nil {
+		infos := make([]DatabaseInfo, 0, len(names))
+		for _, name := range names {
+			infos = append(infos, DatabaseInfo{Name: name})
+		}
+		return infos, nil
+	}
+	infos := make([]DatabaseInfo, 0, len(names))
+	for _, name := range names {
+		infos = append(infos, DatabaseInfo{Name: name, SizeBytes: sizes[name], SizeKnown: true})
+	}
+	return infos, nil
+}
+
+func (m *Manager) databaseSizeMap(ctx context.Context) (map[string]int64, error) {
+	query := "SELECT table_schema, COALESCE(SUM(data_length + index_length), 0) FROM information_schema.tables WHERE table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys') GROUP BY table_schema;"
+	out, err := m.mysqlOutput(ctx, "-N", "-s", "-e", query)
+	if err != nil {
+		return nil, err
+	}
+	sizes := map[string]int64{}
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 2 {
+			fields = strings.Fields(line)
+		}
+		if len(fields) < 2 {
+			continue
+		}
+		size, err := strconv.ParseInt(strings.TrimSpace(fields[len(fields)-1]), 10, 64)
+		if err != nil {
+			continue
+		}
+		name := strings.TrimSpace(strings.Join(fields[:len(fields)-1], " "))
+		if name != "" {
+			sizes[name] = size
+		}
+	}
+	return sizes, nil
 }
 
 func (m *Manager) truncate(ctx context.Context, dbName string) error {
@@ -665,6 +830,23 @@ func (m *Manager) dumpFiles() ([]string, error) {
 	}
 	sort.Strings(files)
 	return files, nil
+}
+
+func (m *Manager) dumpFileInfos() ([]DumpFile, error) {
+	files, err := m.dumpFiles()
+	if err != nil {
+		return nil, err
+	}
+	dumps := make([]DumpFile, 0, len(files))
+	for _, name := range files {
+		dump := DumpFile{Name: name}
+		if info, err := os.Stat(filepath.Join(m.Config.Project.DB.DumpsDir, name)); err == nil {
+			dump.SizeBytes = info.Size()
+			dump.SizeKnown = true
+		}
+		dumps = append(dumps, dump)
+	}
+	return dumps, nil
 }
 
 func normalizeDownloadDumpFileName(fileName string, fallbackID string) string {
@@ -1012,6 +1194,60 @@ printf "  %s%-8s%s %s\n" "$dvv_label" "Command" "$dvv_reset" "$raw"
 printf "\n%sWhat it does%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%s%s\n" "$dvv_muted" "$description" "$dvv_reset"
 ' sh {}`
+}
+
+func databaseNames(databases []DatabaseInfo) []string {
+	names := make([]string, 0, len(databases))
+	for _, database := range databases {
+		names = append(names, database.Name)
+	}
+	return names
+}
+
+func databaseSize(database DatabaseInfo) string {
+	if !database.SizeKnown {
+		return "unknown"
+	}
+	return human.FormatBytes(database.SizeBytes)
+}
+
+func databaseInfoHeader() string {
+	return fmt.Sprintf(" %s  %s  %s",
+		ui.Crown("NO"),
+		ui.Crown(fixedWidth("DATABASE", 32)),
+		ui.Crown("SIZE"),
+	)
+}
+
+func databaseInfoRow(index int, database DatabaseInfo) string {
+	return fmt.Sprintf("%s  %s  %s",
+		ui.Muted(fmt.Sprintf("%02d", index+1)),
+		ui.Accent(fixedWidth(database.Name, 32)),
+		ui.Muted(databaseSize(database)),
+	)
+}
+
+func dumpFileSize(dump DumpFile) string {
+	if !dump.SizeKnown {
+		return "-"
+	}
+	return human.FormatBytes(dump.SizeBytes)
+}
+
+func dumpFileHeader() string {
+	return fmt.Sprintf(" %s  %s  %s",
+		ui.Crown("NO"),
+		ui.Crown(fixedWidth("DUMP", 42)),
+		ui.Crown("SIZE"),
+	)
+}
+
+func dumpFileRow(index int, dump DumpFile) string {
+	return fmt.Sprintf("%s  %s  %s",
+		ui.Muted(fmt.Sprintf("%02d", index+1)),
+		ui.Accent(fixedWidth(dump.Name, 42)),
+		ui.Muted(dumpFileSize(dump)),
+	)
 }
 
 func showHelp() {

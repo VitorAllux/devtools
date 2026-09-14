@@ -46,6 +46,7 @@ Run these checks on the machine that will use the CLI daily:
 | Directory picker | `Alt+P` or `dvv tmux:session` | Directory picker lists current directory, configured roots, and child directories. |
 | Home tmux tab | `Alt+F` or `dvv tmux:home` | New terminal tab opens in WSL/macOS/Linux terminal and attaches to a tmux session in `~`. |
 | Database | `dvv db` | Create/import/truncate/drop/clean actions show confirmation and loader/progress states. |
+| Ports | `dvv ports` | Listening TCP ports render when available; URL copy/open actions work when platform helpers exist; kill asks for confirmation. |
 | Resources | `dvv resources` | Services, Docker, containers, and Compose projects render when available; `Shift+L` opens logs in a terminal tab. |
 | Secrets | `dvv secrets` | Secret file status renders and prepare/restore/sync actions stay inside the hub. |
 

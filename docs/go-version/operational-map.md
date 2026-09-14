@@ -82,7 +82,8 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 
 | Detail | Current rule | Action |
 | --- | --- | --- |
-| Hub-first UX | `dvv` opens the main hub; public commands open feature hubs: `dvv ssh`, `dvv workspace`, `dvv tmux`, `dvv db`, `dvv resources`, `dvv secrets`, `dvv config`. | Keep mutation flows inside hubs where possible. |
+| Hub-first UX | `dvv` opens the main hub; public commands open feature hubs: `dvv ssh`, `dvv workspace`, `dvv tmux`, `dvv db`, `dvv ports`, `dvv resources`, `dvv secrets`, `dvv config`. | Keep mutation flows inside hubs where possible. |
+| Main hub maintenance | `doctor`, `build`, `check`, `setup`, `doctor --fix`, and `bootstrap` stay callable directly but are grouped under `maintenance` in the main hub. | Keep daily destinations visible and maintenance tools out of the first screen. |
 | Shortcut config | Hub action keys are configurable in `dvv.config.json`. | Read from config, do not hard-code feature shortcuts in command handlers. |
 | fzf previews | Detailed shortcut decks belong in the side preview panel. | Use shared `internal/ui.FZFHub` and `FZFPreviewCommandDeck`. |
 | Global shortcuts | Project-managed zsh shortcuts are `Alt+G`, `Alt+W`, `Alt+T`, `Alt+P`, `Alt+F`, `Alt+S`, and the `Alt+R` fallback; project-managed tmux shortcut is `Alt+R`. | Use `Alt+letter` globally and `Shift+letter` inside fzf hubs. Avoid new global `Ctrl-*` bindings. |
@@ -114,6 +115,7 @@ Final indeterminate loader labels should be action-specific, such as `ready`, `c
 | Tmux | Target scanning, environment open/start/stop/restart, directory picker session open. |
 | Database | Database fetch, create, drop, truncate, Google Drive download, import progress, dump cleaning. |
 | Resources | Resource scan, start/stop/restart actions, and log terminal handoff. |
+| Ports | Listening port scan, URL open/copy actions, and confirmed process kill. |
 | Secrets | Secrets hub status, AGE key preparation, SSH backup decrypt/encrypt. |
 
 ## Database Dumps
@@ -123,6 +125,7 @@ Final indeterminate loader labels should be action-specific, such as `ready`, `c
 | Download name | A Google Drive download name without `.sql`, `.gz`, or `.sql.gz` is saved with `.sql.gz`. | Type `adami` and the stored file becomes `adami.sql.gz`. |
 | Import compression | Import detects gzip from the file header, not only from the extension. | Extensionless gzip downloads can still import correctly. |
 | Dump listing | The dump picker lists `.sql`, `.sql.gz`, gzip-header files, and extensionless files that look like SQL. | Avoid hiding valid local dumps just because the name is incomplete. |
+| Database sizes | Database pickers show user database sizes from `information_schema.tables`. | Empty databases show `0 B`; if the size query fails, keep database actions usable. |
 | ASCII null error | `ASCII '\\0' appeared` usually means compressed bytes reached MySQL as raw SQL. | Rebuild and import again with the content-detection path. |
 
 ## Local Data And Secrets
