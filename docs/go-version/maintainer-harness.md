@@ -20,7 +20,7 @@ For workspace changes, also read `internal/workspace`, `internal/git`, `internal
 
 | Command | Main packages | Config area | Runtime files and systems | Primary tests and docs |
 | --- | --- | --- | --- | --- |
-| `dvv ssh` | `internal/ssh`, `internal/terminal`, `internal/secrets`, `internal/ui` | `ssh`, `shortcuts`, `theme`, `terminal` | SSH server list, AGE backup, Bitwarden restore, tmux sessions, terminal tabs | `internal/ssh`, `internal/terminal`, README, configuration, theme |
+| `dvv ssh` | `internal/ssh`, `internal/terminal`, `internal/secrets`, `internal/ui` | `ssh`, `shortcuts`, `theme`, `terminal` | SSH server list, SCP transfer downloads, AGE backup, Bitwarden restore, tmux sessions, terminal tabs | `internal/ssh`, `internal/terminal`, README, configuration, theme |
 | `dvv workspace` | `internal/workspace`, `internal/discovery`, `internal/git`, `internal/metadata`, `internal/hooks`, `internal/safety`, `internal/ui` | `workspace`, `shortcuts`, `theme` | `workspace-*` directories, git worktrees, `.workspace/config.json`, generated workspace `AGENTS.md`, `.agents/manifest.json`, agent guides | `internal/workspace`, `internal/git`, `internal/metadata`, `internal/hooks`, `internal/safety`, architecture, configuration |
 | `dvv tmux` | `internal/tmux`, `internal/terminal`, `internal/ui` | `tmux`, `shortcuts`, `terminal`, `theme` | tmux sessions, configured environment roots, custom API/Web targets, terminal tabs | `internal/tmux`, `internal/terminal`, operational map |
 | `dvv tmux:session` | `internal/tmux`, `internal/setup`, `internal/terminal` | `tmux`, `shortcuts`, `terminal` | `Alt+P` zsh binding, tmux sessions, directory picker roots | `internal/tmux`, `internal/setup`, completion checks |

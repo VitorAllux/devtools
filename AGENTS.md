@@ -89,6 +89,10 @@ Enter  open selected SSH entry in a new terminal tab attached to a dedicated tmu
 Shift+N  add SSH entry
 Shift+D  remove selected SSH entry
 Shift+T  open selected SSH connection in a new terminal tab attached to tmux
+Shift+U  upload a local file or directory with SCP
+Shift+G  download a remote file or directory with SCP
+Shift+O  open the SCP downloads directory
+Shift+C  clean all SCP downloads after confirmation
 Esc    exit
 ```
 

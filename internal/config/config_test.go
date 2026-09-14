@@ -51,6 +51,9 @@ func TestLoadProjectConfigMergesShortcutDefaults(t *testing.T) {
 	if cfg.SSH.Hub.Shortcuts.Remove != "shift+d" {
 		t.Fatalf("remove shortcut = %q, want shift+d", cfg.SSH.Hub.Shortcuts.Remove)
 	}
+	if cfg.SSH.Transfer.DownloadsDir != "~/Downloads/dvv-scp" || cfg.SSH.Transfer.Shortcuts.Upload != "shift+u" {
+		t.Fatalf("ssh transfer defaults = %#v", cfg.SSH.Transfer)
+	}
 	if cfg.Theme.Name != "royal-noir" {
 		t.Fatalf("theme = %q, want royal-noir", cfg.Theme.Name)
 	}
@@ -177,6 +180,7 @@ func TestResolveTerminalConfigUsesEnvOverride(t *testing.T) {
 }
 
 func TestResolveShortcutConfigsUseEnvOverrides(t *testing.T) {
+	t.Setenv("HOME", "/home/tester")
 	t.Setenv("DVV_SHELL_MAIN_SHORTCUT", "alt-g")
 	t.Setenv("DVV_SHELL_WORKSPACE_SHORTCUT", "alt-w")
 	t.Setenv("DVV_SHELL_TMUX_SHORTCUT", "alt-t")
@@ -188,6 +192,11 @@ func TestResolveShortcutConfigsUseEnvOverrides(t *testing.T) {
 	t.Setenv("DVV_SSH_ADD_SHORTCUT", "alt-a")
 	t.Setenv("DVV_SSH_REMOVE_SHORTCUT", "alt-r")
 	t.Setenv("DVV_SSH_NEW_TERMINAL_SHORTCUT", "alt-t")
+	t.Setenv("DVV_SCP_DOWNLOADS_DIR", "scp-downloads")
+	t.Setenv("DVV_SCP_UPLOAD_SHORTCUT", "shift+u")
+	t.Setenv("DVV_SCP_DOWNLOAD_SHORTCUT", "shift+g")
+	t.Setenv("DVV_SCP_OPEN_DOWNLOADS_SHORTCUT", "shift+o")
+	t.Setenv("DVV_SCP_CLEAN_DOWNLOADS_SHORTCUT", "shift+c")
 	t.Setenv("DVV_RESOURCES_START_SHORTCUT", "shift+s")
 	t.Setenv("DVV_RESOURCES_RESTART_SHORTCUT", "shift+r")
 	t.Setenv("DVV_RESOURCES_STOP_SHORTCUT", "shift+x")
@@ -223,6 +232,9 @@ func TestResolveShortcutConfigsUseEnvOverrides(t *testing.T) {
 	}
 	if ssh.Hub.Shortcuts.Add != "alt-a" || ssh.Hub.Shortcuts.Remove != "alt-r" || ssh.Hub.Shortcuts.NewTerminal != "alt-t" {
 		t.Fatalf("ssh shortcuts = %#v", ssh.Hub.Shortcuts)
+	}
+	if ssh.Transfer.DownloadsDir != filepath.Join("/home/tester", "scp-downloads") || ssh.Transfer.Shortcuts.Upload != "shift+u" || ssh.Transfer.Shortcuts.Download != "shift+g" || ssh.Transfer.Shortcuts.OpenDownloads != "shift+o" || ssh.Transfer.Shortcuts.CleanDownloads != "shift+c" {
+		t.Fatalf("ssh transfer config = %#v", ssh.Transfer)
 	}
 	if resources.Hub.Shortcuts.Start != "shift+s" || resources.Hub.Shortcuts.Restart != "shift+r" || resources.Hub.Shortcuts.Stop != "shift+x" || resources.Hub.Shortcuts.Logs != "shift+l" {
 		t.Fatalf("resource shortcuts = %#v", resources.Hub.Shortcuts)

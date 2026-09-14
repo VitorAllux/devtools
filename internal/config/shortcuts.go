@@ -12,9 +12,13 @@ type KeyBinding struct {
 }
 
 type SSHHubKeyBindings struct {
-	Add         KeyBinding
-	Remove      KeyBinding
-	NewTerminal KeyBinding
+	Add            KeyBinding
+	Remove         KeyBinding
+	NewTerminal    KeyBinding
+	Upload         KeyBinding
+	Download       KeyBinding
+	OpenDownloads  KeyBinding
+	CleanDownloads KeyBinding
 }
 
 type ShellShortcutBindings struct {
@@ -72,11 +76,15 @@ type SecretsHubKeyBindings struct {
 }
 
 func (c *Config) SSHHubKeys() SSHHubKeyBindings {
-	defaults := DefaultProjectConfig().SSH.Hub.Shortcuts
+	defaults := DefaultProjectConfig().SSH
 	return SSHHubKeyBindings{
-		Add:         normalizeKeyOrDefault(c.Project.SSH.Hub.Shortcuts.Add, defaults.Add),
-		Remove:      normalizeKeyOrDefault(c.Project.SSH.Hub.Shortcuts.Remove, defaults.Remove),
-		NewTerminal: normalizeKeyOrDefault(c.Project.SSH.Hub.Shortcuts.NewTerminal, defaults.NewTerminal),
+		Add:            normalizeKeyOrDefault(c.Project.SSH.Hub.Shortcuts.Add, defaults.Hub.Shortcuts.Add),
+		Remove:         normalizeKeyOrDefault(c.Project.SSH.Hub.Shortcuts.Remove, defaults.Hub.Shortcuts.Remove),
+		NewTerminal:    normalizeKeyOrDefault(c.Project.SSH.Hub.Shortcuts.NewTerminal, defaults.Hub.Shortcuts.NewTerminal),
+		Upload:         normalizeKeyOrDefault(c.Project.SSH.Transfer.Shortcuts.Upload, defaults.Transfer.Shortcuts.Upload),
+		Download:       normalizeKeyOrDefault(c.Project.SSH.Transfer.Shortcuts.Download, defaults.Transfer.Shortcuts.Download),
+		OpenDownloads:  normalizeKeyOrDefault(c.Project.SSH.Transfer.Shortcuts.OpenDownloads, defaults.Transfer.Shortcuts.OpenDownloads),
+		CleanDownloads: normalizeKeyOrDefault(c.Project.SSH.Transfer.Shortcuts.CleanDownloads, defaults.Transfer.Shortcuts.CleanDownloads),
 	}
 }
 

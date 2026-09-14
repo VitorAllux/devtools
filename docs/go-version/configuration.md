@@ -103,6 +103,15 @@ The file is versioned because it defines project behavior, theme identity, and d
         "remove": "shift+d",
         "newTerminal": "shift+t"
       }
+    },
+    "transfer": {
+      "downloadsDir": "~/Downloads/dvv-scp",
+      "shortcuts": {
+        "upload": "shift+u",
+        "download": "shift+g",
+        "openDownloads": "shift+o",
+        "cleanDownloads": "shift+c"
+      }
     }
   },
   "tmux": {
@@ -260,6 +269,16 @@ The `ports.hub.shortcuts` section configures the port manager actions:
 
 - `copy`: copy the detected local URL.
 - `kill`: kill the selected process after confirmation.
+
+## SSH Transfer Config
+
+The `ssh.transfer` section configures SCP transfer helpers in `dvv ssh`:
+
+- `downloadsDir`: local directory for downloaded SCP files. It defaults to `~/Downloads/dvv-scp` and is created by `dvv setup`, `dvv doctor --fix`, and transfer actions.
+- `upload`: upload a selected local file or directory to the selected SSH entry.
+- `download`: download a prompted remote path from the selected SSH entry.
+- `openDownloads`: open the downloads directory in a tmux/terminal tab.
+- `cleanDownloads`: remove all contents inside the downloads directory after showing file count and size.
 
 ## Secrets Config
 
@@ -440,6 +459,11 @@ DVV_BW_AGE_KEY_ITEM
 DVV_SECRETS_PREPARE_SHORTCUT
 DVV_SECRETS_RESTORE_SHORTCUT
 DVV_SECRETS_SYNC_SHORTCUT
+DVV_SCP_DOWNLOADS_DIR
+DVV_SCP_UPLOAD_SHORTCUT
+DVV_SCP_DOWNLOAD_SHORTCUT
+DVV_SCP_OPEN_DOWNLOADS_SHORTCUT
+DVV_SCP_CLEAN_DOWNLOADS_SHORTCUT
 ```
 
 Legacy equivalents:

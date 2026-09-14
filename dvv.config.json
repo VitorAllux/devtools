@@ -89,6 +89,15 @@
         "remove": "shift+d",
         "newTerminal": "shift+t"
       }
+    },
+    "transfer": {
+      "downloadsDir": "~/Downloads/dvv-scp",
+      "shortcuts": {
+        "upload": "shift+u",
+        "download": "shift+g",
+        "openDownloads": "shift+o",
+        "cleanDownloads": "shift+c"
+      }
     }
   },
   "secrets": {

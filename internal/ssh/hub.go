@@ -127,6 +127,40 @@ func (m *Manager) fzfHub(ctx context.Context, entries []Entry, hubError string) 
 			return true, hubErrorMessage(err), nil
 		}
 		return true, "", nil
+	case keys.Upload.FZFKey:
+		if selection == "" {
+			return true, "Select one SSH entry to upload", nil
+		}
+		entry, ok := findEntryByRaw(entries, selection)
+		if !ok {
+			return true, hubErrorMessage(fmt.Errorf("selected SSH entry no longer exists")), nil
+		}
+		if err := m.Upload(ctx, entry); err != nil {
+			return true, hubErrorMessage(err), nil
+		}
+		return true, "", nil
+	case keys.Download.FZFKey:
+		if selection == "" {
+			return true, "Select one SSH entry to download", nil
+		}
+		entry, ok := findEntryByRaw(entries, selection)
+		if !ok {
+			return true, hubErrorMessage(fmt.Errorf("selected SSH entry no longer exists")), nil
+		}
+		if err := m.Download(ctx, entry); err != nil {
+			return true, hubErrorMessage(err), nil
+		}
+		return true, "", nil
+	case keys.OpenDownloads.FZFKey:
+		if err := m.OpenDownloads(ctx); err != nil {
+			return true, hubErrorMessage(err), nil
+		}
+		return true, "", nil
+	case keys.CleanDownloads.FZFKey:
+		if err := m.CleanDownloads(ctx); err != nil {
+			return true, hubErrorMessage(err), nil
+		}
+		return true, "", nil
 	default:
 		if selection == "" {
 			return false, "", nil
@@ -149,7 +183,7 @@ func (m *Manager) basicHub(ctx context.Context, entries []Entry, hubError string
 	}
 	printEntryList(entries)
 	fmt.Println()
-	fmt.Printf("Commands: number opens terminal | %s adds | %s number removes | %s number opens terminal | q exits\n", keys.Add.Label, keys.Remove.Label, keys.NewTerminal.Label)
+	fmt.Printf("Commands: number opens terminal | %s adds | %s number removes | %s number opens terminal | %s number uploads | %s number downloads | %s opens downloads | %s cleans downloads | q exits\n", keys.Add.Label, keys.Remove.Label, keys.NewTerminal.Label, keys.Upload.Label, keys.Download.Label, keys.OpenDownloads.Label, keys.CleanDownloads.Label)
 	value, err := ui.Prompt("SSH")
 	if err != nil {
 		return false, "", err
@@ -189,6 +223,38 @@ func (m *Manager) basicHub(ctx context.Context, entries []Entry, hubError string
 			return true, hubErrorMessage(fmt.Errorf("invalid SSH entry selection: %s", fields[1])), nil
 		}
 		if err := m.OpenInNewTerminal(ctx, entries[index]); err != nil {
+			return true, hubErrorMessage(err), nil
+		}
+		return true, "", nil
+	}
+	if len(fields) == 2 && matchesShortcut(fields[0], keys.Upload.FZFKey) {
+		index, ok := parseEntryIndex(fields[1], len(entries))
+		if !ok {
+			return true, hubErrorMessage(fmt.Errorf("invalid SSH entry selection: %s", fields[1])), nil
+		}
+		if err := m.Upload(ctx, entries[index]); err != nil {
+			return true, hubErrorMessage(err), nil
+		}
+		return true, "", nil
+	}
+	if len(fields) == 2 && matchesShortcut(fields[0], keys.Download.FZFKey) {
+		index, ok := parseEntryIndex(fields[1], len(entries))
+		if !ok {
+			return true, hubErrorMessage(fmt.Errorf("invalid SSH entry selection: %s", fields[1])), nil
+		}
+		if err := m.Download(ctx, entries[index]); err != nil {
+			return true, hubErrorMessage(err), nil
+		}
+		return true, "", nil
+	}
+	if matchesShortcut(value, keys.OpenDownloads.FZFKey) {
+		if err := m.OpenDownloads(ctx); err != nil {
+			return true, hubErrorMessage(err), nil
+		}
+		return true, "", nil
+	}
+	if matchesShortcut(value, keys.CleanDownloads.FZFKey) {
+		if err := m.CleanDownloads(ctx); err != nil {
 			return true, hubErrorMessage(err), nil
 		}
 		return true, "", nil
@@ -278,6 +344,10 @@ func sshHubShortcuts(keys config.SSHHubKeyBindings) []ui.FZFShortcut {
 		{Key: keys.Add.FZFKey, Label: keys.Add.Label, Description: "add SSH entry"},
 		{Key: keys.Remove.FZFKey, Label: keys.Remove.Label, Description: "remove selected"},
 		{Key: keys.NewTerminal.FZFKey, Label: keys.NewTerminal.Label, Description: "open terminal tab"},
+		{Key: keys.Upload.FZFKey, Label: keys.Upload.Label, Description: "upload file or directory"},
+		{Key: keys.Download.FZFKey, Label: keys.Download.Label, Description: "download remote path"},
+		{Key: keys.OpenDownloads.FZFKey, Label: keys.OpenDownloads.Label, Description: "open downloads"},
+		{Key: keys.CleanDownloads.FZFKey, Label: keys.CleanDownloads.Label, Description: "clean downloads"},
 		{Label: "Esc", Description: "exit hub"},
 	}
 }
@@ -348,8 +418,8 @@ func matchesShortcut(input string, fzfKey string) bool {
 	if strings.EqualFold(input, fzfKey) {
 		return true
 	}
-	if strings.HasPrefix(fzfKey, "alt-") || strings.HasPrefix(fzfKey, "ctrl-") {
-		return strings.EqualFold(input, strings.TrimPrefix(strings.TrimPrefix(fzfKey, "alt-"), "ctrl-"))
+	if strings.HasPrefix(fzfKey, "alt-") || strings.HasPrefix(fzfKey, "ctrl-") || strings.HasPrefix(fzfKey, "shift+") {
+		return strings.EqualFold(input, strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(fzfKey, "alt-"), "ctrl-"), "shift+"))
 	}
 	return false
 }

@@ -82,6 +82,9 @@ func (m Manager) Check(ctx context.Context) error {
 
 func (m Manager) Setup(ctx context.Context) error {
 	ui.Title("Setup")
+	if err := m.ensureRuntimeState(); err != nil {
+		return err
+	}
 	if err := m.Runner.Run(ctx, m.Config.RootDir, "node", "scripts/setup.js"); err != nil {
 		return err
 	}
@@ -99,6 +102,7 @@ func (m Manager) Doctor(ctx context.Context, fix bool) error {
 	checkCommand(m.Runner, "npm", false)
 	checkCommand(m.Runner, "git", true)
 	checkCommand(m.Runner, "ssh", true)
+	checkCommand(m.Runner, "scp", true)
 	checkCommand(m.Runner, "tmux", true)
 	checkCommand(m.Runner, "fzf", true)
 	checkCommand(m.Runner, "code", false)
@@ -123,6 +127,7 @@ func (m Manager) Doctor(ctx context.Context, fix bool) error {
 	checkPath("Workspace root", m.Config.Project.Workspace.Root, false)
 	checkInvalidWorkspaceNames(m.Config.Project.Workspace.Root)
 	checkPath("Dumps dir", m.Config.Project.DB.DumpsDir, false)
+	checkPath("SCP downloads", m.Config.Project.SSH.Transfer.DownloadsDir, false)
 	checkZshCompletion(m.Config.RootDir)
 	checkZshShortcutBlock(m.Config)
 	checkTmuxShortcutBlock(m.Config)
@@ -176,6 +181,7 @@ func (m Manager) ensureRuntimeState() error {
 		filepath.Dir(m.Config.EncryptedServersFile),
 		config.ExpandPath(m.Config.Project.Workspace.Root),
 		config.ExpandPath(m.Config.Project.DB.DumpsDir),
+		config.ExpandPath(m.Config.Project.SSH.Transfer.DownloadsDir),
 	}
 	for _, dir := range dirs {
 		if strings.TrimSpace(dir) == "" || dir == "." {

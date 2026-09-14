@@ -204,6 +204,7 @@ func configCategories() []Category {
 		{"paths", "Paths", "Manage workspace, dumps, SSH, AGE, and config paths"},
 		{"shortcuts", "Shortcuts", "Manage shell, tmux, and hub action keys"},
 		{"workspace", "Workspace", "Manage workspace root, discovery, opener, and action keys"},
+		{"ssh", "SSH", "Manage SSH list and SCP transfer settings"},
 		{"database", "Database", "Manage MySQL, dumps, rclone, and DB safety defaults"},
 		{"tmux", "Tmux", "Manage directory picker and home session settings"},
 		{"resources", "Resources", "Manage resource and port hub settings"},
@@ -309,6 +310,8 @@ func entriesForCategory(categoryID string, entries []Entry) []Entry {
 		})
 	case "workspace":
 		return filterEntriesByCategory(entries, "Workspace")
+	case "ssh":
+		return filterEntriesByCategory(entries, "SSH")
 	case "database":
 		return filterEntriesByCategory(entries, "Database")
 	case "tmux":
@@ -939,6 +942,16 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.SSH.Hub.Shortcuts.Remove = value
 	case "DVV_SSH_NEW_TERMINAL_SHORTCUT":
 		m.Config.Project.SSH.Hub.Shortcuts.NewTerminal = value
+	case "DVV_SCP_DOWNLOADS_DIR":
+		m.Config.Project.SSH.Transfer.DownloadsDir = config.ExpandPath(value)
+	case "DVV_SCP_UPLOAD_SHORTCUT":
+		m.Config.Project.SSH.Transfer.Shortcuts.Upload = value
+	case "DVV_SCP_DOWNLOAD_SHORTCUT":
+		m.Config.Project.SSH.Transfer.Shortcuts.Download = value
+	case "DVV_SCP_OPEN_DOWNLOADS_SHORTCUT":
+		m.Config.Project.SSH.Transfer.Shortcuts.OpenDownloads = value
+	case "DVV_SCP_CLEAN_DOWNLOADS_SHORTCUT":
+		m.Config.Project.SSH.Transfer.Shortcuts.CleanDownloads = value
 	case "DVV_RESOURCES_START_SHORTCUT":
 		m.Config.Project.Resources.Hub.Shortcuts.Start = value
 	case "DVV_RESOURCES_RESTART_SHORTCUT":
@@ -1316,9 +1329,14 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Shortcuts", "DVV_CONFIG_CLEAR_SHORTCUT", "Sets the config hub shortcut for clearing a persisted key.", "shortcut", cfg.Project.System.ConfigHub.Shortcuts.Clear, "", false},
 		{"Shortcuts", "DVV_CONFIG_VALIDATE_SHORTCUT", "Sets the config hub shortcut for validating a selected value.", "shortcut", cfg.Project.System.ConfigHub.Shortcuts.Validate, "", false},
 		{"Shortcuts", "DVV_CONFIG_SECRETS_SHORTCUT", "Sets the config hub shortcut for showing secrets status.", "shortcut", cfg.Project.System.ConfigHub.Shortcuts.Secrets, "", false},
-		{"Shortcuts", "DVV_SSH_ADD_SHORTCUT", "Sets the SSH hub shortcut for adding an entry.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Add, "", false},
-		{"Shortcuts", "DVV_SSH_REMOVE_SHORTCUT", "Sets the SSH hub shortcut for removing an entry.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Remove, "", false},
-		{"Shortcuts", "DVV_SSH_NEW_TERMINAL_SHORTCUT", "Sets the SSH hub shortcut for opening a new tab.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.NewTerminal, "", false},
+		{"SSH", "DVV_SSH_ADD_SHORTCUT", "Sets the SSH hub shortcut for adding an entry.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Add, "", false},
+		{"SSH", "DVV_SSH_REMOVE_SHORTCUT", "Sets the SSH hub shortcut for removing an entry.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.Remove, "", false},
+		{"SSH", "DVV_SSH_NEW_TERMINAL_SHORTCUT", "Sets the SSH hub shortcut for opening a new tab.", "shortcut", cfg.Project.SSH.Hub.Shortcuts.NewTerminal, "", false},
+		{"SSH", "DVV_SCP_DOWNLOADS_DIR", "Sets where SCP downloads are stored.", "path", cfg.Project.SSH.Transfer.DownloadsDir, "", false},
+		{"SSH", "DVV_SCP_UPLOAD_SHORTCUT", "Sets the SSH hub shortcut for SCP upload.", "shortcut", cfg.Project.SSH.Transfer.Shortcuts.Upload, "", false},
+		{"SSH", "DVV_SCP_DOWNLOAD_SHORTCUT", "Sets the SSH hub shortcut for SCP download.", "shortcut", cfg.Project.SSH.Transfer.Shortcuts.Download, "", false},
+		{"SSH", "DVV_SCP_OPEN_DOWNLOADS_SHORTCUT", "Sets the SSH hub shortcut for opening SCP downloads.", "shortcut", cfg.Project.SSH.Transfer.Shortcuts.OpenDownloads, "", false},
+		{"SSH", "DVV_SCP_CLEAN_DOWNLOADS_SHORTCUT", "Sets the SSH hub shortcut for cleaning SCP downloads.", "shortcut", cfg.Project.SSH.Transfer.Shortcuts.CleanDownloads, "", false},
 		{"Shortcuts", "DVV_TMUX_HUB_START_SHORTCUT", "Sets the tmux hub shortcut for starting or opening a target.", "shortcut", cfg.Project.Tmux.Hub.Shortcuts.Start, "", false},
 		{"Shortcuts", "DVV_TMUX_HUB_STOP_SHORTCUT", "Sets the tmux hub shortcut for stopping a target.", "shortcut", cfg.Project.Tmux.Hub.Shortcuts.Stop, "", false},
 		{"Shortcuts", "DVV_TMUX_HUB_RESTART_API_SHORTCUT", "Sets the tmux hub shortcut for restarting API and Horizon panes.", "shortcut", cfg.Project.Tmux.Hub.Shortcuts.RestartAPI, "", false},
