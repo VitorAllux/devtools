@@ -629,7 +629,7 @@ Common cases:
 | `Alt+R` beeps or does nothing | Run `dvv build`, then `dvv setup` and `exec zsh`. If a tmux server was already open, run `tmux source-file ~/.tmux.conf` or open the environment again with `dvv tmux`. |
 | `Alt+R` reports multiple Laravel API windows | Run `dvv tmux:reset-api` manually and select the target once, or run `dvv tmux:reset-api --session <name> --window <name>`. |
 | Autocomplete did not update | Run `dvv setup`, then open a new terminal or run `exec zsh`. |
-| Theme colors look different inside tmux | Rebuild with `dvv build` and open a new tmux tab. `dvv` configures tmux truecolor for sessions it creates; old sessions may need to be recreated. |
+| Theme colors look different inside tmux | Rebuild with `dvv build` and open a new tmux tab. `dvv` configures tmux truecolor for sessions it creates and normalizes `TERM` on terminal handoff; old sessions may need to be recreated. |
 | Workspace opens as missing in VS Code | Run `dvv doctor` and check for invalid workspace names or stale VS Code recent entries. |
 | `dvv workspace` does not show a workspace | Confirm it is a direct child of `workspace.root`, starts with `workspace-`, and has a valid UTF-8 name. |
 | SSH list is empty | Run `dvv bootstrap` or check `~/.config/devv/servers.list`. |

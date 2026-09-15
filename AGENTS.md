@@ -8,7 +8,7 @@ These rules document the local conventions for future agents and maintainers wor
 - Keep output direct and practical. Prefer actionable command names and short descriptions.
 - The CLI visual identity is `Royal Noir`: black foundation, royal purple interaction, and restrained gold status.
 - Use shared theme helpers and the `FZFHub` component from `internal/ui`; do not add one-off color palettes in feature packages.
-- Tmux-launched flows should preserve truecolor by using the shared tmux runtime options and `env COLORTERM=truecolor` terminal handoff.
+- Tmux-launched flows should preserve truecolor by using the shared tmux runtime options and the shared `env TERM=xterm-256color COLORTERM=truecolor` terminal handoff.
 - Loaders should use the shared Royal Noir loader APIs from `internal/ui` and write to stderr.
 - Use `internal/ui.RunWithRoyalLoader` for indeterminate operations where no total is known.
 - Use `internal/ui.NewRoyalProgressLoader` for determinate operations where progress can be measured by bytes, items, or steps.

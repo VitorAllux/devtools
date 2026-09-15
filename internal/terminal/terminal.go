@@ -85,7 +85,7 @@ func commandWithTerminalEnvironment(command string, args ...string) (string, []s
 	if command != "tmux" {
 		return command, args
 	}
-	return "env", append([]string{"COLORTERM=truecolor", command}, args...)
+	return "env", append([]string{"TERM=xterm-256color", "COLORTERM=truecolor", command}, args...)
 }
 
 func (l Launcher) openDarwin(ctx context.Context, preferred string, command string, args ...string) error {

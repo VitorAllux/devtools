@@ -128,7 +128,7 @@ func TestOpenInNewTerminalUsesConfiguredTerminalLauncher(t *testing.T) {
 		}
 		return
 	}
-	if start := runner.lastStart(); !strings.HasPrefix(start, "konsole --new-tab -e env COLORTERM=truecolor tmux attach -t dvv-ssh-api-") {
+	if start := runner.lastStart(); !strings.HasPrefix(start, "konsole --new-tab -e env TERM=xterm-256color COLORTERM=truecolor tmux attach -t dvv-ssh-api-") {
 		t.Fatalf("terminal command = %q, want konsole attach", start)
 	}
 }
@@ -223,7 +223,7 @@ func terminalLauncherTestPaths() map[string]bool {
 func hasTerminalAttachStart(start string, sessionPrefix string) bool {
 	if runtime.GOOS == "darwin" {
 		return strings.HasPrefix(start, "osascript -e tell application \"Terminal\"") &&
-			strings.Contains(start, "do script \"'env' 'COLORTERM=truecolor' 'tmux' 'attach' '-t' '"+sessionPrefix)
+			strings.Contains(start, "do script \"'env' 'TERM=xterm-256color' 'COLORTERM=truecolor' 'tmux' 'attach' '-t' '"+sessionPrefix)
 	}
-	return strings.HasPrefix(start, "x-terminal-emulator -e env COLORTERM=truecolor tmux attach -t "+sessionPrefix)
+	return strings.HasPrefix(start, "x-terminal-emulator -e env TERM=xterm-256color COLORTERM=truecolor tmux attach -t "+sessionPrefix)
 }

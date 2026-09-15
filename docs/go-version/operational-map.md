@@ -58,7 +58,7 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | --- | --- | --- |
 | Launcher config | `DVV_TERMINAL_LAUNCHER` controls terminal handoff and defaults to `auto`. | Prefer config over platform-specific commands in feature packages. |
 | WSL | `auto` opens a new Windows Terminal tab with `wt.exe -w 0 new-tab wsl.exe ...` when available. | Use for SSH and tmux handoff. |
-| Tmux color handoff | Terminal launchers run tmux through `env COLORTERM=truecolor` so `fzf` themes keep truecolor in new tabs. | Preserve this wrapper for tmux attaches. |
+| Tmux color handoff | Terminal launchers run tmux through `env TERM=xterm-256color COLORTERM=truecolor` so new tabs do not inherit nested tmux `TERM` values and `fzf` themes keep truecolor. | Preserve this wrapper for tmux attaches. |
 | Linux | `auto` probes supported terminal emulators such as GNOME Terminal, Konsole, XFCE Terminal, `x-terminal-emulator`, and Alacritty. | Keep fallback errors actionable. |
 | macOS | `auto` uses Terminal.app through `osascript`; `iterm2` uses iTerm2 when configured. | Run the macOS smoke checklist before claiming full macOS support. |
 | Unsupported launcher | Unknown configured launchers fail before opening a new process. | Surface the configured value in the error. |

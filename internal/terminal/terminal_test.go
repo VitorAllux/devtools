@@ -16,7 +16,7 @@ func TestLauncherUsesWindowsTerminalTabWithWSLWhenAvailable(t *testing.T) {
 		t.Fatalf("Open returned error: %v", err)
 	}
 
-	want := "wt.exe -w 0 new-tab wsl.exe -d Ubuntu -e env COLORTERM=truecolor tmux attach -t space"
+	want := "wt.exe -w 0 new-tab wsl.exe -d Ubuntu -e env TERM=xterm-256color COLORTERM=truecolor tmux attach -t space"
 	if got := runner.started; got != want {
 		t.Fatalf("started = %q, want %q", got, want)
 	}
@@ -30,7 +30,7 @@ func TestLauncherUsesLinuxTerminalTabWhenSupported(t *testing.T) {
 		t.Fatalf("Open returned error: %v", err)
 	}
 
-	want := "gnome-terminal --tab -- env COLORTERM=truecolor tmux attach -t space"
+	want := "gnome-terminal --tab -- env TERM=xterm-256color COLORTERM=truecolor tmux attach -t space"
 	if got := runner.started; got != want {
 		t.Fatalf("started = %q, want %q", got, want)
 	}
@@ -65,7 +65,7 @@ func TestLauncherUsesPreferredLinuxTerminal(t *testing.T) {
 		t.Fatalf("Open returned error: %v", err)
 	}
 
-	want := "konsole --new-tab -e env COLORTERM=truecolor tmux attach -t space"
+	want := "konsole --new-tab -e env TERM=xterm-256color COLORTERM=truecolor tmux attach -t space"
 	if got := runner.started; got != want {
 		t.Fatalf("started = %q, want %q", got, want)
 	}
@@ -88,7 +88,7 @@ func TestLauncherUsesTerminalAppOnDarwin(t *testing.T) {
 	if !strings.Contains(runner.started, "selected tab of front window") {
 		t.Fatalf("started = %q, want command to run in selected tab", runner.started)
 	}
-	if !strings.Contains(runner.started, "do script \"'env' 'COLORTERM=truecolor' 'tmux' 'attach' '-t' 'space'\"") {
+	if !strings.Contains(runner.started, "do script \"'env' 'TERM=xterm-256color' 'COLORTERM=truecolor' 'tmux' 'attach' '-t' 'space'\"") {
 		t.Fatalf("started = %q, want escaped shell command", runner.started)
 	}
 }

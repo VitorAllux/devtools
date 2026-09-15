@@ -340,12 +340,12 @@ func (r *fakeRunner) hasTerminalAttachStart(session string) bool {
 	for _, start := range r.starts {
 		if runtime.GOOS == "darwin" {
 			if strings.HasPrefix(start, "osascript -e tell application \"Terminal\"") &&
-				strings.Contains(start, "do script \"'env' 'COLORTERM=truecolor' 'tmux' 'attach' '-t' '"+session+"'\"") {
+				strings.Contains(start, "do script \"'env' 'TERM=xterm-256color' 'COLORTERM=truecolor' 'tmux' 'attach' '-t' '"+session+"'\"") {
 				return true
 			}
 			continue
 		}
-		if start == "x-terminal-emulator -e env COLORTERM=truecolor tmux attach -t "+session {
+		if start == "x-terminal-emulator -e env TERM=xterm-256color COLORTERM=truecolor tmux attach -t "+session {
 			return true
 		}
 	}
