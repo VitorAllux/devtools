@@ -3,8 +3,6 @@ package workspace
 import (
 	"context"
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/VitorAllux/devtools/internal/config"
 	"github.com/VitorAllux/devtools/internal/run"
@@ -24,8 +22,6 @@ func Run(ctx context.Context, cfg *config.Config, runner run.Runner, args []stri
 		return manager.CommandList(ctx)
 	case "__hub-rows":
 		return manager.CommandHubRows(ctx)
-	case "__size":
-		return manager.CommandSize(args[1:])
 	default:
 		return fmt.Errorf("unknown workspace action: %s", args[0])
 	}
@@ -96,16 +92,4 @@ func fillWorkspaceSizes(details []Details) {
 		details[index].SizeBytes = directorySize(details[index].Workspace.Path)
 		details[index].SizeKnown = true
 	}
-}
-
-func (m *Manager) CommandSize(args []string) error {
-	if len(args) == 0 || strings.TrimSpace(args[0]) == "" {
-		return fmt.Errorf("workspace path is required")
-	}
-	path := config.ExpandPath(args[0])
-	if _, err := os.Lstat(path); err != nil {
-		return err
-	}
-	fmt.Println(workspaceSize(Details{SizeBytes: directorySize(path), SizeKnown: true}))
-	return nil
 }

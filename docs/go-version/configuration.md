@@ -395,7 +395,7 @@ Generated harness files:
 
 The generated `AGENTS.md` is written in Portuguese. It tells agents to read workspace metadata, search configured skill paths, prefer project-local rules, and ask concise questions when context or risk is unclear.
 
-The workspace hub and `dvv workspace:list` include workspace disk usage. Hub rows stay stable while you navigate; the preview calculates the selected workspace size on demand when the row still shows `...`. Size calculation walks the workspace tree and skips symlink targets.
+The workspace hub and `dvv workspace:list` include workspace disk usage. Size calculation walks the workspace tree and skips symlink targets.
 
 ## Port Manager Config
 

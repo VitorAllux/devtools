@@ -399,7 +399,7 @@ func TestFZFHubKeepsEmptyWorkspaceHubOpen(t *testing.T) {
 	}
 }
 
-func TestFZFHubDoesNotReloadRowsAfterOpen(t *testing.T) {
+func TestFZFHubReloadsRowsOnceForWorkspaceSizes(t *testing.T) {
 	runner := newWorkspaceRunner()
 	runner.fzfOutput = []byte("\n")
 	manager := NewManager(testWorkspaceConfig(t.TempDir()), runner)
@@ -407,20 +407,21 @@ func TestFZFHubDoesNotReloadRowsAfterOpen(t *testing.T) {
 	if _, _, err := manager.fzfHub(context.Background(), nil, ""); err != nil {
 		t.Fatalf("fzfHub returned error: %v", err)
 	}
+	found := false
 	for _, arg := range runner.fzfArgs {
-		if strings.Contains(arg, "reload") {
-			t.Fatalf("workspace hub should not reload rows while the user is interacting: %#v", runner.fzfArgs)
+		if strings.Contains(arg, "load:reload-sync(") && strings.Contains(arg, "workspace __hub-rows") {
+			found = true
 		}
+	}
+	if !found {
+		t.Fatalf("workspace hub should reload rows once for full sizes: %#v", runner.fzfArgs)
 	}
 }
 
-func TestWorkspacePreviewCalculatesSizeWithoutReloadingRows(t *testing.T) {
+func TestWorkspacePreviewUsesRowSizeOnly(t *testing.T) {
 	preview := workspacePreviewCommand(nil)
-	if !strings.Contains(preview, "workspace __size") {
-		t.Fatalf("preview should calculate selected workspace size on demand: %q", preview)
-	}
-	if strings.Contains(preview, "reload") {
-		t.Fatalf("preview should not reload hub rows: %q", preview)
+	if strings.Contains(preview, "workspace __size") {
+		t.Fatalf("preview should not calculate workspace size on demand: %q", preview)
 	}
 }
 
