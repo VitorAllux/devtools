@@ -59,6 +59,31 @@ func TestCleanDownloadsRemovesOnlyChildren(t *testing.T) {
 	}
 }
 
+func TestPrepareTransferDestinationCreatesDefaultDownloadDirectory(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "downloads", "host", "2026-09-14")
+
+	if err := prepareTransferDestination(dir, true); err != nil {
+		t.Fatalf("prepareTransferDestination returned error: %v", err)
+	}
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		t.Fatalf("destination should be a directory: info=%v err=%v", info, err)
+	}
+}
+
+func TestPrepareTransferDestinationKeepsCustomFileTarget(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "downloads", "custom-name.png")
+
+	if err := prepareTransferDestination(path, false); err != nil {
+		t.Fatalf("prepareTransferDestination returned error: %v", err)
+	}
+	if info, err := os.Stat(filepath.Dir(path)); err != nil || !info.IsDir() {
+		t.Fatalf("parent destination should be a directory: info=%v err=%v", info, err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("custom file target should not be created before scp: err=%v", err)
+	}
+}
+
 func TestValidateCleanDownloadsRejectsHome(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

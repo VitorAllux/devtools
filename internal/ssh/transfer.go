@@ -36,7 +36,7 @@ func (m *Manager) Download(ctx context.Context, entry Entry) error {
 	if !commandExists(m, "scp") {
 		return fmt.Errorf("scp is required for SSH transfers")
 	}
-	remotePath, err := ui.Prompt("Remote path")
+	remotePath, err := ui.Prompt("Remote file path, or directory path ending with /")
 	if err != nil {
 		return err
 	}
@@ -48,19 +48,29 @@ func (m *Manager) Download(ctx context.Context, entry Entry) error {
 	if err != nil || strings.TrimSpace(destination.Path) == "" {
 		return err
 	}
-	recursive := strings.HasSuffix(remotePath, "/") || ui.Confirm("Recursive download? [y/N]")
+	recursive := false
+	if strings.HasSuffix(remotePath, "/") {
+		if !ui.Confirm("Remote path ends with /. Download this directory and all its contents?") {
+			return nil
+		}
+		recursive = true
+	}
 	localPath := destination.Path
 	if destination.PerHost {
 		localPath = filepath.Join(localPath, transferEntryName(entry), time.Now().Format("2006-01-02"))
 	}
 	localPath = config.ExpandPath(localPath)
-	if err := prepareTransferDestination(localPath); err != nil {
+	if err := prepareTransferDestination(localPath, destination.PerHost); err != nil {
 		return err
 	}
 	ui.Info("Download")
 	ui.Info("  Host:   %s", entry.Name)
 	ui.Info("  Remote: %s", remotePath)
-	ui.Info("  Local:  %s", localPath)
+	if destination.PerHost {
+		ui.Info("  Local dir: %s", localPath)
+	} else {
+		ui.Info("  Local:  %s", localPath)
+	}
 	if !ui.Confirm("Start download?") {
 		return nil
 	}
@@ -323,10 +333,13 @@ func transferShellCommand(args []string) string {
 	return command + `; code=$?; printf '\nSCP finished with exit code %s. Press Enter to close.' "$code"; read _; exit "$code"`
 }
 
-func prepareTransferDestination(path string) error {
+func prepareTransferDestination(path string, directory bool) error {
 	path = strings.TrimSpace(path)
 	if path == "" {
 		return fmt.Errorf("local destination cannot be empty")
+	}
+	if directory {
+		return os.MkdirAll(path, 0o700)
 	}
 	if info, err := os.Stat(path); err == nil && info.IsDir() {
 		return nil

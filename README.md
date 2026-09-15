@@ -200,7 +200,7 @@ Shortcuts:
 
 SSH entries are stored in `~/.config/devv/servers.list`. The path is preserved for compatibility with existing local setups.
 
-SCP downloads default to `~/Downloads/dvv-scp`. Downloads are grouped by SSH entry and date, such as `~/Downloads/dvv-scp/prod-api/2026-09-14/app.log`. `dvv setup`, `dvv doctor --fix`, and SCP actions create the directory when needed.
+SCP downloads default to `~/Downloads/dvv-scp`. Downloads are grouped by SSH entry and date, such as `~/Downloads/dvv-scp/prod-api/2026-09-14/app.log`. When the remote path ends with `/`, `dvv` asks before downloading the directory recursively with `scp -r`. `dvv setup`, `dvv doctor --fix`, and SCP actions create the directory when needed.
 
 ## Workspace Hub
 
