@@ -3,6 +3,7 @@ package workspace
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/VitorAllux/devtools/internal/config"
 	"github.com/VitorAllux/devtools/internal/run"
@@ -21,7 +22,7 @@ func Run(ctx context.Context, cfg *config.Config, runner run.Runner, args []stri
 	case "list":
 		return manager.CommandList(ctx)
 	case "__hub-rows":
-		return manager.CommandHubRows(ctx)
+		return manager.CommandHubRows(ctx, args[1:])
 	default:
 		return fmt.Errorf("unknown workspace action: %s", args[0])
 	}
@@ -77,13 +78,32 @@ func (m *Manager) CommandList(ctx context.Context) error {
 	return nil
 }
 
-func (m *Manager) CommandHubRows(ctx context.Context) error {
+func (m *Manager) CommandHubRows(ctx context.Context, args []string) error {
 	details, err := m.ListFast(ctx)
 	if err != nil {
 		return err
 	}
+	if hasArg(args, "--stream") {
+		return m.printStreamingHubRows(details)
+	}
 	fillWorkspaceSizes(details)
 	fmt.Print(workspaceRows(details))
+	return nil
+}
+
+func (m *Manager) printStreamingHubRows(details []Details) error {
+	fmt.Println(ui.FZFHiddenHeader(workspaceTableHeader()))
+	if len(details) == 0 {
+		fmt.Println(ui.FZFHiddenRow("__dvv_empty__", workspaceEmptyRow()))
+		return nil
+	}
+	for index := range details {
+		details[index].SizeBytes = directorySize(details[index].Workspace.Path)
+		details[index].SizeKnown = true
+		if _, err := fmt.Fprintln(os.Stdout, ui.FZFHiddenRow(details[index].Workspace.Path, workspaceRow(index, details[index]))); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -92,4 +112,13 @@ func fillWorkspaceSizes(details []Details) {
 		details[index].SizeBytes = directorySize(details[index].Workspace.Path)
 		details[index].SizeKnown = true
 	}
+}
+
+func hasArg(args []string, want string) bool {
+	for _, arg := range args {
+		if arg == want {
+			return true
+		}
+	}
+	return false
 }

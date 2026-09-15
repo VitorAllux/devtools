@@ -984,7 +984,7 @@ func workspaceRowsReloadBind() string {
 	if err != nil || strings.TrimSpace(executable) == "" {
 		executable = "dvv"
 	}
-	return "--bind=load:reload-sync(" + shellQuote(executable) + " workspace __hub-rows)+unbind(load)"
+	return "--bind=load:reload(" + shellQuote(executable) + " workspace __hub-rows --stream)+unbind(load)"
 }
 
 func projectPreviewCommand() string {

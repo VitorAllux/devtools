@@ -234,7 +234,7 @@ workspace-<name>
 ```
 
 Each workspace contains git worktrees for selected base repositories. The real repositories are not moved or copied.
-The workspace hub shows compact `SIZE` and `ACTIVE` columns based on workspace disk usage and workspace/project activity; full workspace listing also considers the latest git commit time.
+The workspace hub shows compact `SIZE` and `ACTIVE` columns based on workspace disk usage and workspace/project activity. Sizes start as `...` and fill in progressively while the hub stays usable; full workspace listing also considers the latest git commit time.
 
 Creation rules:
 
@@ -585,7 +585,7 @@ DVV_PORTS_KILL_SHORTCUT=shift+k
 | Tmux theme | `dvv setup` writes tmux status, window, pane, message, and copy-mode colors from the active CLI theme by default. The status bar stays full-width and visible. |
 | Tmux reset target | `dvv tmux` stores the last opened or manually selected reset target in `~/.cache/devv/tmux-reset-target.json` for the global `Alt+R` fallback. |
 | Workspace agent harness | Workspace create/add flows and `Shift+H` write `AGENTS.md`, `.agents/manifest.json`, guides, and skill lookup paths inside the workspace. |
-| Workspace size | `dvv workspace` and `dvv workspace:list` show workspace disk usage without following symlink targets. |
+| Workspace size | `dvv workspace` fills workspace disk usage progressively, and `dvv workspace:list` prints completed sizes without following symlink targets. |
 | SCP transfers | `dvv ssh` can upload/download with `scp`, open `~/Downloads/dvv-scp`, and clean its contents after confirmation. |
 | Port manager | `dvv ports` inspects listening TCP ports with `ss` or `lsof`, opens likely local URLs, copies URLs, and confirms before killing a PID. |
 | Database size | Database selection lists show user database sizes from `information_schema.tables`; empty databases show `0 B`. |
