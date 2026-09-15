@@ -3,7 +3,6 @@ package workspace
 import (
 	"context"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -380,49 +379,6 @@ func TestWorkspaceRowKeepsColumnsAligned(t *testing.T) {
 	}
 }
 
-func TestWorkspaceRowsReloadBindStreamsWithoutBlocking(t *testing.T) {
-	bind := workspaceRowsReloadBind()
-	if !strings.Contains(bind, "load:reload(") || strings.Contains(bind, "reload-sync") {
-		t.Fatalf("workspace reload bind should stream asynchronously: %q", bind)
-	}
-	if !strings.Contains(bind, "workspace __hub-rows --stream") {
-		t.Fatalf("workspace reload bind should use streaming rows command: %q", bind)
-	}
-}
-
-func TestPrintStreamingHubRowsPrintsSizePerWorkspace(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	root := t.TempDir()
-	first := filepath.Join(root, "workspace-alpha")
-	second := filepath.Join(root, "workspace-beta")
-	mustMkdir(t, first)
-	mustMkdir(t, second)
-	if err := os.WriteFile(filepath.Join(first, "alpha.txt"), []byte("alpha"), 0o600); err != nil {
-		t.Fatalf("WriteFile alpha failed: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(second, "beta.txt"), []byte("beta"), 0o600); err != nil {
-		t.Fatalf("WriteFile beta failed: %v", err)
-	}
-	manager := NewManager(testWorkspaceConfig(root), newWorkspaceRunner())
-	details, err := manager.ListFast(context.Background())
-	if err != nil {
-		t.Fatalf("ListFast returned error: %v", err)
-	}
-
-	output := captureStdout(t, func() {
-		if err := manager.printStreamingHubRows(details); err != nil {
-			t.Fatalf("printStreamingHubRows returned error: %v", err)
-		}
-	})
-
-	if !strings.Contains(output, "__dvv_header__") || !strings.Contains(output, first) || !strings.Contains(output, second) {
-		t.Fatalf("streaming rows missing expected entries: %q", output)
-	}
-	if strings.Contains(output, " ... ") {
-		t.Fatalf("streaming rows should include known sizes, got: %q", output)
-	}
-}
-
 func TestFZFHubKeepsEmptyWorkspaceHubOpen(t *testing.T) {
 	runner := newWorkspaceRunner()
 	runner.fzfOutput = []byte("\n__dvv_empty__\t--  No workspaces yet\n")
@@ -440,6 +396,31 @@ func TestFZFHubKeepsEmptyWorkspaceHubOpen(t *testing.T) {
 	}
 	if !strings.Contains(runner.fzfInput, "__dvv_empty__") {
 		t.Fatalf("fzf input missing empty state: %q", runner.fzfInput)
+	}
+}
+
+func TestFZFHubDoesNotReloadRowsAfterOpen(t *testing.T) {
+	runner := newWorkspaceRunner()
+	runner.fzfOutput = []byte("\n")
+	manager := NewManager(testWorkspaceConfig(t.TempDir()), runner)
+
+	if _, _, err := manager.fzfHub(context.Background(), nil, ""); err != nil {
+		t.Fatalf("fzfHub returned error: %v", err)
+	}
+	for _, arg := range runner.fzfArgs {
+		if strings.Contains(arg, "reload") {
+			t.Fatalf("workspace hub should not reload rows while the user is interacting: %#v", runner.fzfArgs)
+		}
+	}
+}
+
+func TestWorkspacePreviewCalculatesSizeWithoutReloadingRows(t *testing.T) {
+	preview := workspacePreviewCommand(nil)
+	if !strings.Contains(preview, "workspace __size") {
+		t.Fatalf("preview should calculate selected workspace size on demand: %q", preview)
+	}
+	if strings.Contains(preview, "reload") {
+		t.Fatalf("preview should not reload hub rows: %q", preview)
 	}
 }
 
@@ -1177,27 +1158,6 @@ func withPromptInput(t *testing.T, lines ...string) {
 		<-done
 		_ = reader.Close()
 	})
-}
-
-func captureStdout(t *testing.T, fn func()) string {
-	t.Helper()
-	reader, writer, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("Pipe stdout failed: %v", err)
-	}
-	original := os.Stdout
-	os.Stdout = writer
-	done := make(chan string)
-	go func() {
-		data, _ := io.ReadAll(reader)
-		done <- string(data)
-	}()
-	fn()
-	_ = writer.Close()
-	os.Stdout = original
-	output := <-done
-	_ = reader.Close()
-	return output
 }
 
 type workspaceRunner struct {

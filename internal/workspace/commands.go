@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/VitorAllux/devtools/internal/config"
 	"github.com/VitorAllux/devtools/internal/run"
@@ -22,7 +23,9 @@ func Run(ctx context.Context, cfg *config.Config, runner run.Runner, args []stri
 	case "list":
 		return manager.CommandList(ctx)
 	case "__hub-rows":
-		return manager.CommandHubRows(ctx, args[1:])
+		return manager.CommandHubRows(ctx)
+	case "__size":
+		return manager.CommandSize(args[1:])
 	default:
 		return fmt.Errorf("unknown workspace action: %s", args[0])
 	}
@@ -78,32 +81,13 @@ func (m *Manager) CommandList(ctx context.Context) error {
 	return nil
 }
 
-func (m *Manager) CommandHubRows(ctx context.Context, args []string) error {
+func (m *Manager) CommandHubRows(ctx context.Context) error {
 	details, err := m.ListFast(ctx)
 	if err != nil {
 		return err
 	}
-	if hasArg(args, "--stream") {
-		return m.printStreamingHubRows(details)
-	}
 	fillWorkspaceSizes(details)
 	fmt.Print(workspaceRows(details))
-	return nil
-}
-
-func (m *Manager) printStreamingHubRows(details []Details) error {
-	fmt.Println(ui.FZFHiddenHeader(workspaceTableHeader()))
-	if len(details) == 0 {
-		fmt.Println(ui.FZFHiddenRow("__dvv_empty__", workspaceEmptyRow()))
-		return nil
-	}
-	for index := range details {
-		details[index].SizeBytes = directorySize(details[index].Workspace.Path)
-		details[index].SizeKnown = true
-		if _, err := fmt.Fprintln(os.Stdout, ui.FZFHiddenRow(details[index].Workspace.Path, workspaceRow(index, details[index]))); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -114,11 +98,14 @@ func fillWorkspaceSizes(details []Details) {
 	}
 }
 
-func hasArg(args []string, want string) bool {
-	for _, arg := range args {
-		if arg == want {
-			return true
-		}
+func (m *Manager) CommandSize(args []string) error {
+	if len(args) == 0 || strings.TrimSpace(args[0]) == "" {
+		return fmt.Errorf("workspace path is required")
 	}
-	return false
+	path := config.ExpandPath(args[0])
+	if _, err := os.Lstat(path); err != nil {
+		return err
+	}
+	fmt.Println(workspaceSize(Details{SizeBytes: directorySize(path), SizeKnown: true}))
+	return nil
 }

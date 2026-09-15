@@ -141,7 +141,6 @@ func (m *Manager) fzfHub(ctx context.Context, details []Details, hubError string
 			"--header-lines=1",
 			"--multi",
 			"--track",
-			workspaceRowsReloadBind(),
 		),
 	}.Args()
 	output, err := m.Runner.OutputWithInput(ctx, "", []byte(workspaceRows(details)), "fzf", args...)
@@ -946,6 +945,10 @@ func workspaceHubHeaderLines(message string) []string {
 
 func workspacePreviewCommand(shortcuts []ui.FZFShortcut) string {
 	commandDeck := ui.FZFPreviewCommandDeck(shortcuts)
+	executable, err := os.Executable()
+	if err != nil || strings.TrimSpace(executable) == "" {
+		executable = "dvv"
+	}
 	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
 display=$(printf "%s" "$line" | cut -f2-)
@@ -965,6 +968,10 @@ workspace_name=$(basename "$raw")
 project_count=$(printf "%s" "$display" | awk "{print \$3}")
 status=$(printf "%s" "$display" | awk "{print \$4}")
 row_size=$(printf "%s" "$display" | awk "{print \$5}")
+if [ "$row_size" = "..." ]; then
+  calculated_size=$(` + shellQuote(executable) + ` workspace __size "$raw" 2>/dev/null)
+  [ -n "$calculated_size" ] && row_size=$calculated_size
+fi
 last_active=$(printf "%s" "$display" | awk "{print \$6}")
 printf "%sWorkspace profile%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-9s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$workspace_name"
@@ -977,14 +984,6 @@ printf "\n%s--------------------------------%s\n" "$dvv_muted" "$dvv_reset"
 printf "%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
 print_commands
 ' sh {}`
-}
-
-func workspaceRowsReloadBind() string {
-	executable, err := os.Executable()
-	if err != nil || strings.TrimSpace(executable) == "" {
-		executable = "dvv"
-	}
-	return "--bind=load:reload(" + shellQuote(executable) + " workspace __hub-rows --stream)+unbind(load)"
 }
 
 func projectPreviewCommand() string {
