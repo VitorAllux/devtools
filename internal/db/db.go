@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	pathpkg "path"
@@ -71,6 +72,11 @@ type driveDumpSelectionRow struct {
 type driveDumpBrowserSelection struct {
 	Key  string
 	Raws []string
+}
+
+type driveFolderRef struct {
+	ID          string
+	ResourceKey string
 }
 
 const (
@@ -529,11 +535,11 @@ func (m *Manager) downloadDumpFromDriveBrowser(ctx context.Context) (string, err
 	if err := validateRcloneRemote(remote, remotes); err != nil {
 		return "", err
 	}
-	folderID, ok := extractDriveFolderID(m.Config.Project.DB.DriveFolderID)
+	folder, ok := extractDriveFolderRef(m.Config.Project.DB.DriveFolderID)
 	if !ok {
 		return "", fmt.Errorf("DVV_DB_DRIVE_FOLDER_ID is not configured; set it with `dvv config` or use %s", pasteDriveLinkOption)
 	}
-	entry, ok, err := m.browseDriveDump(ctx, remote, folderID)
+	entry, ok, err := m.browseDriveDump(ctx, remote, folder)
 	if err != nil || !ok {
 		return "", err
 	}
@@ -582,14 +588,14 @@ func (m *Manager) downloadDriveFileByID(ctx context.Context, remote string, file
 	return dest, nil
 }
 
-func (m *Manager) browseDriveDump(ctx context.Context, remote string, rootFolderID string) (DriveDumpEntry, bool, error) {
+func (m *Manager) browseDriveDump(ctx context.Context, remote string, rootFolder driveFolderRef) (DriveDumpEntry, bool, error) {
 	currentPath := ""
 	for {
 		var entries []DriveDumpEntry
 		folder := dbDefaultString(currentPath, "/")
 		err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "listing", Subject: "Drive dumps " + folder}, func() error {
 			var err error
-			entries, err = m.driveDumpEntries(ctx, remote, rootFolderID, currentPath)
+			entries, err = m.driveDumpEntries(ctx, remote, rootFolder, currentPath)
 			return err
 		})
 		if err != nil {
@@ -600,7 +606,7 @@ func (m *Manager) browseDriveDump(ctx context.Context, remote string, rootFolder
 			return DriveDumpEntry{}, false, err
 		}
 		if selection.Key == driveDumpMoveKey {
-			if err := m.moveSelectedDriveDumps(ctx, remote, rootFolderID, currentPath, entries, selection.Raws); err != nil {
+			if err := m.moveSelectedDriveDumps(ctx, remote, rootFolder, currentPath, entries, selection.Raws); err != nil {
 				return DriveDumpEntry{}, false, err
 			}
 			continue
@@ -629,7 +635,7 @@ func (m *Manager) browseDriveDump(ctx context.Context, remote string, rootFolder
 	}
 }
 
-func (m *Manager) moveSelectedDriveDumps(ctx context.Context, remote string, rootFolderID string, currentPath string, entries []DriveDumpEntry, rawSelections []string) error {
+func (m *Manager) moveSelectedDriveDumps(ctx context.Context, remote string, rootFolder driveFolderRef, currentPath string, entries []DriveDumpEntry, rawSelections []string) error {
 	selected, err := driveDumpFilesFromSelections(rawSelections, entries)
 	if err != nil {
 		ui.Warn("%s", err.Error())
@@ -648,30 +654,52 @@ func (m *Manager) moveSelectedDriveDumps(ctx context.Context, remote string, roo
 		return nil
 	}
 	for _, entry := range selected {
-		if err := m.moveDriveDump(ctx, remote, rootFolderID, currentPath, entry, destination); err != nil {
+		if err := m.moveDriveDump(ctx, remote, rootFolder, currentPath, entry, destination); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (m *Manager) moveDriveDump(ctx context.Context, remote string, rootFolderID string, currentPath string, entry DriveDumpEntry, destination DriveDumpEntry) error {
+func (m *Manager) moveDriveDump(ctx context.Context, remote string, rootFolder driveFolderRef, currentPath string, entry DriveDumpEntry, destination DriveDumpEntry) error {
 	sourcePath := drivePathJoin(currentPath, entry.Name)
 	destPath := drivePathJoin(drivePathJoin(currentPath, destination.Name), entry.Name)
 	subject := entry.Name + " -> " + destination.Name
 	return ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "moving", Subject: subject, ShowResult: true, SuccessAction: "moved"}, func() error {
-		return run.Quiet(ctx, m.Runner, "", "rclone", "moveto", driveRemotePath(remote, sourcePath), driveRemotePath(remote, destPath), "--drive-root-folder-id", rootFolderID)
+		return run.Quiet(ctx, m.Runner, "", "rclone", driveRootArgs([]string{"moveto", driveRemotePath(remote, sourcePath), driveRemotePath(remote, destPath)}, rootFolder)...)
 	})
 }
 
-func (m *Manager) driveDumpEntries(ctx context.Context, remote string, rootFolderID string, currentPath string) ([]DriveDumpEntry, error) {
+func (m *Manager) driveDumpEntries(ctx context.Context, remote string, rootFolder driveFolderRef, currentPath string) ([]DriveDumpEntry, error) {
 	remotePath := driveRemotePath(remote, currentPath)
-	out, err := m.Runner.Output(ctx, "", "rclone", "lsjson", remotePath, "--drive-root-folder-id", rootFolderID)
+	out, err := m.driveDumpEntriesOutput(ctx, remotePath, rootFolder)
 	if err != nil {
 		return nil, err
 	}
+	return parseDriveDumpEntries(out)
+}
+
+func (m *Manager) driveDumpEntriesOutput(ctx context.Context, remotePath string, rootFolder driveFolderRef) ([]byte, error) {
+	args := driveRootArgs([]string{"lsjson", remotePath}, rootFolder)
+	return m.Runner.Output(ctx, "", "rclone", args...)
+}
+
+func driveRootArgs(args []string, rootFolder driveFolderRef) []string {
+	args = append(args, "--drive-root-folder-id", rootFolder.ID)
+	if strings.TrimSpace(rootFolder.ResourceKey) != "" {
+		args = append(args, "--drive-resource-key", rootFolder.ResourceKey)
+	}
+	return args
+}
+
+func parseDriveDumpEntries(out []byte) ([]DriveDumpEntry, error) {
 	var entries []DriveDumpEntry
-	if err := json.Unmarshal(out, &entries); err != nil {
+	jsonStart := bytes.IndexAny(out, "[{")
+	if jsonStart < 0 {
+		return nil, fmt.Errorf("rclone lsjson returned no JSON output")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(out[jsonStart:]))
+	if err := decoder.Decode(&entries); err != nil {
 		return nil, err
 	}
 	filtered := make([]DriveDumpEntry, 0, len(entries))
@@ -1766,9 +1794,18 @@ func extractDriveFileID(raw string) (string, bool) {
 }
 
 func extractDriveFolderID(raw string) (string, bool) {
+	folder, ok := extractDriveFolderRef(raw)
+	return folder.ID, ok
+}
+
+func extractDriveFolderRef(raw string) (driveFolderRef, bool) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return "", false
+		return driveFolderRef{}, false
+	}
+	resourceKey := ""
+	if parsed, err := url.Parse(raw); err == nil && parsed.RawQuery != "" {
+		resourceKey = strings.TrimSpace(parsed.Query().Get("resourcekey"))
 	}
 	for _, marker := range []string{"/folders/", "folderId=", "folderid="} {
 		if index := strings.Index(raw, marker); index >= 0 {
@@ -1776,13 +1813,13 @@ func extractDriveFolderID(raw string) (string, bool) {
 			value = strings.TrimLeft(value, "/")
 			parts := strings.FieldsFunc(value, func(r rune) bool { return r == '/' || r == '?' || r == '&' })
 			if len(parts) == 0 {
-				return "", false
+				return driveFolderRef{}, false
 			}
 			value = parts[0]
-			return value, value != ""
+			return driveFolderRef{ID: value, ResourceKey: resourceKey}, value != ""
 		}
 	}
-	return raw, len(raw) >= 10
+	return driveFolderRef{ID: raw}, len(raw) >= 10
 }
 
 func valuesByIndexes(values []string, input string) []string {

@@ -53,6 +53,13 @@ func TestExtractDriveFolderID(t *testing.T) {
 	}
 }
 
+func TestExtractDriveFolderRefPreservesResourceKey(t *testing.T) {
+	got, ok := extractDriveFolderRef("https://drive.google.com/drive/folders/folder456?resourcekey=resource-123&usp=sharing")
+	if !ok || got.ID != "folder456" || got.ResourceKey != "resource-123" {
+		t.Fatalf("extractDriveFolderRef = %#v, %v; want folder/resource", got, ok)
+	}
+}
+
 func TestSQLQuoting(t *testing.T) {
 	if got := identifier("my-db`name"); got != "`my-db``name`" {
 		t.Fatalf("identifier = %q", got)
@@ -455,7 +462,7 @@ func TestDriveDumpEntriesHideInvalidFilesAndSortFoldersFirst(t *testing.T) {
 	]`}}
 	manager := &Manager{Config: &config.Config{Project: config.DefaultProjectConfig()}, Runner: runner}
 
-	entries, err := manager.driveDumpEntries(context.Background(), "gdrive", "folder-root", "")
+	entries, err := manager.driveDumpEntries(context.Background(), "gdrive", driveFolderRef{ID: "folder-root"}, "")
 	if err != nil {
 		t.Fatalf("driveDumpEntries returned error: %v", err)
 	}
@@ -469,6 +476,39 @@ func TestDriveDumpEntriesHideInvalidFilesAndSortFoldersFirst(t *testing.T) {
 	}
 	if len(runner.calls) != 1 || !reflect.DeepEqual(runner.calls[0].args, []string{"lsjson", "gdrive:", "--drive-root-folder-id", "folder-root"}) {
 		t.Fatalf("rclone call = %#v", runner.calls)
+	}
+}
+
+func TestDriveDumpEntriesPassesResourceKey(t *testing.T) {
+	runner := &dbFakeRunner{outputs: []string{`[{"Name":"shared.sql.gz","ID":"file-shared","Size":10,"IsDir":false}]`}}
+	manager := &Manager{Config: &config.Config{Project: config.DefaultProjectConfig()}, Runner: runner}
+
+	entries, err := manager.driveDumpEntries(context.Background(), "gdrive", driveFolderRef{ID: "folder-root", ResourceKey: "resource-123"}, "")
+	if err != nil {
+		t.Fatalf("driveDumpEntries returned error: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Name != "shared.sql.gz" {
+		t.Fatalf("entries = %#v", entries)
+	}
+	if len(runner.calls) != 1 {
+		t.Fatalf("calls = %#v, want one rclone call", runner.calls)
+	}
+	want := []string{"lsjson", "gdrive:", "--drive-root-folder-id", "folder-root", "--drive-resource-key", "resource-123"}
+	if !reflect.DeepEqual(runner.calls[0].args, want) {
+		t.Fatalf("rclone args = %#v, want %#v", runner.calls[0].args, want)
+	}
+}
+
+func TestParseDriveDumpEntriesIgnoresRcloneNotices(t *testing.T) {
+	out := []byte("2026/09/16 18:07:31 NOTICE: gdrive: This remote uses rclone's shared Google Drive client_id\n" +
+		`[{"Name":"dump.sql.gz","ID":"file-dump","Size":10,"IsDir":false}]` + "\n" +
+		"2026/09/16 18:07:32 NOTICE: done\n")
+	entries, err := parseDriveDumpEntries(out)
+	if err != nil {
+		t.Fatalf("parseDriveDumpEntries returned error: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Name != "dump.sql.gz" {
+		t.Fatalf("entries = %#v", entries)
 	}
 }
 
