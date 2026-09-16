@@ -124,6 +124,7 @@ Final indeterminate loader labels should be action-specific, such as `ready`, `c
 | --- | --- | --- |
 | Download name | A Google Drive download name without `.sql`, `.gz`, or `.sql.gz` is saved with `.sql.gz`. | Type `adami` and the stored file becomes `adami.sql.gz`. |
 | Drive browser | `dvv db import` can browse the configured `DVV_DB_DRIVE_FOLDER_ID`, enter subfolders, and shows only folders plus `.sql`, `.sql.gz`, and `.gz` files. | Use pasted Drive links/IDs as the fallback for files outside the configured folder. |
+| Drive move | In the Drive browser, `Tab` marks one or more files and `Shift+M` moves them to a direct subfolder of the current folder after confirmation. | Use it for simple cleanup without leaving the import flow; nested destination picking stays out of scope. |
 | Import compression | Import detects gzip from the file header, not only from the extension. | Extensionless gzip downloads can still import correctly. |
 | Dump listing | The dump picker lists `.sql`, `.sql.gz`, gzip-header files, and extensionless files that look like SQL. | Avoid hiding valid local dumps just because the name is incomplete. |
 | Database sizes | Database pickers show user database sizes from `information_schema.tables`. | Empty databases show `0 B`; if the size query fails, keep database actions usable. |

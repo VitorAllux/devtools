@@ -61,12 +61,23 @@ type DriveDumpEntry struct {
 
 type driveDumpSelectionRow struct {
 	Raw     string
+	Kind    string
+	Name    string
+	Size    string
+	ModTime string
 	Display string
+}
+
+type driveDumpBrowserSelection struct {
+	Key  string
+	Raws []string
 }
 
 const (
 	browseDriveDumpsOption = "[+] Browse Google Drive dumps"
 	pasteDriveLinkOption   = "[+] Paste Google Drive link or ID"
+	driveDumpNameWidth     = 56
+	driveDumpMoveKey       = "M"
 )
 
 var sqlTablePatterns = []*regexp.Regexp{
@@ -574,7 +585,13 @@ func (m *Manager) downloadDriveFileByID(ctx context.Context, remote string, file
 func (m *Manager) browseDriveDump(ctx context.Context, remote string, rootFolderID string) (DriveDumpEntry, bool, error) {
 	currentPath := ""
 	for {
-		entries, err := m.driveDumpEntries(ctx, remote, rootFolderID, currentPath)
+		var entries []DriveDumpEntry
+		folder := dbDefaultString(currentPath, "/")
+		err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "listing", Subject: "Drive dumps " + folder}, func() error {
+			var err error
+			entries, err = m.driveDumpEntries(ctx, remote, rootFolderID, currentPath)
+			return err
+		})
 		if err != nil {
 			return DriveDumpEntry{}, false, err
 		}
@@ -582,16 +599,26 @@ func (m *Manager) browseDriveDump(ctx context.Context, remote string, rootFolder
 		if err != nil || !ok {
 			return DriveDumpEntry{}, false, err
 		}
-		if selection == "__parent__" {
+		if selection.Key == driveDumpMoveKey {
+			if err := m.moveSelectedDriveDumps(ctx, remote, rootFolderID, currentPath, entries, selection.Raws); err != nil {
+				return DriveDumpEntry{}, false, err
+			}
+			continue
+		}
+		if len(selection.Raws) == 0 {
+			continue
+		}
+		raw := selection.Raws[0]
+		if raw == "__parent__" {
 			currentPath = pathpkg.Dir(strings.TrimSuffix(currentPath, "/"))
 			if currentPath == "." {
 				currentPath = ""
 			}
 			continue
 		}
-		index, ok := parseDriveSelection(selection, len(entries))
+		index, ok := parseDriveSelection(raw, len(entries))
 		if !ok {
-			return DriveDumpEntry{}, false, fmt.Errorf("invalid Drive selection: %s", selection)
+			return DriveDumpEntry{}, false, fmt.Errorf("invalid Drive selection: %s", raw)
 		}
 		entry := entries[index]
 		if entry.IsDir {
@@ -602,11 +629,43 @@ func (m *Manager) browseDriveDump(ctx context.Context, remote string, rootFolder
 	}
 }
 
-func (m *Manager) driveDumpEntries(ctx context.Context, remote string, rootFolderID string, currentPath string) ([]DriveDumpEntry, error) {
-	remotePath := remote + ":"
-	if strings.TrimSpace(currentPath) != "" {
-		remotePath += currentPath
+func (m *Manager) moveSelectedDriveDumps(ctx context.Context, remote string, rootFolderID string, currentPath string, entries []DriveDumpEntry, rawSelections []string) error {
+	selected, err := driveDumpFilesFromSelections(rawSelections, entries)
+	if err != nil {
+		ui.Warn("%s", err.Error())
+		return nil
 	}
+	folders := driveDumpFolders(entries)
+	if len(folders) == 0 {
+		ui.Warn("No destination folders in %s", dbDefaultString(currentPath, "/"))
+		return nil
+	}
+	destination, ok, err := m.selectDriveMoveDestination(ctx, currentPath, folders)
+	if err != nil || !ok {
+		return err
+	}
+	if !ui.Confirm(fmt.Sprintf("Move %d file(s) to %s?", len(selected), drivePathJoin(dbDefaultString(currentPath, "/"), destination.Name))) {
+		return nil
+	}
+	for _, entry := range selected {
+		if err := m.moveDriveDump(ctx, remote, rootFolderID, currentPath, entry, destination); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Manager) moveDriveDump(ctx context.Context, remote string, rootFolderID string, currentPath string, entry DriveDumpEntry, destination DriveDumpEntry) error {
+	sourcePath := drivePathJoin(currentPath, entry.Name)
+	destPath := drivePathJoin(drivePathJoin(currentPath, destination.Name), entry.Name)
+	subject := entry.Name + " -> " + destination.Name
+	return ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "moving", Subject: subject, ShowResult: true, SuccessAction: "moved"}, func() error {
+		return run.Quiet(ctx, m.Runner, "", "rclone", "moveto", driveRemotePath(remote, sourcePath), driveRemotePath(remote, destPath), "--drive-root-folder-id", rootFolderID)
+	})
+}
+
+func (m *Manager) driveDumpEntries(ctx context.Context, remote string, rootFolderID string, currentPath string) ([]DriveDumpEntry, error) {
+	remotePath := driveRemotePath(remote, currentPath)
 	out, err := m.Runner.Output(ctx, "", "rclone", "lsjson", remotePath, "--drive-root-folder-id", rootFolderID)
 	if err != nil {
 		return nil, err
@@ -634,7 +693,52 @@ func (m *Manager) driveDumpEntries(ctx context.Context, remote string, rootFolde
 	return filtered, nil
 }
 
-func (m *Manager) selectDriveDumpEntry(ctx context.Context, currentPath string, entries []DriveDumpEntry) (string, bool, error) {
+func driveRemotePath(remote string, currentPath string) string {
+	remotePath := normalizeRcloneRemote(remote) + ":"
+	currentPath = strings.Trim(strings.TrimSpace(currentPath), "/")
+	if currentPath != "" {
+		remotePath += currentPath
+	}
+	return remotePath
+}
+
+func driveDumpFilesFromSelections(rawSelections []string, entries []DriveDumpEntry) ([]DriveDumpEntry, error) {
+	selected := make([]DriveDumpEntry, 0, len(rawSelections))
+	seen := map[int]bool{}
+	for _, raw := range rawSelections {
+		index, ok := parseDriveSelection(raw, len(entries))
+		if !ok || seen[index] {
+			continue
+		}
+		seen[index] = true
+		entry := entries[index]
+		if entry.IsDir {
+			continue
+		}
+		selected = append(selected, entry)
+	}
+	if len(selected) == 0 {
+		return nil, fmt.Errorf("mark one or more files with Tab before moving")
+	}
+	return selected, nil
+}
+
+func driveDumpFolders(entries []DriveDumpEntry) []DriveDumpEntry {
+	folders := make([]DriveDumpEntry, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir {
+			folders = append(folders, entry)
+		}
+	}
+	return folders
+}
+
+func driveDumpRawFromLine(line string) string {
+	raw, _, _ := strings.Cut(strings.TrimSpace(line), "\t")
+	return strings.TrimSpace(raw)
+}
+
+func (m *Manager) selectDriveDumpEntry(ctx context.Context, currentPath string, entries []DriveDumpEntry) (driveDumpBrowserSelection, bool, error) {
 	if _, err := m.Runner.LookPath("fzf"); err != nil {
 		rows := driveDumpSelectionRows(currentPath, entries)
 		for index, row := range rows {
@@ -642,20 +746,20 @@ func (m *Manager) selectDriveDumpEntry(ctx context.Context, currentPath string, 
 		}
 		value, err := ui.Prompt("Drive dump")
 		if err != nil {
-			return "", false, err
+			return driveDumpBrowserSelection{}, false, err
 		}
 		index, ok := parseIndex(value, len(rows))
 		if !ok {
-			return "", false, fmt.Errorf("invalid Drive selection: %s", value)
+			return driveDumpBrowserSelection{}, false, fmt.Errorf("invalid Drive selection: %s", value)
 		}
-		return rows[index].Raw, true, nil
+		return driveDumpBrowserSelection{Raws: []string{rows[index].Raw}}, true, nil
 	}
 	rows := driveDumpSelectionRows(currentPath, entries)
 	var builder strings.Builder
-	builder.WriteString(ui.FZFHiddenHeader(driveDumpHeader()))
+	builder.WriteString(driveDumpFZFLine("__dvv_header__", "", "", "", "", driveDumpHeader()))
 	builder.WriteByte('\n')
 	for _, row := range rows {
-		builder.WriteString(ui.FZFHiddenRow(row.Raw, row.Display))
+		builder.WriteString(driveDumpFZFLine(row.Raw, row.Kind, row.Name, row.Size, row.ModTime, row.Display))
 		builder.WriteByte('\n')
 	}
 	args := ui.FZFHub{
@@ -664,18 +768,86 @@ func (m *Manager) selectDriveDumpEntry(ctx context.Context, currentPath string, 
 		Preview:      driveDumpPreviewCommand(currentPath),
 		PreviewLabel: "drive item",
 		Shortcuts: []ui.FZFShortcut{
-			{Label: "Enter", Description: "open/select"},
+			{Label: "Tab", Description: "mark files"},
+			{Key: driveDumpMoveKey, Label: "Shift+M", Description: "move marked files"},
+			{Label: "Enter", Description: "open/import"},
 			{Label: "Esc", Description: "cancel"},
 		},
-		ExtraArgs: append(ui.FZFHiddenRowArgs(),
+		ExtraArgs: []string{
+			"--delimiter=\t",
+			"--with-nth=6..",
+			"--nth=2,3,6..",
 			"--header-lines=1",
-		),
+			"--multi",
+		},
 	}.Args()
 	output, err := m.Runner.OutputWithInput(ctx, "", []byte(builder.String()), "fzf", args...)
 	if err != nil && len(output) == 0 {
-		return "", false, nil
+		return driveDumpBrowserSelection{}, false, nil
 	}
-	return ui.FZFSelectedRaw(strings.TrimSpace(string(output))), true, nil
+	key, selected := ui.ParseFZFExpectOutput(string(output))
+	raws := make([]string, 0, len(selected))
+	for _, selection := range selected {
+		raw := driveDumpRawFromLine(selection)
+		if raw != "" && raw != "__dvv_header__" {
+			raws = append(raws, raw)
+		}
+	}
+	return driveDumpBrowserSelection{Key: key, Raws: raws}, true, nil
+}
+
+func (m *Manager) selectDriveMoveDestination(ctx context.Context, currentPath string, folders []DriveDumpEntry) (DriveDumpEntry, bool, error) {
+	if _, err := m.Runner.LookPath("fzf"); err != nil {
+		for index, folder := range folders {
+			fmt.Printf("  %2d. %s\n", index+1, folder.Name)
+		}
+		value, err := ui.Prompt("Move to folder")
+		if err != nil {
+			return DriveDumpEntry{}, false, err
+		}
+		index, ok := parseIndex(value, len(folders))
+		if !ok {
+			return DriveDumpEntry{}, false, fmt.Errorf("invalid folder selection: %s", value)
+		}
+		return folders[index], true, nil
+	}
+	var builder strings.Builder
+	builder.WriteString(driveDumpFZFLine("__dvv_header__", "", "", "", "", driveDumpHeader()))
+	builder.WriteByte('\n')
+	for index, folder := range folders {
+		row := driveDumpSelectionRow{Raw: fmt.Sprintf("entry:%d", index), Kind: "folder", Name: folder.Name, Size: "-", ModTime: shortModTime(folder.ModTime), Display: driveDumpRow(folder)}
+		builder.WriteString(driveDumpFZFLine(row.Raw, row.Kind, row.Name, row.Size, row.ModTime, row.Display))
+		builder.WriteByte('\n')
+	}
+	args := ui.FZFHub{
+		Prompt:       ui.Crown("move") + ui.Muted("> "),
+		BorderLabel:  "Move Drive dump",
+		Preview:      driveDumpDestinationPreviewCommand(currentPath),
+		PreviewLabel: "destination",
+		Shortcuts: []ui.FZFShortcut{
+			{Label: "Enter", Description: "choose folder"},
+			{Label: "Esc", Description: "cancel"},
+		},
+		ExtraArgs: []string{
+			"--delimiter=\t",
+			"--with-nth=6..",
+			"--nth=2,3,6..",
+			"--header-lines=1",
+		},
+	}.Args()
+	output, err := m.Runner.OutputWithInput(ctx, "", []byte(builder.String()), "fzf", args...)
+	if err != nil && len(output) == 0 {
+		return DriveDumpEntry{}, false, nil
+	}
+	_, selected := ui.ParseFZFExpectOutput(string(output))
+	if len(selected) == 0 {
+		return DriveDumpEntry{}, false, nil
+	}
+	index, ok := parseDriveSelection(driveDumpRawFromLine(selected[0]), len(folders))
+	if !ok {
+		return DriveDumpEntry{}, false, fmt.Errorf("invalid folder selection: %s", selected[0])
+	}
+	return folders[index], true, nil
 }
 
 func (m *Manager) rcloneRemotes(ctx context.Context) ([]string, error) {
@@ -1418,59 +1590,77 @@ func dumpFileRow(index int, dump DumpFile) string {
 func driveDumpSelectionRows(currentPath string, entries []DriveDumpEntry) []driveDumpSelectionRow {
 	rows := make([]driveDumpSelectionRow, 0, len(entries)+1)
 	if strings.TrimSpace(currentPath) != "" {
-		rows = append(rows, driveDumpSelectionRow{Raw: "__parent__", Display: driveDumpParentRow()})
+		rows = append(rows, driveDumpSelectionRow{Raw: "__parent__", Kind: "folder", Name: "..", Size: "-", ModTime: "parent", Display: driveDumpParentRow()})
 	}
 	for index, entry := range entries {
+		kind := "file"
+		size := human.FormatBytes(entry.Size)
+		if entry.IsDir {
+			kind = "folder"
+			size = "-"
+		}
 		rows = append(rows, driveDumpSelectionRow{
 			Raw:     fmt.Sprintf("entry:%d", index),
+			Kind:    kind,
+			Name:    entry.Name,
+			Size:    size,
+			ModTime: shortModTime(entry.ModTime),
 			Display: driveDumpRow(entry),
 		})
 	}
 	return rows
 }
 
+func driveDumpFZFLine(raw string, kind string, name string, size string, modTime string, display string) string {
+	return strings.Join([]string{
+		cleanFZFField(raw),
+		cleanFZFField(kind),
+		cleanFZFField(name),
+		cleanFZFField(size),
+		cleanFZFField(modTime),
+		display,
+	}, "\t")
+}
+
 func driveDumpHeader() string {
-	return fmt.Sprintf(" %s  %s  %s  %s",
+	return fmt.Sprintf(" %s  %s",
 		ui.Crown(fixedWidth("TYPE", 8)),
-		ui.Crown(fixedWidth("NAME", 52)),
-		ui.Crown(fixedWidth("SIZE", 10)),
-		ui.Crown("MODIFIED"),
+		ui.Crown(fixedWidth("NAME", driveDumpNameWidth)),
 	)
 }
 
 func driveDumpParentRow() string {
-	return fmt.Sprintf("%s  %s  %s  %s",
+	return fmt.Sprintf("%s  %s",
 		ui.Gold(fixedWidth("folder", 8)),
-		ui.Accent(fixedWidth("..", 52)),
-		ui.Muted(fixedWidth("-", 10)),
-		ui.Muted("parent"),
+		ui.Accent(fixedWidth("..", driveDumpNameWidth)),
 	)
 }
 
 func driveDumpRow(entry DriveDumpEntry) string {
 	kind := "file"
-	size := human.FormatBytes(entry.Size)
 	if entry.IsDir {
 		kind = "folder"
-		size = "-"
 	}
-	return fmt.Sprintf("%s  %s  %s  %s",
+	return fmt.Sprintf("%s  %s",
 		ui.Gold(fixedWidth(kind, 8)),
-		ui.Accent(fixedWidth(entry.Name, 52)),
-		ui.Muted(fixedWidth(size, 10)),
-		ui.Muted(shortModTime(entry.ModTime)),
+		ui.Accent(fixedWidth(compactWidth(entry.Name, driveDumpNameWidth), driveDumpNameWidth)),
 	)
 }
 
 func driveDumpPreviewCommand(currentPath string) string {
 	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
-display=$(printf "%s" "$line" | cut -f2-)
-kind=$(printf "%s" "$display" | awk "{print \$1}")
+kind=$(printf "%s" "$line" | cut -f2)
+name=$(printf "%s" "$line" | cut -f3)
+size=$(printf "%s" "$line" | cut -f4)
+modified=$(printf "%s" "$line" | cut -f5)
 printf "%sGoogle Drive dump%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-9s%s ` + shellQuote(dbDefaultString(currentPath, "/")) + `\n" "$dvv_label" "Folder" "$dvv_reset"
 printf "\n%sSelected%s\n" "$dvv_heading" "$dvv_reset"
-printf "  %s%s%s\n" "$dvv_muted" "$display" "$dvv_reset"
+printf "  %s%-9s%s %s\n" "$dvv_label" "Type" "$dvv_reset" "$kind"
+printf "  %s%-9s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$name"
+printf "  %s%-9s%s %s\n" "$dvv_label" "Size" "$dvv_reset" "$size"
+printf "  %s%-9s%s %s\n" "$dvv_label" "Modified" "$dvv_reset" "$modified"
 if [ "$raw" = "__parent__" ]; then
   printf "\n%sPress Enter to go to the parent folder.%s\n" "$dvv_muted" "$dvv_reset"
 elif [ "$kind" = "folder" ]; then
@@ -1478,6 +1668,19 @@ elif [ "$kind" = "folder" ]; then
 else
   printf "\n%sPress Enter to download and import this dump.%s\n" "$dvv_muted" "$dvv_reset"
 fi
+printf "\n%sCommands%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Tab" "$dvv_reset" "$dvv_muted" "mark files" "$dvv_reset"
+printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Shift+M" "$dvv_reset" "$dvv_muted" "move marked files" "$dvv_reset"
+' sh {}`
+}
+
+func driveDumpDestinationPreviewCommand(currentPath string) string {
+	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
+name=$(printf "%s" "$line" | cut -f3)
+printf "%sMove destination%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%-9s%s ` + shellQuote(dbDefaultString(currentPath, "/")) + `\n" "$dvv_label" "From" "$dvv_reset"
+printf "  %s%-9s%s %s\n" "$dvv_label" "To" "$dvv_reset" "$name"
+printf "\n%sPress Enter to choose this folder.%s\n" "$dvv_muted" "$dvv_reset"
 ' sh {}`
 }
 
@@ -1630,4 +1833,16 @@ func fixedWidth(value string, width int) string {
 		return value
 	}
 	return value + strings.Repeat(" ", width-len(value))
+}
+
+func compactWidth(value string, width int) string {
+	value = strings.TrimSpace(value)
+	if width <= 3 {
+		return value
+	}
+	runes := []rune(value)
+	if len(runes) <= width {
+		return value
+	}
+	return string(runes[:width-3]) + "..."
 }

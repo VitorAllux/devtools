@@ -472,6 +472,37 @@ func TestDriveDumpEntriesHideInvalidFilesAndSortFoldersFirst(t *testing.T) {
 	}
 }
 
+func TestDriveDumpFZFLineKeepsNameWithSpacesInDedicatedField(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	rows := driveDumpSelectionRows("", []DriveDumpEntry{{Name: "weekly dump.sql.gz", Size: 1536, IsDir: false, ModTime: "2026-09-16T10:00:00Z"}})
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d, want 1", len(rows))
+	}
+	line := driveDumpFZFLine(rows[0].Raw, rows[0].Kind, rows[0].Name, rows[0].Size, rows[0].ModTime, rows[0].Display)
+	fields := strings.Split(line, "\t")
+	if len(fields) != 6 {
+		t.Fatalf("fields = %#v, want 6 fields", fields)
+	}
+	if fields[0] != "entry:0" || fields[1] != "file" || fields[2] != "weekly dump.sql.gz" || fields[3] != "1.5 KB" || fields[4] != "2026-09-16 10:00" {
+		t.Fatalf("fields = %#v", fields)
+	}
+	if strings.Contains(fields[5], "1.5 KB") || strings.Contains(fields[5], "2026-09-16") {
+		t.Fatalf("visible Drive row should leave size/date for preview: %q", fields[5])
+	}
+}
+
+func TestDriveDumpRowCompactsLongNames(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	name := "veolia_on_premise_eloverde_prod_bg_2620_2026_09_16_11_44_37.sql.gz"
+	row := driveDumpRow(DriveDumpEntry{Name: name, Size: 10, IsDir: false})
+	if strings.Contains(row, "SIZE") || strings.Contains(row, "10 B") {
+		t.Fatalf("Drive row should not include preview-only details: %q", row)
+	}
+	if !strings.Contains(row, "...") || len(row) > 66 {
+		t.Fatalf("Drive row should be compact: %q len=%d", row, len(row))
+	}
+}
+
 func TestDownloadDumpFromDriveBrowserNavigatesAndDownloadsByID(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	t.Setenv("DVV_NO_LOADER", "1")
@@ -504,6 +535,53 @@ func TestDownloadDumpFromDriveBrowserNavigatesAndDownloadsByID(t *testing.T) {
 	}
 	if len(runner.fzfInputs) != 2 || !strings.Contains(runner.fzfInputs[0], "2026") || strings.Contains(runner.fzfInputs[0], "skip.txt") || !strings.Contains(runner.fzfInputs[1], "dump.sql.gz") || strings.Contains(runner.fzfInputs[1], "image.png") {
 		t.Fatalf("fzf inputs should show folders/dumps only: %#v", runner.fzfInputs)
+	}
+}
+
+func TestDownloadDumpFromDriveBrowserMovesMarkedFilesToFolder(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	t.Setenv("DVV_NO_LOADER", "1")
+	withDBStdin(t, "y\n")
+	dir := t.TempDir()
+	cfg := &config.Config{Project: config.DefaultProjectConfig()}
+	cfg.Project.DB.DumpsDir = dir
+	cfg.Project.DB.RcloneRemote = "gdrive"
+	cfg.Project.DB.DriveFolderID = "folder-root"
+	runner := &dbFakeRunner{
+		outputs: []string{
+			"gdrive:\n",
+			`[{"Name":"Archive","ID":"folder-archive","IsDir":true},{"Name":"move me.sql.gz","ID":"file-move","Size":42,"IsDir":false},{"Name":"import.sql.gz","ID":"file-import","Size":7,"IsDir":false}]`,
+			"",
+			`[{"Name":"Archive","ID":"folder-archive","IsDir":true},{"Name":"import.sql.gz","ID":"file-import","Size":7,"IsDir":false}]`,
+			"",
+		},
+		fzfOutputs: [][]byte{
+			[]byte("M\nentry:2\n"),
+			[]byte("entry:0\n"),
+			[]byte("entry:1\n"),
+		},
+	}
+	manager := &Manager{Config: cfg, Runner: runner}
+
+	dest, err := manager.downloadDumpFromDriveBrowser(context.Background())
+	if err != nil {
+		t.Fatalf("downloadDumpFromDriveBrowser returned error: %v", err)
+	}
+	if dest != filepath.Join(dir, "import.sql.gz") {
+		t.Fatalf("dest = %q", dest)
+	}
+	wantMove := []string{"moveto", "gdrive:move me.sql.gz", "gdrive:Archive/move me.sql.gz", "--drive-root-folder-id", "folder-root"}
+	moveFound := false
+	for _, call := range runner.calls {
+		if call.name == "rclone" && reflect.DeepEqual(call.args, wantMove) {
+			moveFound = true
+		}
+	}
+	if !moveFound {
+		t.Fatalf("calls = %#v, want rclone %#v", runner.calls, wantMove)
+	}
+	if len(runner.fzfInputs) != 3 || !strings.Contains(runner.fzfInputs[1], "Archive") || strings.Contains(runner.fzfInputs[1], "move me.sql.gz") {
+		t.Fatalf("destination picker should show direct folders only: %#v", runner.fzfInputs)
 	}
 }
 
