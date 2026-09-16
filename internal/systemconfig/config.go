@@ -1190,7 +1190,6 @@ func configRows(entries []Entry) string {
 
 func configHeader() string {
 	return strings.Join([]string{
-		ui.Crown("SET"),
 		ui.Crown(fixedWidth("KEY", 40)),
 		ui.Crown(fixedWidth("VALUE", 24)),
 		ui.Crown(fixedWidth("GROUP", 12)),
@@ -1202,16 +1201,8 @@ func configHeader() string {
 }
 
 func configRow(entry Entry) string {
-	status := "[ ]"
-	if entry.Default != "" {
-		status = "[d]"
-	}
-	if entry.Persisted {
-		status = "[x]"
-	}
 	value := maskValue(entry)
 	return strings.Join([]string{
-		ui.Gold(status),
 		ui.Accent(fixedWidth(entry.Key, 40)),
 		ui.Muted(fixedWidth(compactField(value, 24), 24)),
 		ui.Muted(fixedWidth(entry.Category, 12)),
@@ -1227,12 +1218,12 @@ func configPreviewCommand(shortcuts []ui.FZFShortcut) string {
 	commandDeck := ui.FZFPreviewCommandDeck(shortcuts)
 	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
 raw=$(printf "%s" "$line" | cut -f1)
-category=$(printf "%s" "$line" | cut -f5)
-value=$(printf "%s" "$line" | cut -f9)
-description=$(printf "%s" "$line" | cut -f10-)
-kind=$(printf "%s" "$line" | cut -f6)
-source=$(printf "%s" "$line" | cut -f7)
-default_value=$(printf "%s" "$line" | cut -f8)
+category=$(printf "%s" "$line" | cut -f4)
+value=$(printf "%s" "$line" | cut -f8)
+description=$(printf "%s" "$line" | cut -f9-)
+kind=$(printf "%s" "$line" | cut -f5)
+source=$(printf "%s" "$line" | cut -f6)
+default_value=$(printf "%s" "$line" | cut -f7)
 printf "%sConfig entry%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Key" "$dvv_reset" "$raw"
 printf "\n%sWhat it does%s\n" "$dvv_heading" "$dvv_reset"
@@ -1514,7 +1505,7 @@ func maskText(value string, kind string, key string) string {
 
 func entrySource(entry Entry) string {
 	if entry.Persisted {
-		return "config.env"
+		return "custom"
 	}
 	if strings.TrimSpace(entry.Default) != "" {
 		return "default"

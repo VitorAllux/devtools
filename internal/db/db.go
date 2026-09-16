@@ -84,6 +84,7 @@ const (
 	pasteDriveLinkOption   = "[+] Paste Google Drive link or ID"
 	driveDumpNameWidth     = 56
 	driveDumpMoveKey       = "M"
+	driveDumpRefreshKey    = "R"
 )
 
 var sqlTablePatterns = []*regexp.Regexp{
@@ -605,6 +606,9 @@ func (m *Manager) browseDriveDump(ctx context.Context, remote string, rootFolder
 		if err != nil || !ok {
 			return DriveDumpEntry{}, false, err
 		}
+		if selection.Key == driveDumpRefreshKey {
+			continue
+		}
 		if selection.Key == driveDumpMoveKey {
 			if err := m.moveSelectedDriveDumps(ctx, remote, rootFolder, currentPath, entries, selection.Raws); err != nil {
 				return DriveDumpEntry{}, false, err
@@ -808,6 +812,7 @@ func (m *Manager) selectDriveDumpEntry(ctx context.Context, currentPath string, 
 		Shortcuts: []ui.FZFShortcut{
 			{Label: "Tab", Description: "mark files"},
 			{Key: driveDumpMoveKey, Label: "Shift+M", Description: "move marked files"},
+			{Key: driveDumpRefreshKey, Label: "Shift+R", Description: "refresh folder"},
 			{Label: "Enter", Description: "open/import"},
 			{Label: "Esc", Description: "cancel"},
 		},
@@ -822,6 +827,9 @@ func (m *Manager) selectDriveDumpEntry(ctx context.Context, currentPath string, 
 	output, err := m.Runner.OutputWithInput(ctx, "", []byte(builder.String()), "fzf", args...)
 	if err != nil && len(output) == 0 {
 		return driveDumpBrowserSelection{}, false, nil
+	}
+	if key := strings.TrimSpace(string(output)); key == driveDumpRefreshKey {
+		return driveDumpBrowserSelection{Key: key}, true, nil
 	}
 	key, selected := ui.ParseFZFExpectOutput(string(output))
 	raws := make([]string, 0, len(selected))
@@ -1661,26 +1669,31 @@ func driveDumpFZFLine(raw string, kind string, name string, size string, modTime
 }
 
 func driveDumpHeader() string {
-	return fmt.Sprintf(" %s  %s",
+	return fmt.Sprintf(" %s  %s  %s",
 		ui.Crown(fixedWidth("TYPE", 8)),
+		ui.Crown(fixedWidth("SIZE", 10)),
 		ui.Crown(fixedWidth("NAME", driveDumpNameWidth)),
 	)
 }
 
 func driveDumpParentRow() string {
-	return fmt.Sprintf("%s  %s",
+	return fmt.Sprintf("%s  %s  %s",
 		ui.Gold(fixedWidth("folder", 8)),
+		ui.Muted(fixedWidth("-", 10)),
 		ui.Accent(fixedWidth("..", driveDumpNameWidth)),
 	)
 }
 
 func driveDumpRow(entry DriveDumpEntry) string {
 	kind := "file"
+	size := human.FormatBytes(entry.Size)
 	if entry.IsDir {
 		kind = "folder"
+		size = "-"
 	}
-	return fmt.Sprintf("%s  %s",
+	return fmt.Sprintf("%s  %s  %s",
 		ui.Gold(fixedWidth(kind, 8)),
+		ui.Muted(fixedWidth(size, 10)),
 		ui.Accent(fixedWidth(compactWidth(entry.Name, driveDumpNameWidth), driveDumpNameWidth)),
 	)
 }
@@ -1709,6 +1722,7 @@ fi
 printf "\n%sCommands%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Tab" "$dvv_reset" "$dvv_muted" "mark files" "$dvv_reset"
 printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Shift+M" "$dvv_reset" "$dvv_muted" "move marked files" "$dvv_reset"
+printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Shift+R" "$dvv_reset" "$dvv_muted" "refresh folder" "$dvv_reset"
 ' sh {}`
 }
 

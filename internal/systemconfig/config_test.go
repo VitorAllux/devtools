@@ -134,12 +134,15 @@ func TestConfigRowsKeepDescriptionsForPreviewAndSearch(t *testing.T) {
 		t.Fatalf("first config raw key = %q, want DVV_THEME", raw)
 	}
 	headerFields := strings.Split(rows[0], "\t")
-	if len(headerFields) < 5 || !strings.Contains(headerFields[2], "KEY") || !strings.Contains(headerFields[3], "VALUE") || !strings.Contains(headerFields[4], "GROUP") {
-		t.Fatalf("config header should show KEY, VALUE, GROUP after SET: %#v", headerFields)
+	if len(headerFields) < 4 || strings.Contains(headerFields[1], "SET") || !strings.Contains(headerFields[1], "KEY") || !strings.Contains(headerFields[2], "VALUE") || !strings.Contains(headerFields[3], "GROUP") {
+		t.Fatalf("config header should show KEY, VALUE, GROUP without SET: %#v", headerFields)
 	}
 	rowFields := strings.Split(rows[1], "\t")
-	if len(rowFields) < 5 || !strings.Contains(rowFields[2], "DVV_THEME") || !strings.Contains(rowFields[4], "Theme") {
+	if len(rowFields) < 4 || !strings.Contains(rowFields[1], "DVV_THEME") || !strings.Contains(rowFields[3], "Theme") {
 		t.Fatalf("config row should keep KEY before GROUP: %#v", rowFields)
+	}
+	if strings.Contains(rowFields[1], "[x]") || strings.Contains(rowFields[1], "[d]") || strings.Contains(rowFields[1], "[ ]") {
+		t.Fatalf("visible config row should not show status badges: %#v", rowFields)
 	}
 	if !strings.Contains(rows[1], "Selects the CLI color theme.") {
 		t.Fatalf("config row should keep description in hidden fields: %q", rows[1])
@@ -532,7 +535,7 @@ func TestEntryFormattingHelpers(t *testing.T) {
 	if maskValue(secret) != "<set>" || defaultPreviewValue(secret) != "<set>" {
 		t.Fatalf("secret values should be masked")
 	}
-	if source := entrySource(Entry{Persisted: true}); source != "config.env" {
+	if source := entrySource(Entry{Persisted: true}); source != "custom" {
 		t.Fatalf("persisted source = %q", source)
 	}
 	if source := entrySource(Entry{Default: "x"}); source != "default" {

@@ -527,8 +527,8 @@ func TestDriveDumpFZFLineKeepsNameWithSpacesInDedicatedField(t *testing.T) {
 	if fields[0] != "entry:0" || fields[1] != "file" || fields[2] != "weekly dump.sql.gz" || fields[3] != "1.5 KB" || fields[4] != "2026-09-16 10:00" {
 		t.Fatalf("fields = %#v", fields)
 	}
-	if strings.Contains(fields[5], "1.5 KB") || strings.Contains(fields[5], "2026-09-16") {
-		t.Fatalf("visible Drive row should leave size/date for preview: %q", fields[5])
+	if !strings.Contains(fields[5], "1.5 KB") || strings.Contains(fields[5], "2026-09-16") {
+		t.Fatalf("visible Drive row should show size but leave date for preview: %q", fields[5])
 	}
 }
 
@@ -536,10 +536,10 @@ func TestDriveDumpRowCompactsLongNames(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	name := "veolia_on_premise_eloverde_prod_bg_2620_2026_09_16_11_44_37.sql.gz"
 	row := driveDumpRow(DriveDumpEntry{Name: name, Size: 10, IsDir: false})
-	if strings.Contains(row, "SIZE") || strings.Contains(row, "10 B") {
-		t.Fatalf("Drive row should not include preview-only details: %q", row)
+	if strings.Contains(row, "SIZE") || !strings.Contains(row, "10 B") {
+		t.Fatalf("Drive row should include size without header text: %q", row)
 	}
-	if !strings.Contains(row, "...") || len(row) > 66 {
+	if !strings.Contains(row, "...") || len(row) > 78 {
 		t.Fatalf("Drive row should be compact: %q len=%d", row, len(row))
 	}
 }
@@ -576,6 +576,43 @@ func TestDownloadDumpFromDriveBrowserNavigatesAndDownloadsByID(t *testing.T) {
 	}
 	if len(runner.fzfInputs) != 2 || !strings.Contains(runner.fzfInputs[0], "2026") || strings.Contains(runner.fzfInputs[0], "skip.txt") || !strings.Contains(runner.fzfInputs[1], "dump.sql.gz") || strings.Contains(runner.fzfInputs[1], "image.png") {
 		t.Fatalf("fzf inputs should show folders/dumps only: %#v", runner.fzfInputs)
+	}
+}
+
+func TestDownloadDumpFromDriveBrowserRefreshesCurrentFolder(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	t.Setenv("DVV_NO_LOADER", "1")
+	dir := t.TempDir()
+	cfg := &config.Config{Project: config.DefaultProjectConfig()}
+	cfg.Project.DB.DumpsDir = dir
+	cfg.Project.DB.RcloneRemote = "gdrive"
+	cfg.Project.DB.DriveFolderID = "folder-root"
+	runner := &dbFakeRunner{
+		outputs: []string{
+			"gdrive:\n",
+			`[]`,
+			`[{"Name":"fresh.sql.gz","ID":"file-fresh","Size":7,"IsDir":false}]`,
+			"",
+		},
+		fzfOutputs: [][]byte{[]byte("R\n"), []byte("entry:0\n")},
+	}
+	manager := &Manager{Config: cfg, Runner: runner}
+
+	dest, err := manager.downloadDumpFromDriveBrowser(context.Background())
+	if err != nil {
+		t.Fatalf("downloadDumpFromDriveBrowser returned error: %v", err)
+	}
+	if dest != filepath.Join(dir, "fresh.sql.gz") {
+		t.Fatalf("dest = %q", dest)
+	}
+	listCalls := 0
+	for _, call := range runner.calls {
+		if call.name == "rclone" && len(call.args) > 0 && call.args[0] == "lsjson" {
+			listCalls++
+		}
+	}
+	if listCalls != 2 {
+		t.Fatalf("list calls = %d, calls = %#v", listCalls, runner.calls)
 	}
 }
 
