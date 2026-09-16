@@ -694,13 +694,23 @@ func driveRootArgs(args []string, rootFolder driveFolderRef) []string {
 
 func parseDriveDumpEntries(out []byte) ([]DriveDumpEntry, error) {
 	var entries []DriveDumpEntry
-	jsonStart := bytes.IndexAny(out, "[{")
+	jsonStart := bytes.IndexByte(out, '[')
 	if jsonStart < 0 {
 		return nil, fmt.Errorf("rclone lsjson returned no JSON output")
 	}
-	decoder := json.NewDecoder(bytes.NewReader(out[jsonStart:]))
-	if err := decoder.Decode(&entries); err != nil {
-		return nil, err
+	var lastErr error
+	for jsonStart >= 0 {
+		decoder := json.NewDecoder(bytes.NewReader(out[jsonStart:]))
+		if err := decoder.Decode(&entries); err == nil {
+			break
+		} else {
+			lastErr = err
+		}
+		next := bytes.IndexByte(out[jsonStart+1:], '[')
+		if next < 0 {
+			return nil, lastErr
+		}
+		jsonStart += next + 1
 	}
 	filtered := make([]DriveDumpEntry, 0, len(entries))
 	for _, entry := range entries {

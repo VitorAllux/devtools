@@ -500,7 +500,8 @@ func TestDriveDumpEntriesPassesResourceKey(t *testing.T) {
 }
 
 func TestParseDriveDumpEntriesIgnoresRcloneNotices(t *testing.T) {
-	out := []byte("2026/09/16 18:07:31 NOTICE: gdrive: This remote uses rclone's shared Google Drive client_id\n" +
+	out := []byte("[NOTICE] client_id warning before JSON\n" +
+		"2026/09/16 18:07:31 NOTICE: gdrive: This remote uses rclone's shared Google Drive client_id\n" +
 		`[{"Name":"dump.sql.gz","ID":"file-dump","Size":10,"IsDir":false}]` + "\n" +
 		"2026/09/16 18:07:32 NOTICE: done\n")
 	entries, err := parseDriveDumpEntries(out)
