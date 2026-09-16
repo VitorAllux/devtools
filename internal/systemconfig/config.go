@@ -1170,7 +1170,7 @@ func configFZFArgs(category Category, keys config.SystemConfigHubKeyBindings) []
 		Shortcuts:     shortcuts,
 		ExtraArgs: []string{
 			"--delimiter=\t",
-			"--with-nth=2,3,4,5",
+			"--with-nth=2,3,4",
 			"--nth=1,2,3,4,5,10",
 			"--header-lines=1",
 		},
@@ -1520,7 +1520,12 @@ func defaultPreviewValue(entry Entry) string {
 	if strings.TrimSpace(entry.Default) == "" {
 		return ""
 	}
-	return maskText(entry.Default, entry.Kind, entry.Key)
+	value := maskText(entry.Value, entry.Kind, entry.Key)
+	defaultValue := maskText(entry.Default, entry.Kind, entry.Key)
+	if value == defaultValue {
+		return ""
+	}
+	return defaultValue
 }
 
 func compactField(value string, width int) string {

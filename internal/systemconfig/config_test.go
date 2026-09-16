@@ -166,6 +166,10 @@ func TestConfigPreviewExplainsSelectedKey(t *testing.T) {
 	if !strings.Contains(preview, "Shift+N") || !strings.Contains(preview, "add custom key") {
 		t.Fatalf("config preview should render configured shortcuts: %s", preview)
 	}
+	args := configFZFArgs(Category{Label: "Database"}, keys)
+	if !containsString(args, "--with-nth=2,3,4") || containsString(args, "--with-nth=2,3,4,5") {
+		t.Fatalf("config fzf args should keep hidden metadata out of visible columns: %#v", args)
+	}
 }
 
 func TestEntriesForCategoryFiltersExpectedGroups(t *testing.T) {
@@ -532,8 +536,11 @@ func TestWriteValueAppliesRuntimeConfig(t *testing.T) {
 
 func TestEntryFormattingHelpers(t *testing.T) {
 	secret := Entry{Key: "DVV_BW_AGE_KEY_ITEM", Kind: "secret", Value: "private", Default: "default"}
-	if maskValue(secret) != "<set>" || defaultPreviewValue(secret) != "<set>" {
+	if maskValue(secret) != "<set>" || defaultPreviewValue(secret) != "" {
 		t.Fatalf("secret values should be masked")
+	}
+	if got := defaultPreviewValue(Entry{Key: "DVV_DB_DRIVE_FOLDER_ID", Kind: "text", Value: "folder-123", Default: "folder-123"}); got != "" {
+		t.Fatalf("defaultPreviewValue should hide defaults matching current value, got %q", got)
 	}
 	if source := entrySource(Entry{Persisted: true}); source != "custom" {
 		t.Fatalf("persisted source = %q", source)
@@ -553,6 +560,15 @@ func TestEntryFormattingHelpers(t *testing.T) {
 	if got := unquoteConfigValue(`'a'\''b'`); got != "a'b" {
 		t.Fatalf("unquoteConfigValue = %q", got)
 	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func testEntries() []Entry {
