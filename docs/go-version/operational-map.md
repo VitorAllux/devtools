@@ -113,7 +113,7 @@ Final indeterminate loader labels should be action-specific, such as `ready`, `c
 | SSH | Connection probe before tmux/terminal handoff, SCP upload/download helpers, encrypted backup sync. |
 | Workspace | Initial hub load, project discovery, create planning, create execution, project add/remove, workspace deletion. |
 | Tmux | Target scanning, environment open/start/stop/restart, directory picker session open. |
-| Database | Database fetch, create, drop, truncate, Google Drive download, import progress, dump cleaning. |
+| Database | Database fetch, create, drop, truncate, Google Drive browse/download, import progress, dump cleaning. |
 | Resources | Resource scan, start/stop/restart actions, and log terminal handoff. |
 | Ports | Listening port scan, URL open/copy actions, and confirmed process kill. |
 | Secrets | Secrets hub status, AGE key preparation, SSH backup decrypt/encrypt. |
@@ -123,6 +123,7 @@ Final indeterminate loader labels should be action-specific, such as `ready`, `c
 | Detail | Current rule | Action |
 | --- | --- | --- |
 | Download name | A Google Drive download name without `.sql`, `.gz`, or `.sql.gz` is saved with `.sql.gz`. | Type `adami` and the stored file becomes `adami.sql.gz`. |
+| Drive browser | `dvv db import` can browse the configured `DVV_DB_DRIVE_FOLDER_ID`, enter subfolders, and shows only folders plus `.sql`, `.sql.gz`, and `.gz` files. | Use pasted Drive links/IDs as the fallback for files outside the configured folder. |
 | Import compression | Import detects gzip from the file header, not only from the extension. | Extensionless gzip downloads can still import correctly. |
 | Dump listing | The dump picker lists `.sql`, `.sql.gz`, gzip-header files, and extensionless files that look like SQL. | Avoid hiding valid local dumps just because the name is incomplete. |
 | Database sizes | Database pickers show user database sizes from `information_schema.tables`. | Empty databases show `0 B`; if the size query fails, keep database actions usable. |

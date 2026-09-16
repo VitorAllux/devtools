@@ -5,10 +5,12 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	pathpkg "path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -46,6 +48,26 @@ type DumpFile struct {
 	SizeBytes int64
 	SizeKnown bool
 }
+
+type DriveDumpEntry struct {
+	ID       string
+	Name     string
+	Path     string
+	Size     int64
+	MimeType string
+	ModTime  string
+	IsDir    bool
+}
+
+type driveDumpSelectionRow struct {
+	Raw     string
+	Display string
+}
+
+const (
+	browseDriveDumpsOption = "[+] Browse Google Drive dumps"
+	pasteDriveLinkOption   = "[+] Paste Google Drive link or ID"
+)
 
 var sqlTablePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)^--\s*(?:table structure for table|dumping data for table)\s+(.+)`),
@@ -390,16 +412,19 @@ func (m *Manager) selectOrDownloadDump(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	download := "[+] Download from Google Drive"
-	options := append([]DumpFile{{Name: download}}, dumps...)
+	options := append([]DumpFile{{Name: browseDriveDumpsOption}, {Name: pasteDriveLinkOption}}, dumps...)
 	selected, err := m.selectDumpFiles(ctx, "Select dump", options, false)
 	if err != nil || len(selected) == 0 {
 		return "", err
 	}
-	if selected[0] != download {
+	switch selected[0] {
+	case browseDriveDumpsOption:
+		return m.downloadDumpFromDriveBrowser(ctx)
+	case pasteDriveLinkOption:
+		return m.downloadDump(ctx)
+	default:
 		return filepath.Join(m.Config.Project.DB.DumpsDir, selected[0]), nil
 	}
-	return m.downloadDump(ctx)
 }
 
 func (m *Manager) selectDumpFiles(ctx context.Context, label string, dumps []DumpFile, multi bool) ([]string, error) {
@@ -457,26 +482,17 @@ func dumpFileNames(dumps []DumpFile) []string {
 }
 
 func (m *Manager) downloadDump(ctx context.Context) (string, error) {
-	if _, err := m.Runner.LookPath("rclone"); err != nil {
-		return "", fmt.Errorf("rclone is required to download dumps")
+	remote, remotes, err := m.promptRcloneRemote(ctx)
+	if err != nil {
+		return "", err
 	}
-	remotes, remotesErr := m.rcloneRemotes(ctx)
-	remote := normalizeRcloneRemote(m.Config.Project.DB.RcloneRemote)
 	if value, err := ui.Prompt("Rclone remote [" + remote + "]"); err != nil {
 		return "", err
 	} else if strings.TrimSpace(value) != "" {
 		remote = normalizeRcloneRemote(value)
 	}
-	if remote == "" {
-		return "", fmt.Errorf("rclone remote cannot be empty")
-	}
-	if remotesErr == nil {
-		if len(remotes) == 0 {
-			return "", fmt.Errorf("rclone has no configured remotes; run `rclone config` before downloading dumps")
-		}
-		if !rcloneRemoteExists(remotes, remote) {
-			return "", unknownRcloneRemoteError(remote, remotes)
-		}
+	if err := validateRcloneRemote(remote, remotes); err != nil {
+		return "", err
 	}
 	fileID, err := ui.Prompt("Google Drive File ID or link")
 	if err != nil {
@@ -491,16 +507,175 @@ func (m *Manager) downloadDump(ctx context.Context) (string, error) {
 		return "", err
 	}
 	fileName = normalizeDownloadDumpFileName(fileName, fileID)
+	return m.downloadDriveFileByID(ctx, remote, fileID, fileName)
+}
+
+func (m *Manager) downloadDumpFromDriveBrowser(ctx context.Context) (string, error) {
+	remote, remotes, err := m.promptRcloneRemote(ctx)
+	if err != nil {
+		return "", err
+	}
+	if err := validateRcloneRemote(remote, remotes); err != nil {
+		return "", err
+	}
+	folderID, ok := extractDriveFolderID(m.Config.Project.DB.DriveFolderID)
+	if !ok {
+		return "", fmt.Errorf("DVV_DB_DRIVE_FOLDER_ID is not configured; set it with `dvv config` or use %s", pasteDriveLinkOption)
+	}
+	entry, ok, err := m.browseDriveDump(ctx, remote, folderID)
+	if err != nil || !ok {
+		return "", err
+	}
+	if strings.TrimSpace(entry.ID) == "" {
+		return "", fmt.Errorf("selected Drive file has no ID: %s", entry.Name)
+	}
+	return m.downloadDriveFileByID(ctx, remote, entry.ID, entry.Name)
+}
+
+func (m *Manager) promptRcloneRemote(ctx context.Context) (string, []string, error) {
+	if _, err := m.Runner.LookPath("rclone"); err != nil {
+		return "", nil, fmt.Errorf("rclone is required to download dumps")
+	}
+	remotes, err := m.rcloneRemotes(ctx)
+	if err != nil {
+		return normalizeRcloneRemote(m.Config.Project.DB.RcloneRemote), nil, nil
+	}
+	remote := normalizeRcloneRemote(m.Config.Project.DB.RcloneRemote)
+	return remote, remotes, nil
+}
+
+func validateRcloneRemote(remote string, remotes []string) error {
+	if remote == "" {
+		return fmt.Errorf("rclone remote cannot be empty")
+	}
+	if remotes == nil {
+		return nil
+	}
+	if len(remotes) == 0 {
+		return fmt.Errorf("rclone has no configured remotes; run `rclone config` before downloading dumps")
+	}
+	if !rcloneRemoteExists(remotes, remote) {
+		return unknownRcloneRemoteError(remote, remotes)
+	}
+	return nil
+}
+
+func (m *Manager) downloadDriveFileByID(ctx context.Context, remote string, fileID string, fileName string) (string, error) {
+	fileName = normalizeDownloadDumpFileName(fileName, fileID)
 	dest := filepath.Join(m.Config.Project.DB.DumpsDir, filepath.Base(fileName))
 	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "downloading", Subject: filepath.Base(dest), ShowResult: true, SuccessAction: "downloaded"}, func() error {
 		return run.Quiet(ctx, m.Runner, "", "rclone", "backend", "copyid", remote+":", fileID, dest)
 	}); err != nil {
-		if isUnknownRcloneRemoteError(err) {
-			return "", unknownRcloneRemoteError(remote, remotes)
-		}
 		return "", err
 	}
 	return dest, nil
+}
+
+func (m *Manager) browseDriveDump(ctx context.Context, remote string, rootFolderID string) (DriveDumpEntry, bool, error) {
+	currentPath := ""
+	for {
+		entries, err := m.driveDumpEntries(ctx, remote, rootFolderID, currentPath)
+		if err != nil {
+			return DriveDumpEntry{}, false, err
+		}
+		selection, ok, err := m.selectDriveDumpEntry(ctx, currentPath, entries)
+		if err != nil || !ok {
+			return DriveDumpEntry{}, false, err
+		}
+		if selection == "__parent__" {
+			currentPath = pathpkg.Dir(strings.TrimSuffix(currentPath, "/"))
+			if currentPath == "." {
+				currentPath = ""
+			}
+			continue
+		}
+		index, ok := parseDriveSelection(selection, len(entries))
+		if !ok {
+			return DriveDumpEntry{}, false, fmt.Errorf("invalid Drive selection: %s", selection)
+		}
+		entry := entries[index]
+		if entry.IsDir {
+			currentPath = drivePathJoin(currentPath, entry.Name)
+			continue
+		}
+		return entry, true, nil
+	}
+}
+
+func (m *Manager) driveDumpEntries(ctx context.Context, remote string, rootFolderID string, currentPath string) ([]DriveDumpEntry, error) {
+	remotePath := remote + ":"
+	if strings.TrimSpace(currentPath) != "" {
+		remotePath += currentPath
+	}
+	out, err := m.Runner.Output(ctx, "", "rclone", "lsjson", remotePath, "--drive-root-folder-id", rootFolderID)
+	if err != nil {
+		return nil, err
+	}
+	var entries []DriveDumpEntry
+	if err := json.Unmarshal(out, &entries); err != nil {
+		return nil, err
+	}
+	filtered := make([]DriveDumpEntry, 0, len(entries))
+	for _, entry := range entries {
+		entry.Name = strings.TrimSpace(entry.Name)
+		if entry.Name == "" {
+			continue
+		}
+		if entry.IsDir || isDriveDumpFileName(entry.Name) {
+			filtered = append(filtered, entry)
+		}
+	}
+	sort.Slice(filtered, func(i, j int) bool {
+		if filtered[i].IsDir != filtered[j].IsDir {
+			return filtered[i].IsDir
+		}
+		return strings.ToLower(filtered[i].Name) < strings.ToLower(filtered[j].Name)
+	})
+	return filtered, nil
+}
+
+func (m *Manager) selectDriveDumpEntry(ctx context.Context, currentPath string, entries []DriveDumpEntry) (string, bool, error) {
+	if _, err := m.Runner.LookPath("fzf"); err != nil {
+		rows := driveDumpSelectionRows(currentPath, entries)
+		for index, row := range rows {
+			fmt.Printf("  %2d. %s\n", index+1, row.Display)
+		}
+		value, err := ui.Prompt("Drive dump")
+		if err != nil {
+			return "", false, err
+		}
+		index, ok := parseIndex(value, len(rows))
+		if !ok {
+			return "", false, fmt.Errorf("invalid Drive selection: %s", value)
+		}
+		return rows[index].Raw, true, nil
+	}
+	rows := driveDumpSelectionRows(currentPath, entries)
+	var builder strings.Builder
+	builder.WriteString(ui.FZFHiddenHeader(driveDumpHeader()))
+	builder.WriteByte('\n')
+	for _, row := range rows {
+		builder.WriteString(ui.FZFHiddenRow(row.Raw, row.Display))
+		builder.WriteByte('\n')
+	}
+	args := ui.FZFHub{
+		Prompt:       ui.Crown("drive") + ui.Muted("> "),
+		BorderLabel:  "Google Drive dumps",
+		Preview:      driveDumpPreviewCommand(currentPath),
+		PreviewLabel: "drive item",
+		Shortcuts: []ui.FZFShortcut{
+			{Label: "Enter", Description: "open/select"},
+			{Label: "Esc", Description: "cancel"},
+		},
+		ExtraArgs: append(ui.FZFHiddenRowArgs(),
+			"--header-lines=1",
+		),
+	}.Args()
+	output, err := m.Runner.OutputWithInput(ctx, "", []byte(builder.String()), "fzf", args...)
+	if err != nil && len(output) == 0 {
+		return "", false, nil
+	}
+	return ui.FZFSelectedRaw(strings.TrimSpace(string(output))), true, nil
 }
 
 func (m *Manager) rcloneRemotes(ctx context.Context) ([]string, error) {
@@ -538,16 +713,6 @@ func unknownRcloneRemoteError(remote string, remotes []string) error {
 		return fmt.Errorf("rclone remote %q is not configured; run `rclone config` before downloading dumps", remote)
 	}
 	return fmt.Errorf("rclone remote %q is not configured; available remotes: %s", remote, strings.Join(remotes, ", "))
-}
-
-func isUnknownRcloneRemoteError(err error) bool {
-	if err == nil {
-		return false
-	}
-	message := err.Error()
-	return strings.Contains(message, "didn't find section in config file") ||
-		strings.Contains(message, "did not find section in config file") ||
-		strings.Contains(message, "section in config file")
 }
 
 func (m *Manager) selectImportDatabase(ctx context.Context) (string, error) {
@@ -1250,6 +1415,113 @@ func dumpFileRow(index int, dump DumpFile) string {
 	)
 }
 
+func driveDumpSelectionRows(currentPath string, entries []DriveDumpEntry) []driveDumpSelectionRow {
+	rows := make([]driveDumpSelectionRow, 0, len(entries)+1)
+	if strings.TrimSpace(currentPath) != "" {
+		rows = append(rows, driveDumpSelectionRow{Raw: "__parent__", Display: driveDumpParentRow()})
+	}
+	for index, entry := range entries {
+		rows = append(rows, driveDumpSelectionRow{
+			Raw:     fmt.Sprintf("entry:%d", index),
+			Display: driveDumpRow(entry),
+		})
+	}
+	return rows
+}
+
+func driveDumpHeader() string {
+	return fmt.Sprintf(" %s  %s  %s  %s",
+		ui.Crown(fixedWidth("TYPE", 8)),
+		ui.Crown(fixedWidth("NAME", 52)),
+		ui.Crown(fixedWidth("SIZE", 10)),
+		ui.Crown("MODIFIED"),
+	)
+}
+
+func driveDumpParentRow() string {
+	return fmt.Sprintf("%s  %s  %s  %s",
+		ui.Gold(fixedWidth("folder", 8)),
+		ui.Accent(fixedWidth("..", 52)),
+		ui.Muted(fixedWidth("-", 10)),
+		ui.Muted("parent"),
+	)
+}
+
+func driveDumpRow(entry DriveDumpEntry) string {
+	kind := "file"
+	size := human.FormatBytes(entry.Size)
+	if entry.IsDir {
+		kind = "folder"
+		size = "-"
+	}
+	return fmt.Sprintf("%s  %s  %s  %s",
+		ui.Gold(fixedWidth(kind, 8)),
+		ui.Accent(fixedWidth(entry.Name, 52)),
+		ui.Muted(fixedWidth(size, 10)),
+		ui.Muted(shortModTime(entry.ModTime)),
+	)
+}
+
+func driveDumpPreviewCommand(currentPath string) string {
+	return `sh -c '` + ui.FZFPreviewShellPrefix() + `line=$1
+raw=$(printf "%s" "$line" | cut -f1)
+display=$(printf "%s" "$line" | cut -f2-)
+kind=$(printf "%s" "$display" | awk "{print \$1}")
+printf "%sGoogle Drive dump%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%-9s%s ` + shellQuote(dbDefaultString(currentPath, "/")) + `\n" "$dvv_label" "Folder" "$dvv_reset"
+printf "\n%sSelected%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%s%s\n" "$dvv_muted" "$display" "$dvv_reset"
+if [ "$raw" = "__parent__" ]; then
+  printf "\n%sPress Enter to go to the parent folder.%s\n" "$dvv_muted" "$dvv_reset"
+elif [ "$kind" = "folder" ]; then
+  printf "\n%sPress Enter to open this folder.%s\n" "$dvv_muted" "$dvv_reset"
+else
+  printf "\n%sPress Enter to download and import this dump.%s\n" "$dvv_muted" "$dvv_reset"
+fi
+' sh {}`
+}
+
+func parseDriveSelection(raw string, length int) (int, bool) {
+	value := strings.TrimPrefix(strings.TrimSpace(raw), "entry:")
+	index, err := strconv.Atoi(value)
+	return index, err == nil && index >= 0 && index < length
+}
+
+func drivePathJoin(base string, name string) string {
+	base = strings.Trim(strings.TrimSpace(base), "/")
+	name = strings.Trim(strings.TrimSpace(name), "/")
+	if base == "" {
+		return name
+	}
+	if name == "" {
+		return base
+	}
+	return pathpkg.Join(base, name)
+}
+
+func isDriveDumpFileName(name string) bool {
+	lower := strings.ToLower(strings.TrimSpace(name))
+	return strings.HasSuffix(lower, ".sql") || strings.HasSuffix(lower, ".sql.gz") || strings.HasSuffix(lower, ".gz")
+}
+
+func shortModTime(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) >= len("2006-01-02 15:04") {
+		value = strings.ReplaceAll(value[:len("2006-01-02T15:04")], "T", " ")
+	}
+	if value == "" {
+		return "-"
+	}
+	return value
+}
+
+func dbDefaultString(value string, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
+}
+
 func showHelp() {
 	ui.Title("Database Hub")
 	fmt.Printf("  %s dvv db\n\n", ui.Bold("Usage:"))
@@ -1276,6 +1548,26 @@ func extractDriveFileID(raw string) (string, bool) {
 		return "", false
 	}
 	for _, marker := range []string{"/file/d/", "id="} {
+		if index := strings.Index(raw, marker); index >= 0 {
+			value := raw[index+len(marker):]
+			value = strings.TrimLeft(value, "/")
+			parts := strings.FieldsFunc(value, func(r rune) bool { return r == '/' || r == '?' || r == '&' })
+			if len(parts) == 0 {
+				return "", false
+			}
+			value = parts[0]
+			return value, value != ""
+		}
+	}
+	return raw, len(raw) >= 10
+}
+
+func extractDriveFolderID(raw string) (string, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", false
+	}
+	for _, marker := range []string{"/folders/", "folderId=", "folderid="} {
 		if index := strings.Index(raw, marker); index >= 0 {
 			value := raw[index+len(marker):]
 			value = strings.TrimLeft(value, "/")

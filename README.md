@@ -333,14 +333,14 @@ The database hub supports:
 
 - Creating databases.
 - Importing local `.sql` and `.sql.gz` dumps.
-- Downloading Google Drive dumps with `rclone`.
+- Browsing and downloading Google Drive dumps with `rclone`, or pasting a Drive file link/ID.
 - Truncating databases.
 - Dropping databases.
 - Cleaning local dump files.
 
 Database pickers show each user database size from `information_schema.tables`; empty databases are shown as `0 B`.
 
-When downloading from Google Drive, a local name without extension is saved as `.sql.gz`. The import step detects gzip by file content, so older extensionless downloads can still be listed and imported when they contain a valid gzip or SQL dump.
+When downloading from Google Drive, `dvv db import` can browse the configured Drive folder, navigate subfolders, and show only folders plus `.sql`, `.sql.gz`, and `.gz` files. A local name without extension is saved as `.sql.gz`. The import step detects gzip by file content, so older extensionless downloads can still be listed and imported when they contain a valid gzip or SQL dump.
 
 Database config can come from `dvv.config.json`, `.env`, or `~/.config/devv/config.env`.
 
@@ -352,6 +352,7 @@ DVV_DB_PORT=3306
 DVV_DB_USER=root
 DVV_DUMPS_DIR=~/workspace/personal/devtools/dumps
 DVV_RCLONE_REMOTE=gdrive
+DVV_DB_DRIVE_FOLDER_ID=<google-drive-folder-id-or-folder-url>
 ```
 
 ## Port Manager

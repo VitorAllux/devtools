@@ -38,6 +38,21 @@ func TestExtractDriveFileIDRejectsIncompleteURL(t *testing.T) {
 	}
 }
 
+func TestExtractDriveFolderID(t *testing.T) {
+	tests := map[string]string{
+		"https://drive.google.com/drive/u/0/folders/folder123":         "folder123",
+		"https://drive.google.com/drive/folders/folder456?usp=sharing": "folder456",
+		"raw-folder-id": "raw-folder-id",
+	}
+
+	for input, expected := range tests {
+		got, ok := extractDriveFolderID(input)
+		if !ok || got != expected {
+			t.Fatalf("extractDriveFolderID(%q) = %q, %v; want %q, true", input, got, ok, expected)
+		}
+	}
+}
+
 func TestSQLQuoting(t *testing.T) {
 	if got := identifier("my-db`name"); got != "`my-db``name`" {
 		t.Fatalf("identifier = %q", got)
@@ -431,6 +446,78 @@ func TestDownloadDumpRejectsUnknownRcloneRemote(t *testing.T) {
 	}
 }
 
+func TestDriveDumpEntriesHideInvalidFilesAndSortFoldersFirst(t *testing.T) {
+	runner := &dbFakeRunner{outputs: []string{`[
+		{"Name":"notes.txt","ID":"bad","Size":10,"IsDir":false},
+		{"Name":"zeta.sql.gz","ID":"file-z","Size":200,"IsDir":false,"ModTime":"2026-09-16T10:00:00Z"},
+		{"Name":"Archive","ID":"folder-a","IsDir":true},
+		{"Name":"alpha.gz","ID":"file-a","Size":100,"IsDir":false}
+	]`}}
+	manager := &Manager{Config: &config.Config{Project: config.DefaultProjectConfig()}, Runner: runner}
+
+	entries, err := manager.driveDumpEntries(context.Background(), "gdrive", "folder-root", "")
+	if err != nil {
+		t.Fatalf("driveDumpEntries returned error: %v", err)
+	}
+	got := []string{}
+	for _, entry := range entries {
+		got = append(got, entry.Name)
+	}
+	want := []string{"Archive", "alpha.gz", "zeta.sql.gz"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("entries = %#v, want %#v", got, want)
+	}
+	if len(runner.calls) != 1 || !reflect.DeepEqual(runner.calls[0].args, []string{"lsjson", "gdrive:", "--drive-root-folder-id", "folder-root"}) {
+		t.Fatalf("rclone call = %#v", runner.calls)
+	}
+}
+
+func TestDownloadDumpFromDriveBrowserNavigatesAndDownloadsByID(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	t.Setenv("DVV_NO_LOADER", "1")
+	dir := t.TempDir()
+	cfg := &config.Config{Project: config.DefaultProjectConfig()}
+	cfg.Project.DB.DumpsDir = dir
+	cfg.Project.DB.RcloneRemote = "gdrive"
+	cfg.Project.DB.DriveFolderID = "https://drive.google.com/drive/u/0/folders/folder-root"
+	runner := &dbFakeRunner{
+		outputs: []string{
+			"gdrive:\n",
+			`[{"Name":"2026","ID":"folder-2026","IsDir":true},{"Name":"skip.txt","ID":"bad","IsDir":false}]`,
+			`[{"Name":"dump.sql.gz","ID":"file-dump","Size":42,"IsDir":false},{"Name":"image.png","ID":"bad","IsDir":false}]`,
+		},
+		fzfOutputs: [][]byte{[]byte("entry:0\n"), []byte("entry:0\n")},
+	}
+	manager := &Manager{Config: cfg, Runner: runner}
+
+	dest, err := manager.downloadDumpFromDriveBrowser(context.Background())
+	if err != nil {
+		t.Fatalf("downloadDumpFromDriveBrowser returned error: %v", err)
+	}
+	if dest != filepath.Join(dir, "dump.sql.gz") {
+		t.Fatalf("dest = %q", dest)
+	}
+	wantLast := []string{"backend", "copyid", "gdrive:", "file-dump", filepath.Join(dir, "dump.sql.gz")}
+	last := runner.calls[len(runner.calls)-1]
+	if last.name != "rclone" || !reflect.DeepEqual(last.args, wantLast) {
+		t.Fatalf("download call = %#v, want rclone %#v", last, wantLast)
+	}
+	if len(runner.fzfInputs) != 2 || !strings.Contains(runner.fzfInputs[0], "2026") || strings.Contains(runner.fzfInputs[0], "skip.txt") || !strings.Contains(runner.fzfInputs[1], "dump.sql.gz") || strings.Contains(runner.fzfInputs[1], "image.png") {
+		t.Fatalf("fzf inputs should show folders/dumps only: %#v", runner.fzfInputs)
+	}
+}
+
+func TestDownloadDumpFromDriveBrowserRequiresFolderID(t *testing.T) {
+	cfg := &config.Config{Project: config.DefaultProjectConfig()}
+	runner := &dbFakeRunner{outputs: []string{"gdrive:\n"}}
+	manager := &Manager{Config: cfg, Runner: runner}
+
+	_, err := manager.downloadDumpFromDriveBrowser(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "DVV_DB_DRIVE_FOLDER_ID") {
+		t.Fatalf("expected folder id error, got %v", err)
+	}
+}
+
 func TestImportDumpUsesMysqlBinaryModeAndSanitizer(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	t.Setenv("DVV_NO_LOADER", "1")
@@ -595,11 +682,14 @@ type dbCommandCall struct {
 }
 
 type dbFakeRunner struct {
-	calls     []dbCommandCall
-	outputs   []string
-	paths     map[string]bool
-	fzfOutput []byte
-	fzfErr    error
+	calls      []dbCommandCall
+	outputs    []string
+	paths      map[string]bool
+	fzfInput   string
+	fzfInputs  []string
+	fzfOutput  []byte
+	fzfOutputs [][]byte
+	fzfErr     error
 }
 
 func (r *dbFakeRunner) Run(_ context.Context, dir string, name string, args ...string) error {
@@ -617,7 +707,14 @@ func (r *dbFakeRunner) Output(_ context.Context, dir string, name string, args .
 	return []byte(out), nil
 }
 
-func (r *dbFakeRunner) OutputWithInput(context.Context, string, []byte, string, ...string) ([]byte, error) {
+func (r *dbFakeRunner) OutputWithInput(_ context.Context, _ string, input []byte, _ string, _ ...string) ([]byte, error) {
+	r.fzfInput = string(input)
+	r.fzfInputs = append(r.fzfInputs, string(input))
+	if len(r.fzfOutputs) > 0 {
+		out := r.fzfOutputs[0]
+		r.fzfOutputs = r.fzfOutputs[1:]
+		return out, r.fzfErr
+	}
 	if r.fzfOutput != nil || r.fzfErr != nil {
 		return r.fzfOutput, r.fzfErr
 	}

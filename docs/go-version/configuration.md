@@ -72,6 +72,7 @@ The file is versioned because it defines project behavior, theme identity, and d
     "user": "root",
     "dumpsDir": "dumps",
     "rcloneRemote": "gdrive",
+    "driveFolderId": "",
     "safetyConfirm": true
   },
   "resources": {
@@ -252,6 +253,7 @@ The `db` section contains local database defaults used by `dvv db`:
 - `user`: MySQL user.
 - `dumpsDir`: local SQL dump storage. Relative paths are resolved from the project root.
 - `rcloneRemote`: default remote name used for Google Drive downloads.
+- `driveFolderId`: Google Drive folder ID or folder URL browsed by `dvv db import`. Keep personal folder IDs in runtime config, not committed project config.
 - `safetyConfirm`: reserved for destructive-action confirmation policy.
 
 ## Resources Config
@@ -523,6 +525,7 @@ DVV_DB_PORT
 DVV_DB_USER
 DVV_DUMPS_DIR
 DVV_RCLONE_REMOTE
+DVV_DB_DRIVE_FOLDER_ID
 ```
 
 Terminal overrides:

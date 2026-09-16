@@ -59,6 +59,7 @@
     "user": "root",
     "dumpsDir": "dumps",
     "rcloneRemote": "gdrive",
+    "driveFolderId": "",
     "safetyConfirm": true
   },
   "resources": {

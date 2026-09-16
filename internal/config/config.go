@@ -87,6 +87,7 @@ type DBConfig struct {
 	User          string `json:"user"`
 	DumpsDir      string `json:"dumpsDir"`
 	RcloneRemote  string `json:"rcloneRemote"`
+	DriveFolderID string `json:"driveFolderId"`
 	SafetyConfirm bool   `json:"safetyConfirm"`
 }
 
@@ -565,6 +566,7 @@ func DefaultProjectConfig() ProjectConfig {
 			User:          "root",
 			DumpsDir:      "dumps",
 			RcloneRemote:  "gdrive",
+			DriveFolderID: "",
 			SafetyConfirm: true,
 		},
 		Resources: ResourcesConfig{
@@ -898,6 +900,9 @@ func mergeDBConfigDefaults(target DBConfig, defaults DBConfig) DBConfig {
 	}
 	if strings.TrimSpace(target.RcloneRemote) == "" {
 		target.RcloneRemote = defaults.RcloneRemote
+	}
+	if strings.TrimSpace(target.DriveFolderID) == "" {
+		target.DriveFolderID = defaults.DriveFolderID
 	}
 	if !target.SafetyConfirm {
 		target.SafetyConfirm = defaults.SafetyConfirm
@@ -1353,6 +1358,9 @@ func resolveDBConfig(cfg DBConfig, root string) DBConfig {
 	}
 	if value := firstSetEnv("DVV_RCLONE_REMOTE", "DEVT_RCLONE_REMOTE"); value != "" {
 		cfg.RcloneRemote = value
+	}
+	if value := firstSetEnv("DVV_DB_DRIVE_FOLDER_ID"); value != "" {
+		cfg.DriveFolderID = value
 	}
 	if value, ok := firstBoolEnv("DVV_DB_SAFETY_CONFIRM"); ok {
 		cfg.SafetyConfirm = value

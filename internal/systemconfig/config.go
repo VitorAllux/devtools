@@ -319,7 +319,7 @@ func entriesForCategory(categoryID string, entries []Entry) []Entry {
 	case "integrations":
 		return filterEntries(entries, func(entry Entry) bool {
 			switch entry.Key {
-			case "DVV_TERMINAL_LAUNCHER", "DVV_RCLONE_REMOTE", "DVV_BW_AGE_KEY_ITEM", "DVV_DB_HOST", "DVV_DB_PORT", "DVV_DB_USER":
+			case "DVV_TERMINAL_LAUNCHER", "DVV_RCLONE_REMOTE", "DVV_DB_DRIVE_FOLDER_ID", "DVV_BW_AGE_KEY_ITEM", "DVV_DB_HOST", "DVV_DB_PORT", "DVV_DB_USER":
 				return true
 			default:
 				return false
@@ -1054,6 +1054,8 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.DB.DumpsDir = path
 	case "DVV_RCLONE_REMOTE":
 		m.Config.Project.DB.RcloneRemote = value
+	case "DVV_DB_DRIVE_FOLDER_ID":
+		m.Config.Project.DB.DriveFolderID = value
 	case "DVV_DB_SAFETY_CONFIRM":
 		m.Config.Project.DB.SafetyConfirm = value == "1"
 	case "DVV_WORKSPACE_REQUIRE_CONFIRMATION":
@@ -1364,6 +1366,7 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Database", "DVV_DB_USER", "Sets the MySQL user for database actions.", "text", cfg.Project.DB.User, "", false},
 		{"Database", "DVV_DUMPS_DIR", "Sets where downloaded and local dump files live.", "path", cfg.Project.DB.DumpsDir, "", false},
 		{"Database", "DVV_RCLONE_REMOTE", "Sets the rclone remote used for Drive downloads.", "text", cfg.Project.DB.RcloneRemote, "", false},
+		{"Database", "DVV_DB_DRIVE_FOLDER_ID", "Sets the Google Drive folder browsed for dump files.", "text", cfg.Project.DB.DriveFolderID, "", false},
 		{"Resources", "DVV_RESOURCES_START_SHORTCUT", "Sets the resources hub shortcut for start.", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Start, "", false},
 		{"Resources", "DVV_RESOURCES_RESTART_SHORTCUT", "Sets the resources hub shortcut for restart.", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Restart, "", false},
 		{"Resources", "DVV_RESOURCES_STOP_SHORTCUT", "Sets the resources hub shortcut for stop.", "shortcut", cfg.Project.Resources.Hub.Shortcuts.Stop, "", false},

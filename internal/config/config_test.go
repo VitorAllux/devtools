@@ -546,6 +546,7 @@ func TestResolveDBConfigUsesEnvOverrides(t *testing.T) {
 	t.Setenv("DVV_DB_USER", "wslroot")
 	t.Setenv("DVV_DUMPS_DIR", "~/dumps")
 	t.Setenv("DVV_RCLONE_REMOTE", "drive")
+	t.Setenv("DVV_DB_DRIVE_FOLDER_ID", "folder-123")
 	t.Setenv("DVV_DB_SAFETY_CONFIRM", "false")
 
 	cfg := resolveDBConfig(defaultDBConfigForTest(), "/repo")
@@ -564,6 +565,9 @@ func TestResolveDBConfigUsesEnvOverrides(t *testing.T) {
 	}
 	if cfg.RcloneRemote != "drive" {
 		t.Fatalf("rclone remote = %q", cfg.RcloneRemote)
+	}
+	if cfg.DriveFolderID != "folder-123" {
+		t.Fatalf("drive folder id = %q", cfg.DriveFolderID)
 	}
 	if cfg.SafetyConfirm {
 		t.Fatalf("db safety confirm = true, want false")
