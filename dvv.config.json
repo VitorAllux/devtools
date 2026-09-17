@@ -178,6 +178,9 @@
       "enabled": true,
       "selector": "fzf",
       "opener": "",
+      "openTarget": "folder",
+      "systemApplication": "",
+      "cursorWindowMode": "default",
       "shortcuts": {
         "create": "shift+n",
         "manage": "shift+m",
@@ -297,7 +300,8 @@
     "codeWorkspace": {
       "enabled": false,
       "fileNameTemplate": "{{ workspace.name }}.code-workspace",
-      "overwrite": false
+      "overwrite": false,
+      "syncProjects": false
     },
     "workspaceHarness": {
       "agentsFile": {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -21,6 +22,7 @@ type Manager struct {
 	Config *config.Config
 	Runner run.Runner
 	Git    gitclient.Client
+	OS     string
 }
 
 type Workspace struct {
@@ -57,7 +59,15 @@ func NewManager(cfg *config.Config, runner run.Runner) *Manager {
 		Config: cfg,
 		Runner: runner,
 		Git:    gitclient.New(runner),
+		OS:     runtime.GOOS,
 	}
+}
+
+func (m *Manager) goos() string {
+	if strings.TrimSpace(m.OS) != "" {
+		return strings.ToLower(strings.TrimSpace(m.OS))
+	}
+	return runtime.GOOS
 }
 
 func (m *Manager) Root() string {

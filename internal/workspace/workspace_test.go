@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -345,6 +346,46 @@ func TestWriteCodeWorkspaceRejectsEscapingFileName(t *testing.T) {
 	}
 }
 
+func TestSyncCodeWorkspaceProjectsPreservesCustomFields(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "alpha.code-workspace")
+	existing := `{
+  "folders": [{"path": "old"}],
+  "settings": {"editor.fontSize": 15},
+  "extensions": {"recommendations": ["example.extension"]}
+}`
+	if err := os.WriteFile(target, []byte(existing), 0o644); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	cfg := config.CodeWorkspaceConfig{Enabled: true, SyncProjects: true, FileNameTemplate: "{{ workspace.name }}.code-workspace"}
+	projects := []metadata.Project{{Name: "api", Path: filepath.Join(root, "api")}, {Name: "web", Path: filepath.Join(root, "web")}}
+
+	written, err := syncCodeWorkspaceProjects(cfg, "alpha", root, projects, false)
+	if err != nil || !written {
+		t.Fatalf("syncCodeWorkspaceProjects written=%v err=%v", written, err)
+	}
+	content, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+	var document map[string]json.RawMessage
+	if err := json.Unmarshal(content, &document); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+	var folders []codeWorkspaceFolder
+	if err := json.Unmarshal(document["folders"], &folders); err != nil || len(folders) != 2 || folders[0].Path != "api" || folders[1].Path != "web" {
+		t.Fatalf("folders were not synchronized: %#v err=%v", folders, err)
+	}
+	var settings map[string]any
+	var extensions map[string]any
+	if err := json.Unmarshal(document["settings"], &settings); err != nil || settings["editor.fontSize"] != float64(15) {
+		t.Fatalf("settings were not preserved: %#v err=%v", settings, err)
+	}
+	if err := json.Unmarshal(document["extensions"], &extensions); err != nil || !strings.Contains(string(document["extensions"]), "example.extension") {
+		t.Fatalf("extensions were not preserved: %#v err=%v", extensions, err)
+	}
+}
+
 func TestDiscoverProjectsPreservesConfiguredOrderAndSearchDepth(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
@@ -448,7 +489,16 @@ func TestRemoveProjectRemovesLinkedWorktreeAndMetadata(t *testing.T) {
 	runner := newWorkspaceRunner()
 	runner.linked[projectPath] = source
 	runner.status[projectPath] = ""
-	manager := NewManager(testWorkspaceConfig(filepath.Join(root, "workspaces")), runner)
+	cfg := testWorkspaceConfig(filepath.Join(root, "workspaces"))
+	cfg.Project.Workspace.CodeWorkspace = config.CodeWorkspaceConfig{
+		Enabled: true, FileNameTemplate: "{{ workspace.name }}.code-workspace", SyncProjects: true,
+	}
+	if written, err := writeCodeWorkspace(cfg.Project.Workspace.CodeWorkspace, "alpha", workspacePath, []metadata.Project{
+		{Name: "api", Path: projectPath}, {Name: "web", Path: otherPath},
+	}); err != nil || !written {
+		t.Fatalf("writeCodeWorkspace written=%v err=%v", written, err)
+	}
+	manager := NewManager(cfg, runner)
 
 	err := manager.RemoveProject(ctx, Workspace{Name: "alpha", DirName: "workspace-alpha", Path: workspacePath}, Project{Name: "api", Source: source, Path: projectPath, WorkBranch: "alpha"}, false)
 	if err != nil {
@@ -463,6 +513,10 @@ func TestRemoveProjectRemovesLinkedWorktreeAndMetadata(t *testing.T) {
 	}
 	if len(meta.Projects) != 1 || meta.Projects[0].Name != "web" {
 		t.Fatalf("metadata projects = %#v", meta.Projects)
+	}
+	content, err := os.ReadFile(filepath.Join(workspacePath, "alpha.code-workspace"))
+	if err != nil || strings.Contains(string(content), `"path": "api"`) || !strings.Contains(string(content), `"path": "web"`) {
+		t.Fatalf("code workspace was not synchronized after remove: content=%s err=%v", content, err)
 	}
 }
 
@@ -602,6 +656,39 @@ func TestFZFHubHarnessRequiresSingleWorkspace(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(first, "AGENTS.md")); !os.IsNotExist(err) {
 		t.Fatalf("harness should not sync when multiple workspaces are selected, stat err=%v", err)
+	}
+}
+
+func TestSyncWorkspaceArtifactsCreatesCodeWorkspace(t *testing.T) {
+	t.Setenv("DVV_NO_LOADER", "1")
+	root := t.TempDir()
+	workspacePath := filepath.Join(root, "workspace-alpha")
+	projectPath := filepath.Join(workspacePath, "api")
+	mustMkdir(t, projectPath)
+	if err := metadata.Write(workspacePath, metadata.Workspace{
+		Version:       1,
+		WorkspaceName: "alpha",
+		WorkspaceDir:  "workspace-alpha",
+		Projects:      []metadata.Project{{Name: "api", Path: projectPath}},
+	}); err != nil {
+		t.Fatalf("metadata write failed: %v", err)
+	}
+	cfg := testWorkspaceConfig(root)
+	cfg.Project.Workspace.CodeWorkspace = config.CodeWorkspaceConfig{
+		Enabled: true, FileNameTemplate: "{{ workspace.name }}.code-workspace",
+	}
+	disabled := false
+	cfg.Project.Workspace.WorkspaceHarness.AgentsFile.Enabled = false
+	cfg.Project.Workspace.WorkspaceHarness.AgentsDir.Enabled = false
+	cfg.Project.Workspace.Projects = []config.WorkspaceProject{{Name: "api", Path: projectPath, Enabled: &disabled}}
+	manager := NewManager(cfg, newWorkspaceRunner())
+
+	if err := manager.syncHarnessInteractive(context.Background(), []string{workspacePath}); err != nil {
+		t.Fatalf("syncHarnessInteractive returned error: %v", err)
+	}
+	content, err := os.ReadFile(filepath.Join(workspacePath, "alpha.code-workspace"))
+	if err != nil || !strings.Contains(string(content), `"path": "api"`) {
+		t.Fatalf("code workspace was not created by artifact sync: content=%s err=%v", content, err)
 	}
 }
 
@@ -908,6 +995,96 @@ func TestVSCodeExeOpenerUsesWSLRemoteURI(t *testing.T) {
 	}
 }
 
+func TestSystemOpenerPrefersCodeWorkspaceOnMacOS(t *testing.T) {
+	root := t.TempDir()
+	workspacePath := filepath.Join(root, "workspace-alpha")
+	mustMkdir(t, workspacePath)
+	target := filepath.Join(workspacePath, "alpha.code-workspace")
+	if err := os.WriteFile(target, []byte(`{"folders":[]}`), 0o644); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	cfg := testWorkspaceConfig(root)
+	cfg.Project.Workspace.CodeWorkspace.FileNameTemplate = "{{ workspace.name }}.code-workspace"
+	cfg.Project.Workspace.Interactive.OpenTarget = "preferCodeWorkspace"
+	cfg.Project.Workspace.Interactive.SystemApplication = "Cursor"
+	runner := newWorkspaceRunner()
+	runner.paths["open"] = true
+	manager := NewManager(cfg, runner)
+	manager.OS = "darwin"
+
+	err := manager.Open(context.Background(), Workspace{Name: "alpha", DirName: "workspace-alpha", Path: workspacePath}, "system")
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if want := "open -a Cursor " + target; !runner.hasRun(want) {
+		t.Fatalf("system opener should prefer code workspace, want %q runs=%#v", want, runner.runs)
+	}
+}
+
+func TestCursorOpenerUsesBundledMacCLIAndClassicWindow(t *testing.T) {
+	root := t.TempDir()
+	workspacePath := filepath.Join(root, "workspace-alpha")
+	mustMkdir(t, workspacePath)
+	target := filepath.Join(workspacePath, "alpha.code-workspace")
+	if err := os.WriteFile(target, []byte(`{"folders":[]}`), 0o644); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	cfg := testWorkspaceConfig(root)
+	cfg.Project.Workspace.Interactive.OpenTarget = "preferCodeWorkspace"
+	cfg.Project.Workspace.Interactive.CursorWindowMode = "classic"
+	command := "/Applications/Cursor.app/Contents/Resources/app/bin/cursor"
+	runner := newWorkspaceRunner()
+	runner.paths[command] = true
+	manager := NewManager(cfg, runner)
+	manager.OS = "darwin"
+
+	err := manager.Open(context.Background(), Workspace{Name: "alpha", DirName: "workspace-alpha", Path: workspacePath}, "cursor")
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if want := command + " --classic --new-window " + target; !runner.hasRun(want) {
+		t.Fatalf("Cursor should use bundled CLI in classic mode, want %q runs=%#v", want, runner.runs)
+	}
+}
+
+func TestSystemOpenerFallsBackToWorkspaceFolder(t *testing.T) {
+	root := t.TempDir()
+	workspacePath := filepath.Join(root, "workspace-alpha")
+	mustMkdir(t, workspacePath)
+	cfg := testWorkspaceConfig(root)
+	cfg.Project.Workspace.Interactive.OpenTarget = "preferCodeWorkspace"
+	cfg.Project.Workspace.Interactive.SystemApplication = "Cursor"
+	runner := newWorkspaceRunner()
+	runner.paths["open"] = true
+	manager := NewManager(cfg, runner)
+	manager.OS = "darwin"
+
+	err := manager.Open(context.Background(), Workspace{Name: "alpha", DirName: "workspace-alpha", Path: workspacePath}, "system")
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if want := "open -a Cursor " + workspacePath; !runner.hasRun(want) {
+		t.Fatalf("system opener should fall back to folder, want %q runs=%#v", want, runner.runs)
+	}
+}
+
+func TestCodeWorkspaceOpenTargetRequiresExistingFile(t *testing.T) {
+	root := t.TempDir()
+	workspacePath := filepath.Join(root, "workspace-alpha")
+	mustMkdir(t, workspacePath)
+	cfg := testWorkspaceConfig(root)
+	cfg.Project.Workspace.Interactive.OpenTarget = "codeWorkspace"
+	runner := newWorkspaceRunner()
+	runner.paths["open"] = true
+	manager := NewManager(cfg, runner)
+	manager.OS = "darwin"
+
+	err := manager.Open(context.Background(), Workspace{Name: "alpha", DirName: "workspace-alpha", Path: workspacePath}, "system")
+	if err == nil || !strings.Contains(err.Error(), "code workspace file is missing") {
+		t.Fatalf("expected missing code workspace error, got %v", err)
+	}
+}
+
 func TestExecuteCreatePlanWritesMetadataAndAgentsFile(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
@@ -1065,6 +1242,9 @@ func TestExecuteAddPlanReportsProgressForEachProject(t *testing.T) {
 	runner.refs[sourceAPI] = map[string]bool{"origin/master": true}
 	runner.refs[sourceWeb] = map[string]bool{"origin/master": true}
 	cfg := testWorkspaceConfig(workspacesRoot)
+	cfg.Project.Workspace.CodeWorkspace = config.CodeWorkspaceConfig{
+		Enabled: true, FileNameTemplate: "{{ workspace.name }}.code-workspace", SyncProjects: true,
+	}
 	cfg.Project.Workspace.Bootstrap.Commands = []config.WorkspaceBootstrapCommand{
 		{Name: "npm-install", Command: "npm", Args: []string{"i"}},
 	}
@@ -1082,6 +1262,10 @@ func TestExecuteAddPlanReportsProgressForEachProject(t *testing.T) {
 
 	if result.Failed != 0 || result.Created != 2 {
 		t.Fatalf("result = %#v", result)
+	}
+	content, err := os.ReadFile(filepath.Join(workspacePath, "release.code-workspace"))
+	if err != nil || !strings.Contains(string(content), `"path": "api"`) || !strings.Contains(string(content), `"path": "web"`) {
+		t.Fatalf("code workspace was not synchronized after add: content=%s err=%v", content, err)
 	}
 	for _, want := range []string{
 		"worktree:api:prune remove stale worktree refs",

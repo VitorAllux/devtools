@@ -74,7 +74,10 @@ func (m *Manager) RemoveProject(ctx context.Context, ws Workspace, project Proje
 	if err := removeProjectFromMetadata(ws.Path, project.Name); err != nil {
 		return err
 	}
-	_, err = hooks.Run(ctx, m.Runner, cfg.Hooks, hooks.ProjectRemoved, hooks.Context{Workspace: workspaceContext, Project: projectContext}, false)
+	if _, err := hooks.Run(ctx, m.Runner, cfg.Hooks, hooks.ProjectRemoved, hooks.Context{Workspace: workspaceContext, Project: projectContext}, false); err != nil {
+		return err
+	}
+	_, err = m.syncCodeWorkspaceFromMetadata(ws, false)
 	return err
 }
 

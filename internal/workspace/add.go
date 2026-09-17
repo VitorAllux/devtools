@@ -188,6 +188,12 @@ func (m *Manager) executeAddPlan(ctx context.Context, plan AddPlan, onStep func(
 		result.Failed++
 		result.Errors = append(result.Errors, workspaceStageError("agent harness", plan.WorkspaceDir, err))
 	}
+	notifyOperationStep(onStep, OperationStep{Stage: "editor workspace", Subject: plan.WorkspaceDir, Detail: "sync code workspace"})
+	ws := Workspace{Name: plan.WorkspaceName, DirName: plan.WorkspaceDir, Path: plan.WorkspacePath}
+	if _, err := m.syncCodeWorkspaceFromMetadata(ws, false); err != nil {
+		result.Failed++
+		result.Errors = append(result.Errors, workspaceStageError("editor workspace", plan.WorkspaceDir, err))
+	}
 	return result
 }
 

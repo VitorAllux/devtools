@@ -1017,6 +1017,14 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		}
 	case "DVV_WORKSPACE_OPENER":
 		m.Config.Project.Workspace.Interactive.Opener = value
+	case "DVV_WORKSPACE_OPEN_TARGET":
+		m.Config.Project.Workspace.Interactive.OpenTarget = value
+	case "DVV_WORKSPACE_SYSTEM_APPLICATION":
+		m.Config.Project.Workspace.Interactive.SystemApplication = value
+	case "DVV_WORKSPACE_CURSOR_WINDOW_MODE":
+		m.Config.Project.Workspace.Interactive.CursorWindowMode = value
+	case "DVV_WORKSPACE_CODE_WORKSPACE_SYNC_PROJECTS":
+		m.Config.Project.Workspace.CodeWorkspace.SyncProjects = value == "1"
 	case "DVV_WORKSPACE_CREATE_SHORTCUT":
 		m.Config.Project.Workspace.Interactive.Shortcuts.Create = value
 	case "DVV_WORKSPACE_MANAGE_SHORTCUT":
@@ -1260,7 +1268,13 @@ func promptValue(entry Entry) (string, error) {
 			return selected, nil
 		}
 	case "choice":
-		selected, err := chooseOne(entry.Key, []string{"auto", "cursor", "code", "vscode", "opencode", "codex", "shell"})
+		options := []string{"auto", "cursor", "code", "vscode", "opencode", "codex", "shell", "system"}
+		if entry.Key == "DVV_WORKSPACE_OPEN_TARGET" {
+			options = []string{"folder", "codeWorkspace", "preferCodeWorkspace"}
+		} else if entry.Key == "DVV_WORKSPACE_CURSOR_WINDOW_MODE" {
+			options = []string{"default", "classic"}
+		}
+		selected, err := chooseOne(entry.Key, options)
 		if err == nil && selected != "" {
 			return selected, nil
 		}
@@ -1349,7 +1363,7 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Shortcuts", "DVV_WORKSPACE_MANAGE_SHORTCUT", "Sets the workspace hub shortcut for managing projects.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Manage, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_DELETE_SHORTCUT", "Sets the workspace hub shortcut for deleting workspaces.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Delete, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "Sets the workspace hub shortcut for opening template management.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Template, "", false},
-		{"Shortcuts", "DVV_WORKSPACE_HARNESS_SHORTCUT", "Sets the workspace hub shortcut for syncing agent harness files.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Harness, "", false},
+		{"Shortcuts", "DVV_WORKSPACE_HARNESS_SHORTCUT", "Sets the workspace hub shortcut for syncing workspace artifacts.", "shortcut", cfg.Project.Workspace.Interactive.Shortcuts.Harness, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT", "Sets the template hub shortcut for creating templates.", "shortcut", cfg.Project.Workspace.TemplateHub.Shortcuts.Create, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT", "Sets the template hub shortcut for editing templates.", "shortcut", cfg.Project.Workspace.TemplateHub.Shortcuts.Edit, "", false},
 		{"Shortcuts", "DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT", "Sets the template hub shortcut for deleting templates.", "shortcut", cfg.Project.Workspace.TemplateHub.Shortcuts.Delete, "", false},
@@ -1358,9 +1372,13 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Workspace", "DVV_WORKSPACE_PROJECT_EXCLUDE_DIRS", "Skips directories during base repository discovery.", "path-list", strings.Join(cfg.Project.Workspace.ProjectExcludeDirs, string(os.PathListSeparator)), "", false},
 		{"Workspace", "DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "Limits repository discovery depth.", "number", fmt.Sprintf("%d", cfg.Project.Workspace.ProjectSearchDepth), "", false},
 		{"Workspace", "DVV_WORKSPACE_OPENER", "Sets how a selected workspace opens.", "choice", defaultString(cfg.Project.Workspace.Interactive.Opener, "auto"), "", false},
+		{"Workspace", "DVV_WORKSPACE_OPEN_TARGET", "Chooses the folder, code workspace file, or preferred available target.", "choice", defaultString(cfg.Project.Workspace.Interactive.OpenTarget, "folder"), "", false},
+		{"Workspace", "DVV_WORKSPACE_SYSTEM_APPLICATION", "Selects an optional macOS application for the system opener.", "text", cfg.Project.Workspace.Interactive.SystemApplication, "", false},
+		{"Workspace", "DVV_WORKSPACE_CURSOR_WINDOW_MODE", "Chooses the default or classic Cursor editor window.", "choice", defaultString(cfg.Project.Workspace.Interactive.CursorWindowMode, "default"), "", false},
 		{"Workspace", "DVV_WORKSPACE_TEMPLATES", "Stores saved workspace templates with base branch and project list.", "json", workspaceTemplatesJSON(cfg.Project.Workspace.Templates), "", false},
 		{"Workspace", "DVV_WORKSPACE_FETCH_BEFORE_CREATE", "Fetches and prunes the configured remote before workspace planning.", "bool", boolValue(cfg.Project.Workspace.Git.FetchBeforeCreate), "", false},
 		{"Workspace", "DVV_WORKSPACE_CODE_WORKSPACE_ENABLED", "Creates an opt-in VS Code or Cursor workspace file.", "bool", boolValue(cfg.Project.Workspace.CodeWorkspace.Enabled), "", false},
+		{"Workspace", "DVV_WORKSPACE_CODE_WORKSPACE_SYNC_PROJECTS", "Keeps the code workspace folder list aligned with managed projects.", "bool", boolValue(cfg.Project.Workspace.CodeWorkspace.SyncProjects), "", false},
 		{"Workspace", "DVV_WORKSPACE_AGENTS_FILE_ENABLED", "Creates the workspace-level AGENTS.md file.", "bool", boolValue(cfg.Project.Workspace.WorkspaceHarness.AgentsFile.Enabled), "", false},
 		{"Workspace", "DVV_WORKSPACE_AGENTS_DIR_ENABLED", "Creates the workspace .agents manifest, guides, and skills directory.", "bool", boolValue(cfg.Project.Workspace.WorkspaceHarness.AgentsDir.Enabled), "", false},
 		{"Workspace", "DVV_WORKSPACE_HARNESS_AGENTS_DIR", "Sets where workspace agent guides and manifest are written.", "path", cfg.Project.Workspace.WorkspaceHarness.AgentsDir.Path, "", false},

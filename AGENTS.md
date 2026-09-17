@@ -60,7 +60,7 @@ Enter  open configured opener or choose from available openers
 Tab    multi-select or mark changes
 Shift+N  create workspace
 Shift+M  manage workspace projects
-Shift+H  sync workspace agent harness
+Shift+H  sync workspace artifacts
 Shift+D  delete workspace
 Esc    cancel/exit
 ```
@@ -110,10 +110,10 @@ dvv workspace
 - Internal implementation paths should keep the feature name explicit as `workspace-hub`.
 - `Enter` in the workspace hub should use `DVV_WORKSPACE_OPENER` when configured, with `DEVT_WORKSPACE_OPENER` as compatibility fallback.
 - When no workspace opener is configured, `Enter` should list openers detected on the system and let the user choose.
-- Supported opener values are `cursor`, `code`, `vscode`, `opencode`, `codex`, and `shell`.
+- Supported opener values are `cursor`, `code`, `vscode`, `opencode`, `codex`, `shell`, and macOS `system`.
 - Workspace templates are managed from the template hub opened by the configured template shortcut and reused from the workspace creation base/template selector.
 - Workspace create/add flows should synchronize the configured agent harness: `AGENTS.md`, `.agents/manifest.json`, focused guide files, and skill lookup directories.
-- The workspace hub `Shift+H` action synchronizes the selected workspace harness for existing workspaces.
+- The workspace hub `Shift+H` action synchronizes enabled workspace artifacts for existing workspaces, including the agent harness and code workspace project list.
 - The harness must always create `<agentsDir>/skills` and place it first in the generated skill lookup order.
 - Generated workspace `AGENTS.md` files are written in Portuguese and should tell agents to read workspace metadata, search configured skills before inventing a workflow, prefer project-local rules, and ask concise questions when context or risk is unclear.
 - Do not overwrite edited `.agents` guide files unless `workspaceHarness.agentsDir.overwriteGuides` is explicitly enabled.

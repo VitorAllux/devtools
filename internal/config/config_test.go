@@ -496,6 +496,10 @@ func TestResolveWorkspaceConfigUsesEnvOverrides(t *testing.T) {
 	t.Setenv("DVV_WORKSPACE_PROJECT_EXCLUDE_DIRS", "worktrees:~/dumps")
 	t.Setenv("DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "7")
 	t.Setenv("DVV_WORKSPACE_OPENER", "cursor")
+	t.Setenv("DVV_WORKSPACE_OPEN_TARGET", "preferCodeWorkspace")
+	t.Setenv("DVV_WORKSPACE_SYSTEM_APPLICATION", "Cursor")
+	t.Setenv("DVV_WORKSPACE_CURSOR_WINDOW_MODE", "classic")
+	t.Setenv("DVV_WORKSPACE_CODE_WORKSPACE_SYNC_PROJECTS", "1")
 	t.Setenv("DVV_WORKSPACE_CREATE_SHORTCUT", "alt-c")
 	t.Setenv("DVV_WORKSPACE_MANAGE_SHORTCUT", "alt-m")
 	t.Setenv("DVV_WORKSPACE_DELETE_SHORTCUT", "alt-d")
@@ -530,6 +534,12 @@ func TestResolveWorkspaceConfigUsesEnvOverrides(t *testing.T) {
 	}
 	if cfg.Interactive.Opener != "cursor" {
 		t.Fatalf("opener = %q", cfg.Interactive.Opener)
+	}
+	if cfg.Interactive.OpenTarget != "preferCodeWorkspace" || cfg.Interactive.SystemApplication != "Cursor" || cfg.Interactive.CursorWindowMode != "classic" {
+		t.Fatalf("interactive open config = %#v", cfg.Interactive)
+	}
+	if !cfg.CodeWorkspace.SyncProjects {
+		t.Fatal("code workspace project sync should be enabled")
 	}
 	if cfg.Interactive.Shortcuts.Create != "alt-c" || cfg.Interactive.Shortcuts.Manage != "alt-m" || cfg.Interactive.Shortcuts.Delete != "alt-d" || cfg.Interactive.Shortcuts.Template != "alt-t" || cfg.Interactive.Shortcuts.Harness != "alt-h" {
 		t.Fatalf("workspace shortcuts = %#v", cfg.Interactive.Shortcuts)

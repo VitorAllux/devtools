@@ -2,7 +2,7 @@
 
 Personal developer CLI for local automation.
 
-Current version: `2.0.0-alpha.4`
+Current version: `2.0.0-alpha.5`
 
 `dvv` is the Go rewrite of the previous shell-based devtools project. The command prefix is now `dvv`; the old `devv` command is intentionally not the public command.
 
@@ -217,7 +217,7 @@ Shortcuts:
 | `Shift+N` | Create a workspace. |
 | `Shift+T` | Manage workspace templates. |
 | `Shift+M` | Manage projects in the selected workspace. |
-| `Shift+H` | Sync the workspace agent harness. |
+| `Shift+H` | Sync enabled workspace artifacts. |
 | `Shift+D` | Delete selected workspace(s). |
 | `Esc` | Exit. |
 
@@ -247,6 +247,8 @@ Creation rules:
 Workspace templates are managed from the hub with `Shift+T` and saved in `~/.config/devv/config.json`. A template stores a name, optional description, base selection, branch name pattern, selected projects, and optional worktree directory aliases. For example, workspace `123` can remain `workspace-123`, use branch `task_123`, and place `api-project` in an `api` directory. The template hub preview shows these choices before use. `DVV_WORKSPACE_TEMPLATES` remains supported as a compatibility input.
 
 Workspace preferences for fetching remotes before creation, generating a `.code-workspace` file, and enabling either agent harness output are available in the `Workspace` category of `dvv config`. Free-form lifecycle hooks and project-targeted bootstrap commands belong in the structured local JSON file. Bootstrap copy rules read from the primary source checkout, so the default `.env` rule copies `<source-repository>/.env` into the new worktree.
+
+Workspace opening separates the opener from its target. `folder` preserves the existing behavior, `codeWorkspace` requires the configured file, and `preferCodeWorkspace` uses it when present with a folder fallback. The `system` opener uses macOS `open`; an optional system application makes the folder fallback deterministic. The Cursor opener also detects the CLI bundled inside `Cursor.app`, and `cursorWindowMode=classic` forces a normal IDE window instead of the Agents Window. When code workspace project sync is enabled, add/remove flows and `Shift+H` update only the generated `folders` list while preserving settings and other fields.
 
 ### Workspace Agent Harness
 
@@ -491,8 +493,12 @@ DVV_WORKSPACE_PROJECT_ROOTS=~/workspace:~/Development/projects:~/Work/Developmen
 DVV_WORKSPACE_PROJECT_EXCLUDE_DIRS=worktrees:External:dumps
 DVV_WORKSPACE_PROJECT_SEARCH_DEPTH=4
 DVV_WORKSPACE_OPENER=cursor
+DVV_WORKSPACE_OPEN_TARGET=folder
+DVV_WORKSPACE_SYSTEM_APPLICATION=
+DVV_WORKSPACE_CURSOR_WINDOW_MODE=default
 DVV_WORKSPACE_FETCH_BEFORE_CREATE=0
 DVV_WORKSPACE_CODE_WORKSPACE_ENABLED=0
+DVV_WORKSPACE_CODE_WORKSPACE_SYNC_PROJECTS=0
 DVV_WORKSPACE_AGENTS_FILE_ENABLED=1
 DVV_WORKSPACE_AGENTS_DIR_ENABLED=1
 DVV_WORKSPACE_HARNESS_AGENTS_DIR=.agents
@@ -600,7 +606,7 @@ DVV_PORTS_KILL_SHORTCUT=shift+k
 | Tmux custom environments | `dvv tmux` can store named API/Web targets for projects outside workspace metadata. |
 | Tmux theme | `dvv setup` writes tmux status, window, pane, message, and copy-mode colors from the active CLI theme by default. The status bar stays full-width and visible. |
 | Tmux reset target | `dvv tmux` stores the last opened or manually selected reset target in `~/.cache/devv/tmux-reset-target.json` for the global `Alt+R` fallback. |
-| Workspace agent harness | Workspace create/add flows and `Shift+H` write `AGENTS.md`, `.agents/manifest.json`, guides, and skill lookup paths inside the workspace. |
+| Workspace artifacts | Workspace create/add flows and `Shift+H` synchronize enabled agent harness files and the code workspace project list. |
 | Workspace size | `dvv workspace` and `dvv workspace:list` show workspace disk usage without following symlink targets. |
 | SCP transfers | `dvv ssh` can upload/download with `scp`, open `~/Downloads/dvv-scp`, and clean its contents after confirmation. |
 | Port manager | `dvv ports` inspects listening TCP ports with `ss` or `lsof`, opens likely local URLs, copies URLs, and confirms before killing a PID. |
@@ -692,6 +698,11 @@ Main packages:
 Before adding a new hub, use `internal/ui.FZFHub`, keep shortcuts configurable, and document the public command in this README and completion.
 
 ## Version Notes
+
+`2.0.0-alpha.5`:
+
+- Added macOS system workspace opening with configurable folder or `.code-workspace` targets.
+- Added optional code workspace project synchronization for add/remove flows and `Shift+H`.
 
 `2.0.0-alpha.4`:
 
