@@ -40,6 +40,7 @@ func showHelp(cfg *config.Config) {
 	helpEntry(keys.Create.Label, "Create workspace")
 	helpEntry(keys.Template.Label, "Manage workspace templates")
 	helpEntry(keys.Manage.Label, "Manage selected workspace projects")
+	helpEntry(keys.Harness.Label, "Sync selected workspace artifacts")
 	helpEntry(keys.Delete.Label, "Delete selected workspace(s)")
 	helpEntry("Esc", "Exit")
 	fmt.Println()

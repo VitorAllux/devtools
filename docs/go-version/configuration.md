@@ -181,6 +181,9 @@ Objects merge recursively and explicit local booleans, including `false`, are pr
       "enabled": true,
       "selector": "fzf",
       "opener": "",
+      "openTarget": "folder",
+      "systemApplication": "",
+      "cursorWindowMode": "default",
       "shortcuts": {
         "create": "shift+n",
         "manage": "shift+m",
@@ -198,7 +201,8 @@ Objects merge recursively and explicit local booleans, including `false`, are pr
     "codeWorkspace": {
       "enabled": false,
       "fileNameTemplate": "{{ workspace.name }}.code-workspace",
-      "overwrite": false
+      "overwrite": false,
+      "syncProjects": false
     }
   }
 }
@@ -372,8 +376,11 @@ The `workspace` section contains these groups:
 - `projectSearchDepth`: discovery depth below each project search root.
 - `git`: remote name, base branch priority, branch reuse/creation rules, branch name template, optional `fetchBeforeCreate`, and base branch by workspace type.
 - `interactive`: selector, opener, and configurable hub shortcuts.
+- `interactive.openTarget`: `folder`, `codeWorkspace`, or `preferCodeWorkspace`.
+- `interactive.systemApplication`: optional macOS application passed to `open -a` when the `system` opener is selected.
+- `interactive.cursorWindowMode`: `default` or `classic`; classic mode forces the Cursor IDE instead of the Agents Window.
 - `templateHub`: configurable shortcuts for creating, editing, and deleting workspace templates.
-- `codeWorkspace`: opt-in editor workspace generation. Existing files are preserved unless `overwrite` is true.
+- `codeWorkspace`: opt-in editor workspace generation. Existing files are preserved unless `overwrite` is true; `syncProjects` reconciles only the folder list after project changes and preserves other fields.
 - `bootstrap.commands[].when.projects`: optional case-insensitive source project names. These compose with file and missing-file conditions.
 - `workspaceHarness`: independent controls for workspace `AGENTS.md` and `.agents` output.
 - `hooks`: lifecycle commands loaded from project or local structured config and executed with argument arrays.
@@ -422,7 +429,7 @@ The `workspaceHarness` section controls the files generated for agents working i
 - `projectSkillPaths`: skill lookup paths relative to each project worktree.
 - `rules`: short rules rendered into the generated Portuguese `AGENTS.md` and `.agents/manifest.json`.
 
-Workspace create/add flows synchronize the harness automatically. Existing workspaces can be synchronized from `dvv workspace` with `Shift+H`.
+Workspace create/add flows synchronize the harness automatically. Existing workspaces can synchronize enabled artifacts from `dvv workspace` with `Shift+H`; this also reconciles an enabled code workspace folder list.
 
 Generated harness files:
 
@@ -533,6 +540,11 @@ DVV_WORKSPACE_PROJECT_ROOTS
 DVV_WORKSPACE_PROJECT_EXCLUDE_DIRS
 DVV_WORKSPACE_PROJECT_SEARCH_DEPTH
 DVV_WORKSPACE_OPENER
+DVV_WORKSPACE_OPEN_TARGET
+DVV_WORKSPACE_SYSTEM_APPLICATION
+DVV_WORKSPACE_CURSOR_WINDOW_MODE
+DVV_WORKSPACE_CODE_WORKSPACE_ENABLED
+DVV_WORKSPACE_CODE_WORKSPACE_SYNC_PROJECTS
 ```
 
 Tmux overrides:

@@ -272,13 +272,17 @@ type CodeWorkspaceConfig struct {
 	Enabled          bool   `json:"enabled"`
 	FileNameTemplate string `json:"fileNameTemplate"`
 	Overwrite        bool   `json:"overwrite"`
+	SyncProjects     bool   `json:"syncProjects"`
 }
 
 type WorkspaceInteractive struct {
-	Enabled   bool                       `json:"enabled"`
-	Selector  string                     `json:"selector"`
-	Opener    string                     `json:"opener"`
-	Shortcuts WorkspaceHubShortcutConfig `json:"shortcuts"`
+	Enabled           bool                       `json:"enabled"`
+	Selector          string                     `json:"selector"`
+	Opener            string                     `json:"opener"`
+	OpenTarget        string                     `json:"openTarget"`
+	SystemApplication string                     `json:"systemApplication,omitempty"`
+	CursorWindowMode  string                     `json:"cursorWindowMode,omitempty"`
+	Shortcuts         WorkspaceHubShortcutConfig `json:"shortcuts"`
 }
 
 type WorkspaceHubShortcutConfig struct {
@@ -715,9 +719,10 @@ func defaultWorkspaceConfig() WorkspaceConfig {
 			},
 		},
 		Interactive: WorkspaceInteractive{
-			Enabled:  true,
-			Selector: "fzf",
-			Opener:   "",
+			Enabled:    true,
+			Selector:   "fzf",
+			Opener:     "",
+			OpenTarget: "folder",
 			Shortcuts: WorkspaceHubShortcutConfig{
 				Create:   "shift+n",
 				Manage:   "shift+m",
@@ -753,6 +758,7 @@ func defaultWorkspaceConfig() WorkspaceConfig {
 			Enabled:          false,
 			FileNameTemplate: "{{ workspace.name }}.code-workspace",
 			Overwrite:        false,
+			SyncProjects:     false,
 		},
 		WorkspaceHarness: WorkspaceHarnessConfig{
 			AgentsFile: AgentsFileConfig{
@@ -1394,6 +1400,9 @@ func mergeWorkspaceConfigDefaults(target WorkspaceConfig, defaults WorkspaceConf
 	if strings.TrimSpace(target.Interactive.Selector) == "" {
 		target.Interactive.Selector = defaults.Interactive.Selector
 	}
+	if strings.TrimSpace(target.Interactive.OpenTarget) == "" {
+		target.Interactive.OpenTarget = defaults.Interactive.OpenTarget
+	}
 	if strings.TrimSpace(target.Interactive.Shortcuts.Create) == "" {
 		target.Interactive.Shortcuts.Create = defaults.Interactive.Shortcuts.Create
 	}
@@ -1614,11 +1623,23 @@ func resolveWorkspaceConfig(cfg WorkspaceConfig) WorkspaceConfig {
 	if opener := firstSetEnv("DVV_WORKSPACE_OPENER", "DEVT_WORKSPACE_OPENER"); opener != "" {
 		cfg.Interactive.Opener = opener
 	}
+	if target := firstSetEnv("DVV_WORKSPACE_OPEN_TARGET"); target != "" {
+		cfg.Interactive.OpenTarget = target
+	}
+	if application := firstSetEnv("DVV_WORKSPACE_SYSTEM_APPLICATION"); application != "" {
+		cfg.Interactive.SystemApplication = application
+	}
+	if mode := firstSetEnv("DVV_WORKSPACE_CURSOR_WINDOW_MODE"); mode != "" {
+		cfg.Interactive.CursorWindowMode = mode
+	}
 	if enabled, ok := firstBoolEnv("DVV_WORKSPACE_FETCH_BEFORE_CREATE"); ok {
 		cfg.Git.FetchBeforeCreate = enabled
 	}
 	if enabled, ok := firstBoolEnv("DVV_WORKSPACE_CODE_WORKSPACE_ENABLED"); ok {
 		cfg.CodeWorkspace.Enabled = enabled
+	}
+	if enabled, ok := firstBoolEnv("DVV_WORKSPACE_CODE_WORKSPACE_SYNC_PROJECTS"); ok {
+		cfg.CodeWorkspace.SyncProjects = enabled
 	}
 	if enabled, ok := firstBoolEnv("DVV_WORKSPACE_AGENTS_FILE_ENABLED"); ok {
 		cfg.WorkspaceHarness.AgentsFile.Enabled = enabled
