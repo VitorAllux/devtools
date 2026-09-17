@@ -1,10 +1,122 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestLoadLocalProjectConfigMergesPersonalWorkspaceSettings(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	content := []byte(`{
+  "ui": {"hubHeightPercent": 85, "hubMinHeight": 24, "previewWidthPercent": 42},
+  "workspace": {
+    "git": {"reuseExistingBranch": false, "fetchBeforeCreate": true},
+    "codeWorkspace": {"enabled": true},
+    "workspaceHarness": {"agentsFile": {"enabled": false}, "agentsDir": {"enabled": false}},
+    "templates": [{"name": "Shared", "baseKind": "other", "baseBranch": "release", "branchNameTemplate": "task_{{ workspace.name }}", "projects": []}],
+    "bootstrap": {"commands": [{"name": "local-command", "command": "touch", "args": ["local.file"]}]},
+    "hooks": {"workspace.created": [{"command": "/tmp/local-hook", "args": ["{{ workspace.name }}"]}]}
+  }
+}`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+
+	cfg := DefaultProjectConfig()
+	cfg.Workspace.Git.ReuseExistingBranch = true
+	cfg.Workspace.Templates = []WorkspaceTemplate{{Name: "shared", BaseKind: "bug"}, {Name: "Versioned", BaseKind: "issue"}}
+	if err := loadLocalProjectConfig(path, &cfg); err != nil {
+		t.Fatalf("loadLocalProjectConfig failed: %v", err)
+	}
+
+	if cfg.Workspace.Git.ReuseExistingBranch || !cfg.Workspace.Git.FetchBeforeCreate || !cfg.Workspace.CodeWorkspace.Enabled {
+		t.Fatalf("local booleans were not preserved: %#v", cfg.Workspace)
+	}
+	if cfg.Workspace.WorkspaceHarness.AgentsFile.Enabled || cfg.Workspace.WorkspaceHarness.AgentsDir.Enabled {
+		t.Fatalf("local harness toggles = %#v", cfg.Workspace.WorkspaceHarness)
+	}
+	if cfg.UI.HubHeightPercent != 85 || cfg.UI.HubMinHeight != 24 || cfg.UI.PreviewWidthPercent != 42 {
+		t.Fatalf("local UI layout = %#v", cfg.UI)
+	}
+	if len(cfg.Workspace.Templates) != 2 || cfg.Workspace.Templates[0].BaseBranch != "release" || cfg.Workspace.Templates[1].Name != "Versioned" {
+		t.Fatalf("merged templates = %#v", cfg.Workspace.Templates)
+	}
+	if got := cfg.Workspace.Hooks["workspace.created"]; len(got) != 1 || got[0].Command != "/tmp/local-hook" {
+		t.Fatalf("local hooks = %#v", cfg.Workspace.Hooks)
+	}
+	if len(cfg.Workspace.Bootstrap.Commands) < 2 || cfg.Workspace.Bootstrap.Commands[len(cfg.Workspace.Bootstrap.Commands)-1].Name != "local-command" {
+		t.Fatalf("merged bootstrap commands = %#v", cfg.Workspace.Bootstrap.Commands)
+	}
+}
+
+func TestLoadLocalProjectConfigCanClearBootstrapCommands(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"workspace":{"bootstrap":{"commands":[]}}}`), 0o600); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	cfg := DefaultProjectConfig()
+	if err := loadLocalProjectConfig(path, &cfg); err != nil {
+		t.Fatalf("loadLocalProjectConfig failed: %v", err)
+	}
+	if cfg.Workspace.Bootstrap.Commands == nil || len(cfg.Workspace.Bootstrap.Commands) != 0 {
+		t.Fatalf("bootstrap commands were not explicitly cleared: %#v", cfg.Workspace.Bootstrap.Commands)
+	}
+}
+
+func TestWriteLocalWorkspaceTemplatesPreservesOtherSettings(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"custom":{"keep":true},"workspace":{"git":{"fetchBeforeCreate":true}}}`), 0o600); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	templates := []WorkspaceTemplate{{Name: "Task", BranchNameTemplate: "task_{{ workspace.name }}"}}
+	if err := WriteLocalWorkspaceTemplates(path, templates); err != nil {
+		t.Fatalf("WriteLocalWorkspaceTemplates failed: %v", err)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(content, &got); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+	if got["custom"].(map[string]any)["keep"] != true {
+		t.Fatalf("unknown local setting was removed: %s", content)
+	}
+	workspace := got["workspace"].(map[string]any)
+	if workspace["git"].(map[string]any)["fetchBeforeCreate"] != true {
+		t.Fatalf("workspace setting was removed: %s", content)
+	}
+	if len(workspace["templates"].([]any)) != 1 {
+		t.Fatalf("templates were not written: %s", content)
+	}
+}
+
+func TestLoadLocalProjectConfigRejectsMalformedJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"workspace":`), 0o600); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	cfg := DefaultProjectConfig()
+	if err := loadLocalProjectConfig(path, &cfg); err == nil || !strings.Contains(err.Error(), path) {
+		t.Fatalf("expected actionable malformed local config error, got %v", err)
+	}
+}
+
+func TestLoadLocalProjectConfigRejectsDuplicateTemplates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	content := []byte(`{"workspace":{"templates":[{"name":"Task"},{"name":" task "}]}}`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	cfg := DefaultProjectConfig()
+	if err := loadLocalProjectConfig(path, &cfg); err == nil || !strings.Contains(err.Error(), "duplicate workspace template name") {
+		t.Fatalf("expected duplicate template error, got %v", err)
+	}
+}
 
 func TestExpandPath(t *testing.T) {
 	t.Setenv("HOME", "/home/tester")

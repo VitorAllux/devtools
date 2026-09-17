@@ -319,7 +319,7 @@ func (m *Manager) createInteractive(ctx context.Context) (Workspace, error) {
 	var plan CreatePlan
 	if err := ui.RunWithRoyalLoader(workspaceLoaderOptions("planning", "workspace", Slug(name), "planned", true), func() error {
 		var buildErr error
-		plan, buildErr = m.BuildCreatePlan(ctx, name, projects, source.BaseKind, source.BaseOverride)
+		plan, buildErr = m.BuildCreatePlanWithTemplate(ctx, name, projects, source.BaseKind, source.BaseOverride, source.BranchNameTemplate)
 		return buildErr
 	}); err != nil {
 		return Workspace{}, err

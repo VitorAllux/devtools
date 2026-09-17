@@ -191,6 +191,160 @@ func TestBuildCreatePlanUsesBaseTypeAndCreateAction(t *testing.T) {
 	}
 }
 
+func TestBuildCreatePlanFallsBackPerProjectForMixedBaseBranches(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	apiSource := filepath.Join(root, "repos", "api-project")
+	toolkitSource := filepath.Join(root, "repos", "agent-toolkit")
+	mustMkdir(t, apiSource)
+	mustMkdir(t, toolkitSource)
+
+	runner := newWorkspaceRunner()
+	runner.refs[apiSource] = map[string]bool{"origin/prod": true}
+	runner.refs[toolkitSource] = map[string]bool{"origin/main": true}
+	manager := NewManager(testWorkspaceConfig(filepath.Join(root, "worktrees")), runner)
+
+	plan, err := manager.BuildCreatePlanWithTemplate(ctx, "123", []discovery.Project{
+		{Name: "api-project", Path: apiSource, DestinationName: "api"},
+		{Name: "agent-toolkit", Path: toolkitSource, DestinationName: "toolkit"},
+	}, "bug", "", "task_{{ workspace.name }}")
+	if err != nil {
+		t.Fatalf("BuildCreatePlanWithTemplate returned error: %v", err)
+	}
+	if len(plan.Items) != 2 {
+		t.Fatalf("items length = %d", len(plan.Items))
+	}
+	if plan.Items[0].BaseBranch != "prod" || plan.Items[0].Action != CreateBranchAction {
+		t.Fatalf("api item = %#v", plan.Items[0])
+	}
+	if plan.Items[1].BaseBranch != "main" || plan.Items[1].Action != CreateBranchAction {
+		t.Fatalf("toolkit item = %#v", plan.Items[1])
+	}
+}
+
+func TestBuildCreatePlanUsesTemplateBranchAndDestinationNames(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	source := filepath.Join(root, "repos", "api-project")
+	mustMkdir(t, source)
+	runner := newWorkspaceRunner()
+	runner.refs[source] = map[string]bool{"origin/master": true}
+	manager := NewManager(testWorkspaceConfig(filepath.Join(root, "worktrees")), runner)
+
+	plan, err := manager.BuildCreatePlanWithTemplate(ctx, "123", []discovery.Project{{
+		Name: "api-project", Path: source, DestinationName: "api",
+	}}, "issue", "", "task_{{ workspace.name }}")
+	if err != nil {
+		t.Fatalf("BuildCreatePlanWithTemplate returned error: %v", err)
+	}
+	if plan.WorkspaceDir != "workspace-123" || plan.WorkBranch != "task_123" {
+		t.Fatalf("plan naming = %#v", plan)
+	}
+	if len(plan.Items) != 1 || filepath.Base(plan.Items[0].Destination) != "api" || plan.Items[0].Project.Name != "api-project" {
+		t.Fatalf("project destination = %#v", plan.Items)
+	}
+}
+
+func TestBuildCreatePlanRejectsUnsafeAndDuplicateDestinations(t *testing.T) {
+	ctx := context.Background()
+	cfg := testWorkspaceConfig(t.TempDir()).Project.Workspace
+	runner := newWorkspaceRunner()
+	git := NewManager(&config.Config{Project: config.ProjectConfig{Workspace: cfg}}, runner).Git
+
+	if _, err := BuildCreatePlan(ctx, cfg, git, "123", []discovery.Project{{Name: "api", Path: "/repo/api", DestinationName: "../api"}}, "other", "master"); err == nil {
+		t.Fatal("expected traversal destination to be rejected")
+	}
+	_, err := BuildCreatePlan(ctx, cfg, git, "123", []discovery.Project{
+		{Name: "api", Path: "/repo/api", DestinationName: "service"},
+		{Name: "web", Path: "/repo/web", DestinationName: "SERVICE"},
+	}, "other", "master")
+	if err == nil || !strings.Contains(err.Error(), "duplicate project destination") {
+		t.Fatalf("expected duplicate destination error, got %v", err)
+	}
+}
+
+func TestBuildCreatePlanFetchesEachSourceWhenEnabled(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	source := filepath.Join(root, "repo")
+	mustMkdir(t, source)
+	runner := newWorkspaceRunner()
+	runner.refs[source] = map[string]bool{"origin/master": true}
+	cfg := testWorkspaceConfig(filepath.Join(root, "worktrees"))
+	cfg.Project.Workspace.Git.FetchBeforeCreate = true
+	manager := NewManager(cfg, runner)
+
+	_, err := manager.BuildCreatePlan(ctx, "123", []discovery.Project{{Name: "api", Path: source}, {Name: "api-copy", Path: source}}, "issue", "")
+	if err != nil {
+		t.Fatalf("BuildCreatePlan returned error: %v", err)
+	}
+	want := "git -C " + source + " fetch --prune origin"
+	count := 0
+	for _, command := range runner.runs {
+		if command == want {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("fetch count = %d, runs=%#v", count, runner.runs)
+	}
+}
+
+func TestBuildCreatePlanReportsFetchFailureWithProject(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "repo")
+	mustMkdir(t, source)
+	runner := newWorkspaceRunner()
+	command := "git -C " + source + " fetch --prune origin"
+	runner.outputErr[command] = errors.New("remote unavailable")
+	cfg := testWorkspaceConfig(filepath.Join(root, "worktrees"))
+	cfg.Project.Workspace.Git.FetchBeforeCreate = true
+	manager := NewManager(cfg, runner)
+
+	_, err := manager.BuildCreatePlan(context.Background(), "123", []discovery.Project{{Name: "api-project", Path: source}}, "issue", "")
+	if err == nil || !strings.Contains(err.Error(), "refresh api-project from origin") {
+		t.Fatalf("expected project fetch error, got %v", err)
+	}
+}
+
+func TestWriteCodeWorkspaceIsOptInAndPreservesExistingFile(t *testing.T) {
+	root := t.TempDir()
+	projects := []metadata.Project{{Name: "api", Path: filepath.Join(root, "api")}, {Name: "web", Path: filepath.Join(root, "web")}}
+	if written, err := writeCodeWorkspace(config.CodeWorkspaceConfig{}, "123", root, projects); err != nil || written {
+		t.Fatalf("disabled code workspace written=%v err=%v", written, err)
+	}
+	cfg := config.CodeWorkspaceConfig{Enabled: true, FileNameTemplate: "workspace-{{ workspace.name }}.code-workspace"}
+	written, err := writeCodeWorkspace(cfg, "123", root, projects)
+	if err != nil || !written {
+		t.Fatalf("writeCodeWorkspace written=%v err=%v", written, err)
+	}
+	target := filepath.Join(root, "workspace-123.code-workspace")
+	content, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+	if !strings.Contains(string(content), `"path": "api"`) || !strings.Contains(string(content), `"path": "web"`) {
+		t.Fatalf("code workspace content = %s", content)
+	}
+	if err := os.WriteFile(target, []byte("edited\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile edited failed: %v", err)
+	}
+	if written, err := writeCodeWorkspace(cfg, "123", root, projects); err != nil || written {
+		t.Fatalf("existing code workspace written=%v err=%v", written, err)
+	}
+	content, _ = os.ReadFile(target)
+	if string(content) != "edited\n" {
+		t.Fatalf("existing code workspace was overwritten: %q", content)
+	}
+}
+
+func TestWriteCodeWorkspaceRejectsEscapingFileName(t *testing.T) {
+	_, err := writeCodeWorkspace(config.CodeWorkspaceConfig{Enabled: true, FileNameTemplate: "../outside.code-workspace"}, "123", t.TempDir(), nil)
+	if err == nil {
+		t.Fatal("expected escaping code workspace file name to be rejected")
+	}
+}
+
 func TestDiscoverProjectsPreservesConfiguredOrderAndSearchDepth(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
@@ -639,7 +793,7 @@ func TestWorkspaceTemplateHelpers(t *testing.T) {
 	if len(removed) != 1 || removed[0].Name != "A" {
 		t.Fatalf("removeWorkspaceTemplates = %#v", removed)
 	}
-	indexes := selectedTemplateIndexes([]string{templateLine("template:1", "B", "prod", "1 project(s)", "api", "", "visible"), templateLine("__dvv_empty__", "", "", "", "", "", "empty")})
+	indexes := selectedTemplateIndexes([]string{templateLine("template:1", "B", "prod", "1 project(s)", "task_{{ workspace.name }}", "api", "api", "", "visible"), templateLine("__dvv_empty__", "", "", "", "", "", "", "", "empty")})
 	if len(indexes) != 1 || indexes[0] != 1 {
 		t.Fatalf("selectedTemplateIndexes = %#v", indexes)
 	}
@@ -649,10 +803,11 @@ func TestWorkspaceTemplateHubRowsKeepProjectsInPreview(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	cfg := config.DefaultProjectConfig().Workspace
 	templates := []config.WorkspaceTemplate{{
-		Name:        "Fullstack Bug",
-		Description: "API and Web for bug work.",
-		BaseKind:    "bug",
-		Projects:    []config.WorkspaceProject{{Name: "api", Path: "/repo/api"}, {Name: "web", Path: "/repo/web"}},
+		Name:               "Fullstack Bug",
+		Description:        "API and Web for bug work.",
+		BaseKind:           "bug",
+		BranchNameTemplate: "task_{{ workspace.name }}",
+		Projects:           []config.WorkspaceProject{{Name: "api-project", Path: "/repo/api", DestinationName: "api"}, {Name: "web", Path: "/repo/web"}},
 	}}
 	rows := templateRows(cfg, templates)
 	if !strings.Contains(rows, "Fullstack Bug") || !strings.Contains(rows, "prod") {
@@ -660,18 +815,18 @@ func TestWorkspaceTemplateHubRowsKeepProjectsInPreview(t *testing.T) {
 	}
 	templateRow := strings.Split(strings.TrimSpace(rows), "\n")[1]
 	fields := strings.Split(templateRow, "\t")
-	if len(fields) != 7 {
+	if len(fields) != 9 {
 		t.Fatalf("template row fields = %#v", fields)
 	}
-	if fields[4] != "api|web" {
-		t.Fatalf("template project names field = %q, want api|web", fields[4])
+	if fields[4] != "task_{{ workspace.name }}" || fields[5] != "api-project|web" || fields[6] != "api-project -> api|web" {
+		t.Fatalf("template preview fields = %#v", fields)
 	}
-	if visible := fields[6]; strings.Contains(visible, "api|web") || strings.Contains(visible, "API and Web") {
+	if visible := fields[8]; strings.Contains(visible, "api|web") || strings.Contains(visible, "API and Web") {
 		t.Fatalf("visible template row should keep projects and description in preview only: %q", visible)
 	}
 
 	preview := templatePreviewCommand(workspaceTemplateHubShortcuts((&config.Config{Project: config.DefaultProjectConfig()}).WorkspaceTemplateHubKeys()))
-	for _, want := range []string{"Hub commands", "Selected projects", "create template", "edit selected", "delete selected"} {
+	for _, want := range []string{"Hub commands", "Selected projects", "branch_template", "project_destinations", "create template", "edit selected", "delete selected"} {
 		if !strings.Contains(preview, want) {
 			t.Fatalf("template preview missing %q: %s", want, preview)
 		}
@@ -1174,16 +1329,18 @@ type workspaceRunner struct {
 	fzfInput  string
 	fzfOutput []byte
 	fzfErr    error
+	outputErr map[string]error
 }
 
 func newWorkspaceRunner() *workspaceRunner {
 	return &workspaceRunner{
-		linked:   map[string]string{},
-		primary:  map[string]bool{},
-		refs:     map[string]map[string]bool{},
-		branches: map[string]string{},
-		status:   map[string]string{},
-		paths:    map[string]bool{},
+		linked:    map[string]string{},
+		primary:   map[string]bool{},
+		refs:      map[string]map[string]bool{},
+		branches:  map[string]string{},
+		status:    map[string]string{},
+		paths:     map[string]bool{},
+		outputErr: map[string]error{},
 	}
 }
 
@@ -1227,7 +1384,15 @@ func (r *workspaceRunner) Run(_ context.Context, _ string, name string, args ...
 }
 
 func (r *workspaceRunner) Output(_ context.Context, _ string, name string, args ...string) ([]byte, error) {
+	command := strings.Join(append([]string{name}, args...), " ")
+	if err := r.outputErr[command]; err != nil {
+		return nil, err
+	}
 	if name == "git" {
+		if len(args) >= 4 && args[0] == "-C" && args[2] == "fetch" {
+			r.runs = append(r.runs, command)
+			return nil, nil
+		}
 		if handled, err := r.handleQuietGitMutation(args); handled {
 			return nil, err
 		}

@@ -11,8 +11,9 @@ import (
 )
 
 type Project struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
+	Name            string `json:"name"`
+	Path            string `json:"path"`
+	DestinationName string `json:"destinationName,omitempty"`
 }
 
 func Discover(ctx context.Context, git gitclient.Client, configured []Project, roots []string, excludeDirs []string, maxDepth int) ([]Project, error) {
@@ -136,6 +137,7 @@ func (e excluder) matches(path string, name string) bool {
 func cleanProject(project Project) Project {
 	project.Name = strings.TrimSpace(project.Name)
 	project.Path = strings.TrimSpace(project.Path)
+	project.DestinationName = strings.TrimSpace(project.DestinationName)
 	if project.Path != "" {
 		project.Path = filepath.Clean(project.Path)
 	}

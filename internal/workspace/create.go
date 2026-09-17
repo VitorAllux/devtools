@@ -14,6 +14,7 @@ import (
 	gitclient "github.com/VitorAllux/devtools/internal/git"
 	"github.com/VitorAllux/devtools/internal/hooks"
 	"github.com/VitorAllux/devtools/internal/metadata"
+	"github.com/VitorAllux/devtools/internal/safety"
 )
 
 type PlanAction string
@@ -61,10 +62,34 @@ type OperationStep struct {
 }
 
 func (m *Manager) BuildCreatePlan(ctx context.Context, workspaceName string, projects []discovery.Project, baseKind string, baseOverride string) (CreatePlan, error) {
-	return BuildCreatePlan(ctx, m.Config.Project.Workspace, m.Git, workspaceName, projects, baseKind, baseOverride)
+	return m.buildCreatePlan(ctx, workspaceName, projects, baseKind, baseOverride, "")
+}
+
+func (m *Manager) BuildCreatePlanWithTemplate(ctx context.Context, workspaceName string, projects []discovery.Project, baseKind string, baseOverride string, branchNameTemplate string) (CreatePlan, error) {
+	return m.buildCreatePlan(ctx, workspaceName, projects, baseKind, baseOverride, branchNameTemplate)
+}
+
+func (m *Manager) buildCreatePlan(ctx context.Context, workspaceName string, projects []discovery.Project, baseKind string, baseOverride string, branchNameTemplate string) (CreatePlan, error) {
+	if m.Config.Project.Workspace.Git.FetchBeforeCreate {
+		seen := map[string]bool{}
+		for _, project := range projects {
+			if seen[project.Path] {
+				continue
+			}
+			seen[project.Path] = true
+			if err := m.Git.Fetch(ctx, project.Path, m.Config.Project.Workspace.Git.RemoteName); err != nil {
+				return CreatePlan{}, fmt.Errorf("refresh %s from %s: %w", project.Name, m.Config.Project.Workspace.Git.RemoteName, err)
+			}
+		}
+	}
+	return buildCreatePlan(ctx, m.Config.Project.Workspace, m.Git, workspaceName, projects, baseKind, baseOverride, branchNameTemplate)
 }
 
 func BuildCreatePlan(ctx context.Context, cfg config.WorkspaceConfig, git gitclient.Client, workspaceName string, projects []discovery.Project, baseKind string, baseOverride string) (CreatePlan, error) {
+	return buildCreatePlan(ctx, cfg, git, workspaceName, projects, baseKind, baseOverride, "")
+}
+
+func buildCreatePlan(ctx context.Context, cfg config.WorkspaceConfig, git gitclient.Client, workspaceName string, projects []discovery.Project, baseKind string, baseOverride string, branchNameTemplate string) (CreatePlan, error) {
 	workspaceName = Slug(workspaceName)
 	dirName, err := DirName(workspaceName)
 	if err != nil {
@@ -74,7 +99,10 @@ func BuildCreatePlan(ctx context.Context, cfg config.WorkspaceConfig, git gitcli
 	if _, err := os.Stat(workspacePath); err == nil {
 		return CreatePlan{}, fmt.Errorf("workspace already exists: %s", workspacePath)
 	}
-	workBranch := RenderBranchName(cfg.Git.BranchNameTemplate, workspaceName)
+	if strings.TrimSpace(branchNameTemplate) == "" {
+		branchNameTemplate = cfg.Git.BranchNameTemplate
+	}
+	workBranch := RenderBranchName(branchNameTemplate, workspaceName)
 	plan := CreatePlan{
 		WorkspaceName: workspaceName,
 		WorkspaceDir:  dirName,
@@ -83,9 +111,20 @@ func BuildCreatePlan(ctx context.Context, cfg config.WorkspaceConfig, git gitcli
 		BaseKind:      baseKind,
 		Items:         make([]CreatePlanItem, 0, len(projects)),
 	}
+	destinations := map[string]bool{}
 	for _, project := range projects {
 		baseBranch := resolveBaseBranch(ctx, cfg, git, project.Path, baseKind, baseOverride)
-		destination := filepath.Join(workspacePath, project.Name)
+		destinationName, err := projectDestinationName(project)
+		if err != nil {
+			return CreatePlan{}, err
+		}
+		key := strings.ToLower(destinationName)
+		if destinations[key] {
+			return CreatePlan{}, fmt.Errorf("duplicate project destination: %s", destinationName)
+		}
+		destinations[key] = true
+		project.DestinationName = destinationName
+		destination := filepath.Join(workspacePath, destinationName)
 		item := CreatePlanItem{
 			Project:     project,
 			BaseBranch:  baseBranch,
@@ -96,6 +135,21 @@ func BuildCreatePlan(ctx context.Context, cfg config.WorkspaceConfig, git gitcli
 		plan.Items = append(plan.Items, item)
 	}
 	return plan, nil
+}
+
+func projectDestinationName(project discovery.Project) (string, error) {
+	name := strings.TrimSpace(project.DestinationName)
+	if name == "" {
+		name = strings.TrimSpace(project.Name)
+	}
+	clean, err := safety.CleanRelativePath(name, "project destination")
+	if err != nil {
+		return "", err
+	}
+	if filepath.Base(clean) != clean || strings.Contains(filepath.ToSlash(name), "/") {
+		return "", fmt.Errorf("project destination must be one directory name: %s", name)
+	}
+	return clean, nil
 }
 
 func (m *Manager) ExecuteCreatePlan(ctx context.Context, plan CreatePlan) CreateResult {
@@ -143,11 +197,12 @@ func (m *Manager) executeCreatePlan(ctx context.Context, plan CreatePlan, onStep
 		}
 		result.Created++
 		project := metadata.Project{
-			Name:       item.Project.Name,
-			Source:     item.Project.Path,
-			Path:       item.Destination,
-			BaseBranch: item.BaseBranch,
-			WorkBranch: item.WorkBranch,
+			Name:            item.Project.Name,
+			DestinationName: item.Project.DestinationName,
+			Source:          item.Project.Path,
+			Path:            item.Destination,
+			BaseBranch:      item.BaseBranch,
+			WorkBranch:      item.WorkBranch,
 		}
 		result.CreatedProjects = append(result.CreatedProjects, project)
 		notifyOperationStep(onStep, OperationStep{Stage: "hook", Subject: item.Project.Name, Detail: "project.added"})
@@ -184,6 +239,11 @@ func (m *Manager) executeCreatePlan(ctx context.Context, plan CreatePlan, onStep
 	if _, err := bootstrap.WriteWorkspaceHarness(*m.Config, plan.WorkspacePath); err != nil {
 		result.Failed++
 		result.Errors = append(result.Errors, workspaceStageError("agent harness", plan.WorkspaceDir, err))
+	}
+	notifyOperationStep(onStep, OperationStep{Stage: "editor workspace", Subject: plan.WorkspaceDir, Detail: "write code workspace"})
+	if _, err := writeCodeWorkspace(cfg.CodeWorkspace, plan.WorkspaceName, plan.WorkspacePath, result.CreatedProjects); err != nil {
+		result.Failed++
+		result.Errors = append(result.Errors, workspaceStageError("editor workspace", plan.WorkspaceDir, err))
 	}
 	notifyOperationStep(onStep, OperationStep{Stage: "hook", Subject: plan.WorkspaceDir, Detail: "workspace.created"})
 	if _, err := hooks.Run(ctx, m.Runner, cfg.Hooks, hooks.WorkspaceCreated, hooks.Context{Workspace: workspaceContext}, false); err != nil {

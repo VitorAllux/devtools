@@ -60,9 +60,6 @@ func (m *Manager) Download(ctx context.Context, entry Entry) error {
 		localPath = filepath.Join(localPath, transferEntryName(entry), time.Now().Format("2006-01-02"))
 	}
 	localPath = config.ExpandPath(localPath)
-	if err := prepareTransferDestination(localPath, destination.PerHost); err != nil {
-		return err
-	}
 	ui.Info("Download")
 	ui.Info("  Host:   %s", entry.Name)
 	ui.Info("  Remote: %s", remotePath)
@@ -73,6 +70,9 @@ func (m *Manager) Download(ctx context.Context, entry Entry) error {
 	}
 	if !ui.Confirm("Start download?") {
 		return nil
+	}
+	if err := prepareTransferDestination(localPath, destination.PerHost); err != nil {
+		return err
 	}
 	args := scpArgs(recursive, entry.Target+":"+remotePath, localPath)
 	return m.runTransferInTerminal(ctx, "download", transferEntryName(entry), args)
@@ -115,16 +115,22 @@ func (m *Manager) Upload(ctx context.Context, entry Entry) error {
 }
 
 func (m *Manager) OpenDownloads(ctx context.Context) error {
-	dir, err := m.ensureDownloadsDir()
-	if err != nil {
+	dir := m.downloadsDir()
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		ui.Info("SCP downloads directory does not exist yet: %s", dir)
+		return nil
+	} else if err != nil {
 		return err
 	}
 	return m.openDirectoryInTerminal(ctx, dir)
 }
 
 func (m *Manager) CleanDownloads(ctx context.Context) error {
-	dir, err := m.ensureDownloadsDir()
-	if err != nil {
+	dir := m.downloadsDir()
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		ui.Info("SCP downloads are already clean")
+		return nil
+	} else if err != nil {
 		return err
 	}
 	if err := validateCleanDownloadsDir(m.Config, dir); err != nil {
@@ -156,22 +162,16 @@ func (m *Manager) CleanDownloads(ctx context.Context) error {
 	return nil
 }
 
-func (m *Manager) ensureDownloadsDir() (string, error) {
+func (m *Manager) downloadsDir() string {
 	dir := config.ExpandPath(strings.TrimSpace(m.Config.Project.SSH.Transfer.DownloadsDir))
 	if dir == "" {
 		dir = config.ExpandPath(config.DefaultProjectConfig().SSH.Transfer.DownloadsDir)
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", err
-	}
-	return dir, nil
+	return dir
 }
 
 func (m *Manager) selectTransferDestination(ctx context.Context, entry Entry) (transferDestination, error) {
-	downloadsDir, err := m.ensureDownloadsDir()
-	if err != nil {
-		return transferDestination{}, err
-	}
+	downloadsDir := m.downloadsDir()
 	cwd, _ := os.Getwd()
 	options := []transferDestination{
 		{Raw: "default", Label: "Default downloads dir", Path: downloadsDir, PerHost: true},

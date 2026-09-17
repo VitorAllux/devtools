@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/VitorAllux/devtools/internal/bootstrap"
@@ -79,6 +80,16 @@ func BuildAddPlan(ctx context.Context, cfg config.WorkspaceConfig, git gitclient
 		WorkBranch:    workBranch,
 		Items:         make([]AddPlanItem, 0, len(projects)),
 	}
+	destinations := map[string]bool{}
+	for _, project := range meta.Projects {
+		destinationName := strings.TrimSpace(project.DestinationName)
+		if destinationName == "" {
+			destinationName = strings.TrimSpace(project.Name)
+		}
+		if destinationName != "" {
+			destinations[strings.ToLower(destinationName)] = true
+		}
+	}
 	for _, project := range projects {
 		baseBranch := options.BaseBranch
 		if baseBranch == "" && options.Mode == AddBaseWorkspace {
@@ -91,7 +102,17 @@ func BuildAddPlan(ctx context.Context, cfg config.WorkspaceConfig, git gitclient
 			baseBranch = git.DetectBaseBranch(ctx, project.Path, cfg.Git.RemoteName, cfg.Git.BaseBranchPriority)
 		}
 
-		destination := filepath.Join(ws.Path, project.Name)
+		destinationName, err := projectDestinationName(project)
+		if err != nil {
+			return AddPlan{}, err
+		}
+		key := strings.ToLower(destinationName)
+		if destinations[key] {
+			return AddPlan{}, fmt.Errorf("duplicate project destination: %s", destinationName)
+		}
+		destinations[key] = true
+		project.DestinationName = destinationName
+		destination := filepath.Join(ws.Path, destinationName)
 		item := AddPlanItem{
 			Project:     project,
 			BaseBranch:  baseBranch,
@@ -134,11 +155,12 @@ func (m *Manager) executeAddPlan(ctx context.Context, plan AddPlan, onStep func(
 		}
 		result.Created++
 		project := metadata.Project{
-			Name:       item.Project.Name,
-			Source:     item.Project.Path,
-			Path:       item.Destination,
-			BaseBranch: item.BaseBranch,
-			WorkBranch: item.WorkBranch,
+			Name:            item.Project.Name,
+			DestinationName: item.Project.DestinationName,
+			Source:          item.Project.Path,
+			Path:            item.Destination,
+			BaseBranch:      item.BaseBranch,
+			WorkBranch:      item.WorkBranch,
 		}
 		result.AddedProjects = append(result.AddedProjects, project)
 		notifyOperationStep(onStep, OperationStep{Stage: "hook", Subject: item.Project.Name, Detail: "project.added"})

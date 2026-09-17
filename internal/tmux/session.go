@@ -232,7 +232,7 @@ func sessionPickerThemeArgs(prompt string) []string {
 		}
 		filtered = append(filtered, arg)
 	}
-	return append([]string{"--height=50%", "--min-height=12"}, filtered...)
+	return ui.ApplyFZFHubLayout(append([]string{"--height=50%", "--min-height=12"}, filtered...))
 }
 
 func browseFeedCommand(executable string, currentDir string, query string, searchRoot string, depth int) string {

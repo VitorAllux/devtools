@@ -43,12 +43,13 @@ type Details struct {
 }
 
 type Project struct {
-	Name       string
-	Source     string
-	Path       string
-	BaseBranch string
-	WorkBranch string
-	Dirty      bool
+	Name            string
+	DestinationName string
+	Source          string
+	Path            string
+	BaseBranch      string
+	WorkBranch      string
+	Dirty           bool
 }
 
 func NewManager(cfg *config.Config, runner run.Runner) *Manager {
@@ -227,7 +228,11 @@ func (m *Manager) workspaceLastActivity(ctx context.Context, ws Workspace, meta 
 		for _, project := range meta.Projects {
 			projectPath := strings.TrimSpace(project.Path)
 			if projectPath == "" && strings.TrimSpace(project.Name) != "" {
-				projectPath = filepath.Join(ws.Path, project.Name)
+				destinationName := strings.TrimSpace(project.DestinationName)
+				if destinationName == "" {
+					destinationName = project.Name
+				}
+				projectPath = filepath.Join(ws.Path, destinationName)
 			}
 			if projectPath == "" {
 				continue
@@ -312,6 +317,18 @@ func (m *Manager) WorktreeProjects(ctx context.Context, ws Workspace) ([]Project
 	if err != nil {
 		return nil, err
 	}
+	meta, hasMetadata, err := metadata.Read(ws.Path)
+	if err != nil {
+		return nil, err
+	}
+	metadataByPath := map[string]metadata.Project{}
+	if hasMetadata {
+		for _, project := range meta.Projects {
+			if strings.TrimSpace(project.Path) != "" {
+				metadataByPath[cleanAbs(project.Path)] = project
+			}
+		}
+	}
 	projects := []Project{}
 	for _, entry := range entries {
 		if !entry.IsDir() {
@@ -326,13 +343,23 @@ func (m *Manager) WorktreeProjects(ctx context.Context, ws Workspace) ([]Project
 		if err != nil {
 			return nil, err
 		}
-		projects = append(projects, Project{
-			Name:       entry.Name(),
-			Source:     source,
-			Path:       path,
-			WorkBranch: m.Git.CurrentBranch(ctx, path),
-			Dirty:      m.Git.HasChanges(ctx, path),
-		})
+		project := Project{
+			Name:            entry.Name(),
+			DestinationName: entry.Name(),
+			Source:          source,
+			Path:            path,
+			WorkBranch:      m.Git.CurrentBranch(ctx, path),
+			Dirty:           m.Git.HasChanges(ctx, path),
+		}
+		if stored, ok := metadataByPath[cleanAbs(path)]; ok {
+			project.Name = stored.Name
+			project.DestinationName = stored.DestinationName
+			if strings.TrimSpace(project.DestinationName) == "" {
+				project.DestinationName = entry.Name()
+			}
+			project.BaseBranch = stored.BaseBranch
+		}
+		projects = append(projects, project)
 	}
 	sort.Slice(projects, func(i, j int) bool { return projects[i].Name < projects[j].Name })
 	return projects, nil

@@ -2,7 +2,7 @@
 
 Personal developer CLI for local automation.
 
-Current version: `2.0.0-alpha.3`
+Current version: `2.0.0-alpha.4`
 
 `dvv` is the Go rewrite of the previous shell-based devtools project. The command prefix is now `dvv`; the old `devv` command is intentionally not the public command.
 
@@ -200,7 +200,7 @@ Shortcuts:
 
 SSH entries are stored in `~/.config/devv/servers.list`. The path is preserved for compatibility with existing local setups.
 
-SCP downloads default to `~/Downloads/dvv-scp`. Downloads are grouped by SSH entry and date, such as `~/Downloads/dvv-scp/prod-api/2026-09-14/app.log`. When the remote path ends with `/`, `dvv` asks before downloading the directory recursively with `scp -r`. `dvv setup`, `dvv doctor --fix`, and SCP actions create the directory when needed.
+SCP downloads default to `~/Downloads/dvv-scp`. Downloads are grouped by SSH entry and date, such as `~/Downloads/dvv-scp/prod-api/2026-09-14/app.log`. When the remote path ends with `/`, `dvv` asks before downloading the directory recursively with `scp -r`. The directory is created only after a download using that destination is confirmed; setup, doctor, opening, cleaning, and cancelled transfers leave it absent.
 
 ## Workspace Hub
 
@@ -244,7 +244,9 @@ Creation rules:
 | `Issue` | `master` |
 | `Other` | Ask for source branch |
 
-Workspace templates are managed from the hub with `Shift+T`. A template stores a name, optional description, base selection, optional source branch, and selected projects in `DVV_WORKSPACE_TEMPLATES`. The template hub can create, edit, and delete saved templates with its own configurable shortcuts. When creating a workspace with `Shift+N`, the base selector lists `Bug`, `Issue`, `Other`, and saved templates in one screen. Choosing a template reuses its projects and base branch rules.
+Workspace templates are managed from the hub with `Shift+T` and saved in `~/.config/devv/config.json`. A template stores a name, optional description, base selection, branch name pattern, selected projects, and optional worktree directory aliases. For example, workspace `123` can remain `workspace-123`, use branch `task_123`, and place `api-project` in an `api` directory. The template hub preview shows these choices before use. `DVV_WORKSPACE_TEMPLATES` remains supported as a compatibility input.
+
+Workspace preferences for fetching remotes before creation, generating a `.code-workspace` file, and enabling either agent harness output are available in the `Workspace` category of `dvv config`. Free-form lifecycle hooks and project-targeted bootstrap commands belong in the structured local JSON file. Bootstrap copy rules read from the primary source checkout, so the default `.env` rule copies `<source-repository>/.env` into the new worktree.
 
 ### Workspace Agent Harness
 
@@ -415,11 +417,19 @@ Shortcuts:
 dvv config
 ```
 
-The configuration hub edits persisted runtime values in:
+The configuration hub edits persisted scalar runtime values in:
 
 ```text
 ~/.config/devv/config.env
 ```
+
+Structured personal settings, including workspace templates and lifecycle hooks, live in:
+
+```text
+~/.config/devv/config.json
+```
+
+Load precedence is project `dvv.config.json`, structured local `config.json`, persisted `config.env`, then explicit process environment values. Templates are merged by case-insensitive name; a local template replaces a versioned template with the same name.
 
 `dvv config` opens a category hub first. Use `Theme` to switch the CLI theme, `Profiles` to select the active runtime profile, `All Keys` for the complete raw key editor, or choose a focused area such as `Paths`, `Shortcuts`, `Workspace`, `SSH`, `Database`, `Tmux`, `Resources`/ports, `Integrations`, or `Safety`.
 
@@ -453,6 +463,7 @@ Runtime/local data lives outside the repository:
 | Data | Path |
 | --- | --- |
 | Runtime config | `~/.config/devv/config.env` |
+| Structured local config | `~/.config/devv/config.json` |
 | SSH list | `~/.config/devv/servers.list` |
 | AGE private key | `~/.config/devv/keys/age.key` |
 | Encrypted SSH backup | `secrets/servers.list.age` or `~/.config/devv/servers.list.age` |
@@ -480,6 +491,10 @@ DVV_WORKSPACE_PROJECT_ROOTS=~/workspace:~/Development/projects:~/Work/Developmen
 DVV_WORKSPACE_PROJECT_EXCLUDE_DIRS=worktrees:External:dumps
 DVV_WORKSPACE_PROJECT_SEARCH_DEPTH=4
 DVV_WORKSPACE_OPENER=cursor
+DVV_WORKSPACE_FETCH_BEFORE_CREATE=0
+DVV_WORKSPACE_CODE_WORKSPACE_ENABLED=0
+DVV_WORKSPACE_AGENTS_FILE_ENABLED=1
+DVV_WORKSPACE_AGENTS_DIR_ENABLED=1
 DVV_WORKSPACE_HARNESS_AGENTS_DIR=.agents
 DVV_WORKSPACE_HARNESS_SKILL_PATHS=.agents/skills:.codex/skills:.claude/skills:~/.codex/skills:~/.agents/skills:~/.claude/skills
 DVV_WORKSPACE_HARNESS_PROJECT_SKILL_PATHS=.agents/skills:.codex/skills:.claude/skills
@@ -521,7 +536,7 @@ DVV_TMUX_HUB_CREATE_SHORTCUT=shift+n
 DVV_TMUX_ENVIRONMENTS='[{"name":"on-premise","apiDir":"~/workspace/on-premise/api","webDir":"~/workspace/on-premise/web"}]'
 ```
 
-Workspace templates:
+Compatibility workspace templates and template hub shortcuts:
 
 ```bash
 DVV_WORKSPACE_TEMPLATES='[{"name":"fullstack-bug","baseKind":"bug","projects":[{"name":"api","path":"~/workspace/projects/api"},{"name":"web","path":"~/workspace/projects/web"}]}]'
@@ -677,6 +692,14 @@ Main packages:
 Before adding a new hub, use `internal/ui.FZFHub`, keep shortcuts configurable, and document the public command in this README and completion.
 
 ## Version Notes
+
+`2.0.0-alpha.4`:
+
+- Added structured personal workspace config in `~/.config/devv/config.json`.
+- Added per-template branch patterns and project directory aliases.
+- Added optional remote refresh, `.code-workspace` generation, agent harness toggles, and project-targeted bootstrap commands.
+- Made the SCP downloads directory lazy and fixed platform-specific resource tests on macOS.
+- Added optional personal sizing for all fzf hubs and selectors.
 
 `2.0.0-alpha.3`:
 

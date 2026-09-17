@@ -357,7 +357,7 @@ func FZFThemeArgs(prompt ...string) []string {
 	if len(prompt) > 0 && strings.TrimSpace(prompt[0]) != "" {
 		value = prompt[0]
 	}
-	return []string{
+	return ApplyFZFHubLayout([]string{
 		"--ansi",
 		"--height=~85%",
 		"--min-height=18",
@@ -374,7 +374,7 @@ func FZFThemeArgs(prompt ...string) []string {
 		"--pointer=>>",
 		"--marker=+",
 		"--color=" + fzfColorSpec(themeColors()),
-	}
+	})
 }
 
 func isTerminal(file *os.File) bool {

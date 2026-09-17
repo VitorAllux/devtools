@@ -69,6 +69,14 @@ func (c Client) HasChanges(ctx context.Context, path string) bool {
 	return err == nil && strings.TrimSpace(string(out)) != ""
 }
 
+func (c Client) Fetch(ctx context.Context, projectPath string, remoteName string) error {
+	remoteName = strings.TrimSpace(remoteName)
+	if remoteName == "" {
+		return fmt.Errorf("git remote name is required")
+	}
+	return run.Quiet(ctx, c.Runner, "", "git", "-C", projectPath, "fetch", "--prune", remoteName)
+}
+
 func (c Client) BranchExists(ctx context.Context, projectPath string, branch string) bool {
 	branch = strings.TrimSpace(branch)
 	if branch == "" {

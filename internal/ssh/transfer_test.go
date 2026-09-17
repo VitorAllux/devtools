@@ -6,11 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/VitorAllux/devtools/internal/config"
 )
 
-func TestOpenDownloadsCreatesDirectoryAndTerminalSession(t *testing.T) {
+func TestOpenDownloadsDoesNotCreateMissingDirectory(t *testing.T) {
 	t.Setenv("TMUX", "")
 	dir := filepath.Join(t.TempDir(), "downloads")
 	cfg := configWithSCPDownloads(t, dir)
@@ -20,8 +21,25 @@ func TestOpenDownloadsCreatesDirectoryAndTerminalSession(t *testing.T) {
 	if err := manager.OpenDownloads(context.Background()); err != nil {
 		t.Fatalf("OpenDownloads returned error: %v", err)
 	}
-	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
-		t.Fatalf("downloads dir was not created: info=%v err=%v", info, err)
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("downloads dir should remain absent: err=%v", err)
+	}
+	if got := runner.lastCommand(); got != "" {
+		t.Fatalf("missing downloads directory should not open tmux: %q", got)
+	}
+}
+
+func TestOpenDownloadsOpensExistingDirectory(t *testing.T) {
+	t.Setenv("TMUX", "")
+	dir := filepath.Join(t.TempDir(), "downloads")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("MkdirAll failed: %v", err)
+	}
+	runner := &terminalFakeRunner{paths: terminalLauncherTestPaths()}
+	manager := Manager{Config: configWithSCPDownloads(t, dir), Runner: runner}
+
+	if err := manager.OpenDownloads(context.Background()); err != nil {
+		t.Fatalf("OpenDownloads returned error: %v", err)
 	}
 	if got := runner.lastCommand(); !strings.HasPrefix(got, "tmux new-session -ds dvv-scp-downloads-") || !strings.Contains(got, " -c "+dir+" ") {
 		t.Fatalf("tmux command = %q", got)
@@ -56,6 +74,36 @@ func TestCleanDownloadsRemovesOnlyChildren(t *testing.T) {
 	}
 	if len(entries) != 0 {
 		t.Fatalf("downloads dir should be empty: %#v", entries)
+	}
+}
+
+func TestCleanDownloadsDoesNotCreateMissingDirectory(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "downloads")
+	manager := Manager{Config: configWithSCPDownloads(t, dir), Runner: &terminalFakeRunner{}}
+
+	if err := manager.CleanDownloads(context.Background()); err != nil {
+		t.Fatalf("CleanDownloads returned error: %v", err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("downloads dir should remain absent: err=%v", err)
+	}
+}
+
+func TestCancelledDownloadDoesNotCreateDestination(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	withSSHStdin(t, "/tmp/app.log\n\nn\n")
+	dir := filepath.Join(t.TempDir(), "downloads")
+	runner := &terminalFakeRunner{paths: map[string]bool{"scp": true}}
+	manager := Manager{Config: configWithSCPDownloads(t, dir), Runner: runner}
+
+	if err := manager.Download(context.Background(), Entry{Name: "test", Target: "user@example.com"}); err != nil {
+		t.Fatalf("Download returned error: %v", err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("cancelled download should leave destination absent: err=%v", err)
+	}
+	if got := runner.lastCommand(); got != "" {
+		t.Fatalf("cancelled download should not launch transfer: %q", got)
 	}
 }
 
@@ -118,7 +166,13 @@ func withSSHStdin(t *testing.T, input string) {
 	os.Stdin = reader
 	done := make(chan struct{})
 	go func() {
-		_, _ = writer.WriteString(input)
+		for _, line := range strings.SplitAfter(input, "\n") {
+			if line == "" {
+				continue
+			}
+			_, _ = writer.WriteString(line)
+			time.Sleep(20 * time.Millisecond)
+		}
 		_ = writer.Close()
 		close(done)
 	}()

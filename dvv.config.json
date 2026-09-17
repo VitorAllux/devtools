@@ -168,6 +168,7 @@
       "reuseExistingBranch": true,
       "createBranchIfMissing": true,
       "branchNameTemplate": "{{ workspace.name }}",
+      "fetchBeforeCreate": false,
       "baseByType": {
         "bug": "prod",
         "issue": "master"
@@ -292,6 +293,11 @@
           }
         }
       ]
+    },
+    "codeWorkspace": {
+      "enabled": false,
+      "fileNameTemplate": "{{ workspace.name }}.code-workspace",
+      "overwrite": false
     },
     "workspaceHarness": {
       "agentsFile": {

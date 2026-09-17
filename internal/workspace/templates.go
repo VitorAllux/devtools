@@ -2,7 +2,6 @@ package workspace
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -13,32 +12,35 @@ import (
 )
 
 type createSource struct {
-	ID            string
-	Kind          string
-	Label         string
-	BaseKind      string
-	BaseOverride  string
-	BaseLabel     string
-	ProjectsLabel string
-	Description   string
-	Projects      []discovery.Project
+	ID                 string
+	Kind               string
+	Label              string
+	BaseKind           string
+	BaseOverride       string
+	BaseLabel          string
+	ProjectsLabel      string
+	Description        string
+	Projects           []discovery.Project
+	BranchNameTemplate string
 }
 
 type templateHubItem struct {
-	ID          string
-	Index       int
-	Name        string
-	Description string
-	BaseLabel   string
-	Projects    []discovery.Project
+	ID                 string
+	Index              int
+	Name               string
+	Description        string
+	BaseLabel          string
+	BranchNameTemplate string
+	Projects           []discovery.Project
 }
 
 type templateEditOptions struct {
-	Name        string
-	Description string
-	BaseKind    string
-	BaseBranch  string
-	Projects    []config.WorkspaceProject
+	Name               string
+	Description        string
+	BaseKind           string
+	BaseBranch         string
+	BranchNameTemplate string
+	Projects           []config.WorkspaceProject
 }
 
 func (m *Manager) templatesHub(ctx context.Context) error {
@@ -82,8 +84,8 @@ func (m *Manager) fzfTemplatesHub(ctx context.Context, hubError string) (bool, s
 		Shortcuts:     shortcuts,
 		ExtraArgs: []string{
 			"--delimiter=\t",
-			"--with-nth=7",
-			"--nth=1,2,3,4,5,6,7",
+			"--with-nth=9",
+			"--nth=1,2,3,4,5,6,7,8,9",
 			"--header-lines=1",
 			"--multi",
 		},
@@ -218,13 +220,25 @@ func (m *Manager) createTemplateInteractive(ctx context.Context) error {
 	if len(projects) == 0 {
 		return fmt.Errorf("no projects selected")
 	}
+	branchTemplate, err := promptDefault("Branch name template", m.Config.Project.Workspace.Git.BranchNameTemplate)
+	if err != nil {
+		return err
+	}
+	templateProjects := workspaceProjectsFromDiscovery(projects)
+	if ui.Confirm("Customize project directory names?") {
+		templateProjects, err = promptProjectDestinationNames(templateProjects)
+		if err != nil {
+			return err
+		}
+	}
 
 	template := config.WorkspaceTemplate{
-		Name:        name,
-		Description: strings.TrimSpace(description),
-		BaseKind:    baseKind,
-		BaseBranch:  strings.TrimSpace(baseBranch),
-		Projects:    workspaceProjectsFromDiscovery(projects),
+		Name:               name,
+		Description:        strings.TrimSpace(description),
+		BaseKind:           baseKind,
+		BaseBranch:         strings.TrimSpace(baseBranch),
+		BranchNameTemplate: strings.TrimSpace(branchTemplate),
+		Projects:           templateProjects,
 	}
 	templates := appendOrReplaceWorkspaceTemplate(m.Config.Project.Workspace.Templates, template)
 	if err := m.writeWorkspaceTemplates(templates); err != nil {
@@ -241,11 +255,12 @@ func (m *Manager) editTemplateInteractive(ctx context.Context, index int) error 
 	}
 	current := templates[index]
 	options := templateEditOptions{
-		Name:        strings.TrimSpace(current.Name),
-		Description: strings.TrimSpace(current.Description),
-		BaseKind:    strings.TrimSpace(current.BaseKind),
-		BaseBranch:  strings.TrimSpace(current.BaseBranch),
-		Projects:    current.Projects,
+		Name:               strings.TrimSpace(current.Name),
+		Description:        strings.TrimSpace(current.Description),
+		BaseKind:           strings.TrimSpace(current.BaseKind),
+		BaseBranch:         strings.TrimSpace(current.BaseBranch),
+		BranchNameTemplate: strings.TrimSpace(current.BranchNameTemplate),
+		Projects:           current.Projects,
 	}
 
 	name, err := promptDefault("Template name", options.Name)
@@ -261,6 +276,13 @@ func (m *Manager) editTemplateInteractive(ctx context.Context, index int) error 
 		return err
 	}
 	options.Description = strings.TrimSpace(description)
+	if ui.Confirm("Change branch name template?") {
+		branchTemplate, err := promptDefault("Branch name template", firstNonEmpty(options.BranchNameTemplate, m.Config.Project.Workspace.Git.BranchNameTemplate))
+		if err != nil {
+			return err
+		}
+		options.BranchNameTemplate = strings.TrimSpace(branchTemplate)
+	}
 
 	if ui.Confirm("Change base branch?") {
 		baseKind, err := m.selectBaseKind(ctx)
@@ -294,13 +316,21 @@ func (m *Manager) editTemplateInteractive(ctx context.Context, index int) error 
 		}
 		options.Projects = workspaceProjectsFromDiscovery(projects)
 	}
+	if ui.Confirm("Change project directory names?") {
+		projects, err := promptProjectDestinationNames(options.Projects)
+		if err != nil {
+			return err
+		}
+		options.Projects = projects
+	}
 
 	next := config.WorkspaceTemplate{
-		Name:        options.Name,
-		Description: options.Description,
-		BaseKind:    options.BaseKind,
-		BaseBranch:  options.BaseBranch,
-		Projects:    options.Projects,
+		Name:               options.Name,
+		Description:        options.Description,
+		BaseKind:           options.BaseKind,
+		BaseBranch:         options.BaseBranch,
+		BranchNameTemplate: options.BranchNameTemplate,
+		Projects:           options.Projects,
 	}
 	updated, err := updateWorkspaceTemplate(templates, index, next)
 	if err != nil {
@@ -418,15 +448,16 @@ func templateCreateSource(cfg config.WorkspaceConfig, index int, template config
 		description = "Uses saved projects: " + projectNameList(projects)
 	}
 	return createSource{
-		ID:            fmt.Sprintf("template:%d", index),
-		Kind:          "template",
-		Label:         name,
-		BaseKind:      strings.TrimSpace(template.BaseKind),
-		BaseOverride:  strings.TrimSpace(template.BaseBranch),
-		BaseLabel:     workspaceBaseLabel(cfg, template.BaseKind, template.BaseBranch),
-		ProjectsLabel: fmt.Sprintf("%d project(s)", len(projects)),
-		Description:   description,
-		Projects:      projects,
+		ID:                 fmt.Sprintf("template:%d", index),
+		Kind:               "template",
+		Label:              name,
+		BaseKind:           strings.TrimSpace(template.BaseKind),
+		BaseOverride:       strings.TrimSpace(template.BaseBranch),
+		BaseLabel:          workspaceBaseLabel(cfg, template.BaseKind, template.BaseBranch),
+		ProjectsLabel:      fmt.Sprintf("%d project(s)", len(projects)),
+		Description:        description,
+		Projects:           projects,
+		BranchNameTemplate: strings.TrimSpace(template.BranchNameTemplate),
 	}
 }
 
@@ -456,7 +487,7 @@ func templateProjects(template config.WorkspaceTemplate) []discovery.Project {
 		if name == "" {
 			name = filepath.Base(path)
 		}
-		projects = append(projects, discovery.Project{Name: name, Path: path})
+		projects = append(projects, discovery.Project{Name: name, Path: path, DestinationName: strings.TrimSpace(project.DestinationName)})
 	}
 	return projects
 }
@@ -472,7 +503,7 @@ func workspaceProjectsFromDiscovery(projects []discovery.Project) []config.Works
 		if name == "" {
 			name = filepath.Base(path)
 		}
-		out = append(out, config.WorkspaceProject{Name: name, Path: path})
+		out = append(out, config.WorkspaceProject{Name: name, Path: path, DestinationName: strings.TrimSpace(project.DestinationName)})
 	}
 	return out
 }
@@ -489,26 +520,49 @@ func appendOrReplaceWorkspaceTemplate(templates []config.WorkspaceTemplate, next
 }
 
 func (m *Manager) writeWorkspaceTemplates(templates []config.WorkspaceTemplate) error {
-	if strings.TrimSpace(m.Config.ConfigFile) == "" {
-		return fmt.Errorf("runtime config file path is not configured")
+	if strings.TrimSpace(m.Config.LocalConfigFile) == "" {
+		return fmt.Errorf("local config file path is not configured")
 	}
-	content, err := json.Marshal(templates)
-	if err != nil {
+	if err := config.WriteLocalWorkspaceTemplates(m.Config.LocalConfigFile, templates); err != nil {
 		return err
 	}
-	if err := config.SetEnvFileValue(m.Config.ConfigFile, "DVV_WORKSPACE_TEMPLATES", string(content)); err != nil {
-		return err
+	if strings.TrimSpace(m.Config.ConfigFile) != "" {
+		if err := config.SetEnvFileValue(m.Config.ConfigFile, "DVV_WORKSPACE_TEMPLATES", ""); err != nil {
+			return err
+		}
 	}
 	m.Config.Project.Workspace.Templates = templates
 	return nil
 }
 
+func promptProjectDestinationNames(projects []config.WorkspaceProject) ([]config.WorkspaceProject, error) {
+	out := append([]config.WorkspaceProject{}, projects...)
+	for index := range out {
+		fallback := firstNonEmpty(strings.TrimSpace(out[index].DestinationName), strings.TrimSpace(out[index].Name))
+		value, err := promptDefault("Directory for "+out[index].Name, fallback)
+		if err != nil {
+			return nil, err
+		}
+		out[index].DestinationName = strings.TrimSpace(value)
+	}
+	return out, nil
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
 func templateRows(cfg config.WorkspaceConfig, templates []config.WorkspaceTemplate) string {
 	var builder strings.Builder
-	builder.WriteString(templateLine("__dvv_header__", "", "", "", "", "", templateHeader()))
+	builder.WriteString(templateLine("__dvv_header__", "", "", "", "", "", "", "", templateHeader()))
 	builder.WriteByte('\n')
 	if len(templates) == 0 {
-		builder.WriteString(templateLine("__dvv_empty__", "", "", "", "", "No templates saved yet.", ui.Muted("--  No workspace templates yet")))
+		builder.WriteString(templateLine("__dvv_empty__", "", "", "", "", "", "", "No templates saved yet.", ui.Muted("--  No workspace templates yet")))
 		builder.WriteByte('\n')
 		return builder.String()
 	}
@@ -519,9 +573,13 @@ func templateRows(cfg config.WorkspaceConfig, templates []config.WorkspaceTempla
 			Name:        strings.TrimSpace(template.Name),
 			Description: templateDescription(template),
 			BaseLabel:   workspaceBaseLabel(cfg, template.BaseKind, template.BaseBranch),
-			Projects:    templateProjects(template),
+			BranchNameTemplate: firstNonEmpty(
+				strings.TrimSpace(template.BranchNameTemplate),
+				strings.TrimSpace(cfg.Git.BranchNameTemplate),
+			),
+			Projects: templateProjects(template),
 		}
-		builder.WriteString(templateLine(item.ID, item.Name, item.BaseLabel, fmt.Sprintf("%d project(s)", len(item.Projects)), projectNamePreviewList(item.Projects), item.Description, templateRow(item)))
+		builder.WriteString(templateLine(item.ID, item.Name, item.BaseLabel, fmt.Sprintf("%d project(s)", len(item.Projects)), item.BranchNameTemplate, projectNamePreviewList(item.Projects), projectDestinationPreviewList(item.Projects), item.Description, templateRow(item)))
 		builder.WriteByte('\n')
 	}
 	return builder.String()
@@ -545,13 +603,15 @@ func templateRow(item templateHubItem) string {
 	)
 }
 
-func templateLine(raw string, name string, base string, projects string, projectNames string, description string, display string) string {
+func templateLine(raw string, name string, base string, projects string, branchTemplate string, projectNames string, projectDestinations string, description string, display string) string {
 	return strings.Join([]string{
 		cleanTemplateFZFField(raw),
 		cleanTemplateFZFField(name),
 		cleanTemplateFZFField(base),
 		cleanTemplateFZFField(projects),
+		cleanTemplateFZFField(branchTemplate),
 		cleanTemplateFZFField(projectNames),
+		cleanTemplateFZFField(projectDestinations),
 		cleanTemplateFZFField(description),
 		display,
 	}, "\t")
@@ -564,8 +624,10 @@ raw=$(printf "%s" "$line" | cut -f1)
 name=$(printf "%s" "$line" | cut -f2)
 base=$(printf "%s" "$line" | cut -f3)
 projects=$(printf "%s" "$line" | cut -f4)
-project_names=$(printf "%s" "$line" | cut -f5)
-description=$(printf "%s" "$line" | cut -f6)
+branch_template=$(printf "%s" "$line" | cut -f5)
+project_names=$(printf "%s" "$line" | cut -f6)
+project_destinations=$(printf "%s" "$line" | cut -f7)
+description=$(printf "%s" "$line" | cut -f8)
 print_commands() {
 ` + commandDeck + `
 }
@@ -581,12 +643,13 @@ fi
 printf "%sTemplate profile%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-12s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$name"
 printf "  %s%-12s%s %s\n" "$dvv_label" "Base" "$dvv_reset" "$base"
+printf "  %s%-12s%s %s\n" "$dvv_label" "Branch" "$dvv_reset" "$branch_template"
 printf "  %s%-12s%s %s\n" "$dvv_label" "Projects" "$dvv_reset" "$projects"
 printf "  %s%-12s%s %s\n" "$dvv_label" "ID" "$dvv_reset" "$raw"
 if [ -n "$project_names" ]; then
   printf "\n%sSelected projects%s\n" "$dvv_heading" "$dvv_reset"
-  printf "%s" "$project_names" | tr "|" "\n" | while IFS= read -r project_name; do
-    [ -n "$project_name" ] && printf "  %s- %s%s\n" "$dvv_label" "$project_name" "$dvv_reset"
+  printf "%s" "$project_destinations" | tr "|" "\n" | while IFS= read -r project_destination; do
+    [ -n "$project_destination" ] && printf "  %s- %s%s\n" "$dvv_label" "$project_destination" "$dvv_reset"
   done
 fi
 printf "\n%s%s%s\n" "$dvv_muted" "$description" "$dvv_reset"
@@ -855,6 +918,20 @@ func projectNamePreviewList(projects []discovery.Project) string {
 	for _, project := range projects {
 		if strings.TrimSpace(project.Name) != "" {
 			names = append(names, strings.TrimSpace(project.Name))
+		}
+	}
+	return strings.Join(names, "|")
+}
+
+func projectDestinationPreviewList(projects []discovery.Project) string {
+	names := make([]string, 0, len(projects))
+	for _, project := range projects {
+		name := strings.TrimSpace(project.Name)
+		destination := firstNonEmpty(strings.TrimSpace(project.DestinationName), name)
+		if destination != name {
+			names = append(names, name+" -> "+destination)
+		} else {
+			names = append(names, name)
 		}
 	}
 	return strings.Join(names, "|")

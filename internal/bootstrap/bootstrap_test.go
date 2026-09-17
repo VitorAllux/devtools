@@ -64,7 +64,37 @@ func TestRunProjectCopiesFilesAndRunsMatchingCommands(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(worktree, ".env")); err != nil {
 		t.Fatalf("copied file missing: %v", err)
 	}
+	copied, err := os.ReadFile(filepath.Join(worktree, ".env"))
+	if err != nil || string(copied) != "APP_ENV=local\n" {
+		t.Fatalf("copied .env = %q err=%v", copied, err)
+	}
 	if got := strings.Join(runner.commands, " "); got != "npm i" {
+		t.Fatalf("commands = %q", got)
+	}
+}
+
+func TestRunProjectTargetsCommandsBySourceProjectName(t *testing.T) {
+	root := t.TempDir()
+	apiPath := filepath.Join(root, "api")
+	webPath := filepath.Join(root, "web")
+	if err := os.MkdirAll(apiPath, 0o755); err != nil {
+		t.Fatalf("MkdirAll api failed: %v", err)
+	}
+	if err := os.MkdirAll(webPath, 0o755); err != nil {
+		t.Fatalf("MkdirAll web failed: %v", err)
+	}
+	cfg := config.WorkspaceBootstrap{Commands: []config.WorkspaceBootstrapCommand{{
+		Name: "api-only", Command: "mkdir", Args: []string{"-p", "storage/runtime"},
+		When: config.WorkspaceBootstrapWhen{Projects: []string{"api-project"}},
+	}}}
+	runner := &bootstrapRunner{}
+	api := RunProject(context.Background(), cfg, runner, Project{Name: "api-project", Path: apiPath}, false)
+	web := RunProject(context.Background(), cfg, runner, Project{Name: "web-project", Path: webPath}, false)
+
+	if api.Failures != 0 || len(api.Commands) != 1 || len(web.Commands) != 0 {
+		t.Fatalf("project-targeted bootstrap api=%#v web=%#v", api, web)
+	}
+	if got := strings.Join(runner.commands, " "); got != "mkdir -p storage/runtime" {
 		t.Fatalf("commands = %q", got)
 	}
 }
@@ -227,6 +257,28 @@ func TestWriteWorkspaceHarnessWritesManifestGuidesAndSkillPaths(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(workspacePath, ".agents", "skills")); err != nil {
 		t.Fatalf("workspace skills dir missing: %v", err)
+	}
+}
+
+func TestWriteWorkspaceHarnessCanDisableBothOutputs(t *testing.T) {
+	workspacePath := t.TempDir()
+	project := config.DefaultProjectConfig()
+	project.Workspace.WorkspaceHarness.AgentsFile.Enabled = false
+	project.Workspace.WorkspaceHarness.AgentsDir.Enabled = false
+	cfg := config.Config{ConfigDir: filepath.Join(t.TempDir(), "config"), Project: project}
+
+	result, err := WriteWorkspaceHarness(cfg, workspacePath)
+	if err != nil {
+		t.Fatalf("WriteWorkspaceHarness returned error: %v", err)
+	}
+	if result.AgentsFileWritten || result.ManifestWritten || len(result.GuideFilesWritten) != 0 {
+		t.Fatalf("disabled harness result = %#v", result)
+	}
+	if _, err := os.Stat(filepath.Join(workspacePath, "AGENTS.md")); !os.IsNotExist(err) {
+		t.Fatalf("AGENTS.md should not exist, stat err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspacePath, ".agents")); !os.IsNotExist(err) {
+		t.Fatalf(".agents should not exist, stat err=%v", err)
 	}
 }
 

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -11,6 +12,27 @@ type FZFShortcut struct {
 	Key         string
 	Label       string
 	Description string
+}
+
+type FZFHubLayout struct {
+	HeightPercent       int
+	MinHeight           int
+	PreviewWidthPercent int
+}
+
+var configuredFZFHubLayout FZFHubLayout
+
+func SetFZFHubLayout(layout FZFHubLayout) {
+	configuredFZFHubLayout = FZFHubLayout{}
+	if layout.HeightPercent >= 20 && layout.HeightPercent <= 100 {
+		configuredFZFHubLayout.HeightPercent = layout.HeightPercent
+	}
+	if layout.MinHeight >= 10 && layout.MinHeight <= 100 {
+		configuredFZFHubLayout.MinHeight = layout.MinHeight
+	}
+	if layout.PreviewWidthPercent >= 20 && layout.PreviewWidthPercent <= 70 {
+		configuredFZFHubLayout.PreviewWidthPercent = layout.PreviewWidthPercent
+	}
 }
 
 type FZFHub struct {
@@ -37,8 +59,15 @@ func (h FZFHub) Args() []string {
 	}
 
 	args := FZFThemeArgs(prompt)
-	if strings.TrimSpace(h.Height) != "" || strings.TrimSpace(h.MinHeight) != "" {
-		args = replaceFZFHeightArgs(args, h.Height, h.MinHeight)
+	height, minHeight := h.Height, h.MinHeight
+	if configuredFZFHubLayout.HeightPercent > 0 {
+		height = strconv.Itoa(configuredFZFHubLayout.HeightPercent) + "%"
+	}
+	if configuredFZFHubLayout.MinHeight > 0 {
+		minHeight = strconv.Itoa(configuredFZFHubLayout.MinHeight)
+	}
+	if strings.TrimSpace(height) != "" || strings.TrimSpace(minHeight) != "" {
+		args = replaceFZFHeightArgs(args, height, minHeight)
 	}
 	if strings.TrimSpace(h.BorderLabel) != "" {
 		label := Crown(" " + strings.TrimSpace(h.BorderLabel) + " ")
@@ -68,6 +97,9 @@ func (h FZFHub) Args() []string {
 		if strings.TrimSpace(previewWindow) == "" {
 			previewWindow = "right,44%,border-rounded,wrap"
 		}
+		if configuredFZFHubLayout.PreviewWidthPercent > 0 {
+			previewWindow = replaceFZFPreviewWidth(previewWindow, configuredFZFHubLayout.PreviewWidthPercent)
+		}
 		args = append(args,
 			"--preview="+h.Preview,
 			"--preview-window="+previewWindow,
@@ -77,6 +109,22 @@ func (h FZFHub) Args() []string {
 	}
 	args = append(args, h.ExtraArgs...)
 	return args
+}
+
+func replaceFZFPreviewWidth(window string, width int) string {
+	parts := strings.Split(window, ",")
+	value := strconv.Itoa(width) + "%"
+	for index, part := range parts {
+		if strings.HasSuffix(strings.TrimSpace(part), "%") {
+			parts[index] = value
+			return strings.Join(parts, ",")
+		}
+	}
+	if len(parts) > 0 {
+		parts = append(parts[:1], append([]string{value}, parts[1:]...)...)
+		return strings.Join(parts, ",")
+	}
+	return "right," + value + ",border-rounded,wrap"
 }
 
 func (h FZFHub) Header() string {
@@ -129,6 +177,21 @@ func replaceFZFHeightArgs(args []string, height string, minHeight string) []stri
 		filtered = append(filtered, "--min-height="+strings.TrimSpace(minHeight))
 	}
 	return filtered
+}
+
+func ApplyFZFHubLayout(args []string) []string {
+	height := ""
+	minHeight := ""
+	if configuredFZFHubLayout.HeightPercent > 0 {
+		height = strconv.Itoa(configuredFZFHubLayout.HeightPercent) + "%"
+	}
+	if configuredFZFHubLayout.MinHeight > 0 {
+		minHeight = strconv.Itoa(configuredFZFHubLayout.MinHeight)
+	}
+	if height == "" && minHeight == "" {
+		return args
+	}
+	return replaceFZFHeightArgs(args, height, minHeight)
 }
 
 func ShortcutLine(shortcuts []FZFShortcut) string {
