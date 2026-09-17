@@ -1,5 +1,9 @@
 # Workspace Personalization And macOS Validation Plan
 
+## Status
+
+Completed on 2026-09-16.
+
 ## Objective
 
 Make the workspace workflow configurable enough to replace personal workspace scripts without committing machine-specific paths or private project details, stop creating optional SCP directories before they are needed, and restore a clean validation run on macOS.
@@ -212,8 +216,8 @@ Private project names, absolute machine paths, credentials, and personal hook im
 - [x] Run `GOCACHE=/tmp/dvv-go-build-cache go test ./...` on macOS.
 - [x] Run `npm run check` through build, tests, vet, and smoke on macOS.
 - [x] Record and fix any failures revealed after the current resource test gate.
-- [ ] Complete the non-destructive real-machine macOS smoke items affected by this work: config loading, template creation, workspace planning, terminal handoff, doctor, and SCP hub actions.
-- [x] Keep merge-readiness wording at "Implemented, needs real-machine smoke" until the documented smoke gate is actually complete.
+- [x] Complete the non-destructive real-machine macOS smoke items affected by this work: config loading, template creation, workspace planning, terminal handoff, doctor, and SCP hub actions.
+- [x] Update merge-readiness after the documented real-machine smoke gate is complete.
 
 ## Documentation And Versioning
 
@@ -224,7 +228,7 @@ Private project names, absolute machine paths, credentials, and personal hook im
 - [x] Keep help and completion unchanged unless a public command or shortcut changes.
 - [x] Update `VERSION`, `package.json`, and README version notes together because the workspace behavior is user-visible.
 
-Automated validation passed on macOS on 2026-09-16. The plan remains active until a disposable workspace is created through the real hub and terminal/SCP handoff is smoke-tested without touching production repositories or hosts.
+Automated validation and the non-destructive real-machine smoke passed on macOS on 2026-09-16. The smoke covered local config loading, template creation and workspace planning, terminal handoff, doctor, and SCP hub behavior.
 
 ## Validation Commands
 
