@@ -70,7 +70,7 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 | Default target | `dvv tmux` still reads legacy `API_DIR`, `WEB_DIR`, `TMUX_SESSION`, and `TMUX_WIN`. | Keep this for compatibility with existing local env files. |
 | Workspace targets | Workspace metadata adds one tmux target per `workspace-*` directory. | Use workspace paths when a task is worktree-based. |
 | Custom targets | `tmux.environments` or `DVV_TMUX_ENVIRONMENTS` adds named API/Web targets. | Use `Shift+N` in `dvv tmux` to pick API/Web projects from workspace discovery and save a reusable target. |
-| Workspace templates | `workspace.templates` or `DVV_WORKSPACE_TEMPLATES` adds reusable creation presets. | Use `Shift+T` in `dvv workspace` to save project/base selections and `Shift+N` to reuse them. |
+| Workspace templates | The template hub saves personal presets in `~/.config/devv/config.json`; versioned templates and `DVV_WORKSPACE_TEMPLATES` remain readable. | Use `Shift+T` to manage project aliases, branch patterns, and base rules, then `Shift+N` to reuse them. |
 | Workspace agent harness | `workspaceHarness` writes `AGENTS.md`, `.agents/manifest.json`, focused guides, and skill lookup paths into each workspace. | Create/add flows sync it automatically; use `Shift+H` in `dvv workspace` for existing workspaces. |
 | Target validation | API dir must contain `artisan`; Web dir must contain `package.json`. | Keep invalid targets visible as missing/invalid, but block start actions. |
 | Tmux theme | `dvv setup` writes status, window, pane border, message, and copy-mode colors from the active CLI theme by default. The status bar stays full-width and uses the theme status color as its background. | Change `DVV_THEME`, then run `dvv setup`; set `DVV_TMUX_THEME_FOLLOW_CLI=0` to use a separate tmux theme. |
@@ -134,9 +134,9 @@ Final indeterminate loader labels should be action-specific, such as `ready`, `c
 
 | Detail | Current rule | Action |
 | --- | --- | --- |
-| Runtime config | Stored in `~/.config/devv/config.env`. | Keep this path for compatibility until a migration explicitly changes it. |
+| Runtime config | Scalar values are stored in `~/.config/devv/config.env`; structured personal templates and hooks use `~/.config/devv/config.json`. | Keep private paths and commands outside the repository. |
 | SSH list | Stored in `~/.config/devv/servers.list`. | Do not commit real SSH targets. |
-| SCP downloads | Stored in `~/Downloads/dvv-scp` by default. | `dvv setup`, `dvv doctor --fix`, and SCP actions create it; clean removes only contents after confirmation. |
+| SCP downloads | Stored in `~/Downloads/dvv-scp` by default. | Create it only after a confirmed download uses it; open, clean, setup, and doctor do not create it. |
 | AGE key | Stored in `~/.config/devv/keys/age.key`. | Never commit private keys. |
 | Encrypted SSH backup | Uses repo `secrets/servers.list.age` when `secrets/` exists, otherwise `~/.config/devv/servers.list.age`. | Keep `secrets/` out of git history. |
 | Bitwarden | `dvv bootstrap` can restore the AGE key from Bitwarden. | Configure `DVV_BW_AGE_KEY_ITEM` when needed. |

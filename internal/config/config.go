@@ -13,6 +13,7 @@ type Config struct {
 	RootDir              string
 	ConfigDir            string
 	ConfigFile           string
+	LocalConfigFile      string
 	ServersFile          string
 	AgeKeyFile           string
 	AgeRecipientsFile    string
@@ -23,6 +24,7 @@ type Config struct {
 
 type ProjectConfig struct {
 	Theme     ThemeConfig     `json:"theme"`
+	UI        UIConfig        `json:"ui"`
 	Profiles  ProfilesConfig  `json:"profiles"`
 	Terminal  TerminalConfig  `json:"terminal"`
 	Shell     ShellConfig     `json:"shell"`
@@ -38,6 +40,12 @@ type ProjectConfig struct {
 
 type ThemeConfig struct {
 	Name string `json:"name"`
+}
+
+type UIConfig struct {
+	HubHeightPercent    int `json:"hubHeightPercent,omitempty"`
+	HubMinHeight        int `json:"hubMinHeight,omitempty"`
+	PreviewWidthPercent int `json:"previewWidthPercent,omitempty"`
 }
 
 type TerminalConfig struct {
@@ -228,23 +236,26 @@ type WorkspaceConfig struct {
 	Interactive        WorkspaceInteractive    `json:"interactive"`
 	TemplateHub        WorkspaceTemplateHub    `json:"templateHub"`
 	Bootstrap          WorkspaceBootstrap      `json:"bootstrap"`
+	CodeWorkspace      CodeWorkspaceConfig     `json:"codeWorkspace"`
 	WorkspaceHarness   WorkspaceHarnessConfig  `json:"workspaceHarness"`
 	Hooks              map[string][]HookConfig `json:"hooks"`
 	Safety             WorkspaceSafety         `json:"safety"`
 }
 
 type WorkspaceProject struct {
-	Name    string `json:"name"`
-	Path    string `json:"path"`
-	Enabled *bool  `json:"enabled,omitempty"`
+	Name            string `json:"name"`
+	Path            string `json:"path"`
+	DestinationName string `json:"destinationName,omitempty"`
+	Enabled         *bool  `json:"enabled,omitempty"`
 }
 
 type WorkspaceTemplate struct {
-	Name        string             `json:"name"`
-	Description string             `json:"description"`
-	BaseKind    string             `json:"baseKind"`
-	BaseBranch  string             `json:"baseBranch"`
-	Projects    []WorkspaceProject `json:"projects"`
+	Name               string             `json:"name"`
+	Description        string             `json:"description"`
+	BaseKind           string             `json:"baseKind"`
+	BaseBranch         string             `json:"baseBranch"`
+	BranchNameTemplate string             `json:"branchNameTemplate,omitempty"`
+	Projects           []WorkspaceProject `json:"projects"`
 }
 
 type WorkspaceGitConfig struct {
@@ -253,7 +264,14 @@ type WorkspaceGitConfig struct {
 	ReuseExistingBranch   bool              `json:"reuseExistingBranch"`
 	CreateBranchIfMissing bool              `json:"createBranchIfMissing"`
 	BranchNameTemplate    string            `json:"branchNameTemplate"`
+	FetchBeforeCreate     bool              `json:"fetchBeforeCreate"`
 	BaseByType            map[string]string `json:"baseByType"`
+}
+
+type CodeWorkspaceConfig struct {
+	Enabled          bool   `json:"enabled"`
+	FileNameTemplate string `json:"fileNameTemplate"`
+	Overwrite        bool   `json:"overwrite"`
 }
 
 type WorkspaceInteractive struct {
@@ -330,6 +348,7 @@ type WorkspaceBootstrapCommand struct {
 type WorkspaceBootstrapWhen struct {
 	Files        []string `json:"files"`
 	MissingFiles []string `json:"missingFiles"`
+	Projects     []string `json:"projects,omitempty"`
 }
 
 type HookConfig struct {
@@ -364,6 +383,7 @@ func Load() (*Config, error) {
 
 	configDir := filepath.Join(xdgConfigHome(), "devv")
 	configFile := filepath.Join(configDir, "config.env")
+	localConfigFile := filepath.Join(configDir, "config.json")
 	if err := LoadEnvFile(configFile, false); err != nil {
 		return nil, err
 	}
@@ -375,6 +395,9 @@ func Load() (*Config, error) {
 	if err := loadProjectConfig(filepath.Join(root, "dvv.config.json"), &projectConfig); err != nil {
 		return nil, err
 	}
+	if err := loadLocalProjectConfig(localConfigFile, &projectConfig); err != nil {
+		return nil, err
+	}
 	projectConfig.Profiles = resolveProfilesConfig(projectConfig.Profiles)
 	applyActiveProfile(projectConfig.Profiles)
 
@@ -382,6 +405,7 @@ func Load() (*Config, error) {
 		RootDir:              root,
 		ConfigDir:            configDir,
 		ConfigFile:           configFile,
+		LocalConfigFile:      localConfigFile,
 		ServersFile:          ExpandPath(firstEnv("DVV_SERVERS_FILE", "DEVT_SERVERS_FILE", filepath.Join(configDir, "servers.list"))),
 		AgeKeyFile:           ExpandPath(firstEnv("DVV_AGE_KEY_FILE", "DEVT_AGE_KEY_FILE", filepath.Join(keyDir, "age.key"))),
 		AgeRecipientsFile:    ExpandPath(firstEnv("DVV_AGE_RECIPIENTS_FILE", "DEVT_AGE_RECIPIENTS_FILE", ageRecipientsFile)),
@@ -684,6 +708,7 @@ func defaultWorkspaceConfig() WorkspaceConfig {
 			ReuseExistingBranch:   true,
 			CreateBranchIfMissing: true,
 			BranchNameTemplate:    "{{ workspace.name }}",
+			FetchBeforeCreate:     false,
 			BaseByType: map[string]string{
 				"bug":   "prod",
 				"issue": "master",
@@ -723,6 +748,11 @@ func defaultWorkspaceConfig() WorkspaceConfig {
 				{Name: "sync-agents-node", Command: "npm", Args: []string{"run", "sync-agents", "--", "--target=.codex"}, When: WorkspaceBootstrapWhen{Files: []string{"package.json", ".agents/manifest.json"}, MissingFiles: []string{"artisan"}}},
 				{Name: "sync-agents-php", Command: "composer", Args: []string{"sync-agents", "--", "--target=.codex"}, When: WorkspaceBootstrapWhen{Files: []string{"composer.json", ".agents/manifest.json"}}},
 			},
+		},
+		CodeWorkspace: CodeWorkspaceConfig{
+			Enabled:          false,
+			FileNameTemplate: "{{ workspace.name }}.code-workspace",
+			Overwrite:        false,
 		},
 		WorkspaceHarness: WorkspaceHarnessConfig{
 			AgentsFile: AgentsFileConfig{
@@ -784,6 +814,167 @@ func loadProjectConfig(path string, target *ProjectConfig) error {
 	}
 	mergeProjectConfigDefaults(target)
 	return nil
+}
+
+func loadLocalProjectConfig(path string, target *ProjectConfig) error {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if len(strings.TrimSpace(string(content))) == 0 {
+		return nil
+	}
+	var overlay map[string]any
+	if err := json.Unmarshal(content, &overlay); err != nil {
+		return fmt.Errorf("read local config %s: %w", path, err)
+	}
+	if err := validateLocalWorkspaceTemplates(overlay); err != nil {
+		return fmt.Errorf("read local config %s: %w", path, err)
+	}
+	baseData, err := json.Marshal(target)
+	if err != nil {
+		return err
+	}
+	var base map[string]any
+	if err := json.Unmarshal(baseData, &base); err != nil {
+		return err
+	}
+	mergeConfigMaps(base, overlay, "")
+	merged, err := json.Marshal(base)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(merged, target); err != nil {
+		return err
+	}
+	mergeProjectConfigDefaults(target)
+	return nil
+}
+
+func validateLocalWorkspaceTemplates(root map[string]any) error {
+	workspace, ok := root["workspace"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	items, ok := workspace["templates"].([]any)
+	if !ok {
+		return nil
+	}
+	seen := map[string]bool{}
+	for index, item := range items {
+		object, ok := item.(map[string]any)
+		if !ok {
+			return fmt.Errorf("workspace.templates[%d] must be an object", index)
+		}
+		name, _ := object["name"].(string)
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return fmt.Errorf("workspace.templates[%d].name is required", index)
+		}
+		key := strings.ToLower(name)
+		if seen[key] {
+			return fmt.Errorf("duplicate workspace template name: %s", name)
+		}
+		seen[key] = true
+	}
+	return nil
+}
+
+func mergeConfigMaps(target map[string]any, overlay map[string]any, prefix string) {
+	for key, value := range overlay {
+		path := key
+		if prefix != "" {
+			path = prefix + "." + key
+		}
+		currentMap, currentOK := target[key].(map[string]any)
+		overlayMap, overlayOK := value.(map[string]any)
+		if currentOK && overlayOK {
+			mergeConfigMaps(currentMap, overlayMap, path)
+			continue
+		}
+		if path == "workspace.templates" {
+			if current, ok := target[key].([]any); ok {
+				if next, ok := value.([]any); ok {
+					target[key] = mergeNamedJSONItems(current, next)
+					continue
+				}
+			}
+		}
+		if path == "workspace.bootstrap.commands" {
+			if current, ok := target[key].([]any); ok {
+				if next, ok := value.([]any); ok {
+					if len(next) == 0 {
+						target[key] = next
+					} else {
+						target[key] = mergeNamedJSONItems(current, next)
+					}
+					continue
+				}
+			}
+		}
+		target[key] = value
+	}
+}
+
+func mergeNamedJSONItems(base []any, overlay []any) []any {
+	result := append([]any{}, base...)
+	indexes := map[string]int{}
+	for index, item := range result {
+		if object, ok := item.(map[string]any); ok {
+			if name, ok := object["name"].(string); ok {
+				indexes[strings.ToLower(strings.TrimSpace(name))] = index
+			}
+		}
+	}
+	for _, item := range overlay {
+		object, ok := item.(map[string]any)
+		if !ok {
+			result = append(result, item)
+			continue
+		}
+		name, _ := object["name"].(string)
+		key := strings.ToLower(strings.TrimSpace(name))
+		if index, exists := indexes[key]; key != "" && exists {
+			result[index] = item
+			continue
+		}
+		if key != "" {
+			indexes[key] = len(result)
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
+func WriteLocalWorkspaceTemplates(path string, templates []WorkspaceTemplate) error {
+	root := map[string]any{}
+	if content, err := os.ReadFile(path); err == nil && len(strings.TrimSpace(string(content))) > 0 {
+		if err := json.Unmarshal(content, &root); err != nil {
+			return fmt.Errorf("read local config %s: %w", path, err)
+		}
+	} else if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	workspace, _ := root["workspace"].(map[string]any)
+	if workspace == nil {
+		workspace = map[string]any{}
+		root["workspace"] = workspace
+	}
+	workspace["templates"] = templates
+	data, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, append(data, '\n'), 0o600); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0o600)
 }
 
 func mergeProjectConfigDefaults(target *ProjectConfig) {
@@ -1233,6 +1424,9 @@ func mergeWorkspaceConfigDefaults(target WorkspaceConfig, defaults WorkspaceConf
 	if target.Bootstrap.Commands == nil {
 		target.Bootstrap.Commands = defaults.Bootstrap.Commands
 	}
+	if strings.TrimSpace(target.CodeWorkspace.FileNameTemplate) == "" {
+		target.CodeWorkspace.FileNameTemplate = defaults.CodeWorkspace.FileNameTemplate
+	}
 	if strings.TrimSpace(target.WorkspaceHarness.AgentsFile.Path) == "" {
 		target.WorkspaceHarness.AgentsFile.Path = defaults.WorkspaceHarness.AgentsFile.Path
 	}
@@ -1420,6 +1614,18 @@ func resolveWorkspaceConfig(cfg WorkspaceConfig) WorkspaceConfig {
 	if opener := firstSetEnv("DVV_WORKSPACE_OPENER", "DEVT_WORKSPACE_OPENER"); opener != "" {
 		cfg.Interactive.Opener = opener
 	}
+	if enabled, ok := firstBoolEnv("DVV_WORKSPACE_FETCH_BEFORE_CREATE"); ok {
+		cfg.Git.FetchBeforeCreate = enabled
+	}
+	if enabled, ok := firstBoolEnv("DVV_WORKSPACE_CODE_WORKSPACE_ENABLED"); ok {
+		cfg.CodeWorkspace.Enabled = enabled
+	}
+	if enabled, ok := firstBoolEnv("DVV_WORKSPACE_AGENTS_FILE_ENABLED"); ok {
+		cfg.WorkspaceHarness.AgentsFile.Enabled = enabled
+	}
+	if enabled, ok := firstBoolEnv("DVV_WORKSPACE_AGENTS_DIR_ENABLED"); ok {
+		cfg.WorkspaceHarness.AgentsDir.Enabled = enabled
+	}
 	if shortcut := firstSetEnv("DVV_WORKSPACE_CREATE_SHORTCUT"); shortcut != "" {
 		cfg.Interactive.Shortcuts.Create = shortcut
 	}
@@ -1508,6 +1714,7 @@ func normalizeWorkspaceTemplate(template WorkspaceTemplate) WorkspaceTemplate {
 	template.Description = strings.TrimSpace(template.Description)
 	template.BaseKind = strings.ToLower(strings.TrimSpace(template.BaseKind))
 	template.BaseBranch = strings.TrimSpace(template.BaseBranch)
+	template.BranchNameTemplate = strings.TrimSpace(template.BranchNameTemplate)
 	if template.BaseKind == "" {
 		if template.BaseBranch != "" {
 			template.BaseKind = "other"
@@ -1519,6 +1726,7 @@ func normalizeWorkspaceTemplate(template WorkspaceTemplate) WorkspaceTemplate {
 	for _, project := range template.Projects {
 		project.Name = strings.TrimSpace(project.Name)
 		project.Path = strings.TrimSpace(project.Path)
+		project.DestinationName = strings.TrimSpace(project.DestinationName)
 		if project.Path == "" {
 			continue
 		}

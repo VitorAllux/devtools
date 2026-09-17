@@ -348,6 +348,7 @@ func TestDoctorFixPreparesRuntimeStateAndRunsLocalScripts(t *testing.T) {
 	project := config.DefaultProjectConfig()
 	project.Workspace.Root = filepath.Join(root, "workspace")
 	project.DB.DumpsDir = filepath.Join(root, "dumps")
+	project.SSH.Transfer.DownloadsDir = filepath.Join(root, "downloads", "dvv-scp")
 	cfg := &config.Config{
 		RootDir:              root,
 		ConfigDir:            filepath.Join(root, "config"),
@@ -376,6 +377,9 @@ func TestDoctorFixPreparesRuntimeStateAndRunsLocalScripts(t *testing.T) {
 	}
 	if _, err := os.Stat(cfg.ServersFile); err != nil {
 		t.Fatalf("expected servers file: %v", err)
+	}
+	if _, err := os.Stat(project.SSH.Transfer.DownloadsDir); !os.IsNotExist(err) {
+		t.Fatalf("doctor fix should not create optional SCP downloads: err=%v", err)
 	}
 	if !runner.hasCommand("node scripts/build.js") || !runner.hasCommand("node scripts/setup.js") {
 		t.Fatalf("doctor fix commands = %#v", runner.commands)

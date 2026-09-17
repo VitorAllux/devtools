@@ -127,7 +127,6 @@ func (m Manager) Doctor(ctx context.Context, fix bool) error {
 	checkPath("Workspace root", m.Config.Project.Workspace.Root, false)
 	checkInvalidWorkspaceNames(m.Config.Project.Workspace.Root)
 	checkPath("Dumps dir", m.Config.Project.DB.DumpsDir, false)
-	checkPath("SCP downloads", m.Config.Project.SSH.Transfer.DownloadsDir, false)
 	checkZshCompletion(m.Config.RootDir)
 	checkZshShortcutBlock(m.Config)
 	checkTmuxShortcutBlock(m.Config)
@@ -181,7 +180,6 @@ func (m Manager) ensureRuntimeState() error {
 		filepath.Dir(m.Config.EncryptedServersFile),
 		config.ExpandPath(m.Config.Project.Workspace.Root),
 		config.ExpandPath(m.Config.Project.DB.DumpsDir),
-		config.ExpandPath(m.Config.Project.SSH.Transfer.DownloadsDir),
 	}
 	for _, dir := range dirs {
 		if strings.TrimSpace(dir) == "" || dir == "." {

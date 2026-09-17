@@ -72,11 +72,12 @@ func adoptedProjects(projects []Project) []metadata.Project {
 	out := make([]metadata.Project, 0, len(projects))
 	for _, project := range projects {
 		out = append(out, metadata.Project{
-			Name:       project.Name,
-			Source:     project.Source,
-			Path:       project.Path,
-			BaseBranch: project.BaseBranch,
-			WorkBranch: project.WorkBranch,
+			Name:            project.Name,
+			DestinationName: project.DestinationName,
+			Source:          project.Source,
+			Path:            project.Path,
+			BaseBranch:      project.BaseBranch,
+			WorkBranch:      project.WorkBranch,
 		})
 	}
 	return out

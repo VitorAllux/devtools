@@ -58,13 +58,29 @@ type HarnessResult struct {
 }
 
 func Matches(projectPath string, when config.WorkspaceBootstrapWhen) bool {
+	return matchesProject(Project{Path: projectPath}, when)
+}
+
+func matchesProject(project Project, when config.WorkspaceBootstrapWhen) bool {
+	if len(when.Projects) > 0 {
+		matched := false
+		for _, name := range when.Projects {
+			if strings.EqualFold(strings.TrimSpace(name), strings.TrimSpace(project.Name)) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
 	for _, file := range when.Files {
-		if _, err := os.Stat(filepath.Join(projectPath, file)); err != nil {
+		if _, err := os.Stat(filepath.Join(project.Path, file)); err != nil {
 			return false
 		}
 	}
 	for _, file := range when.MissingFiles {
-		if _, err := os.Stat(filepath.Join(projectPath, file)); err == nil {
+		if _, err := os.Stat(filepath.Join(project.Path, file)); err == nil {
 			return false
 		}
 	}
@@ -88,7 +104,7 @@ func RunProjectWithSteps(ctx context.Context, cfg config.WorkspaceBootstrap, run
 		}
 	}
 	for _, command := range cfg.Commands {
-		if !Matches(project.Path, command.When) {
+		if !matchesProject(project, command.When) {
 			continue
 		}
 		action := CommandAction{Name: command.Name, Command: command.Command, Args: command.Args}

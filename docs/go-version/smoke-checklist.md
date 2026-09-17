@@ -62,12 +62,13 @@ Run after installing Homebrew dependencies listed in the README:
 | Doctor | `dvv doctor` | Checks `brew` and `osascript`; does not warn about Linux-only `systemctl` or `service`. |
 | Terminal | `DVV_TERMINAL_LAUNCHER=terminal dvv ssh` | SSH handoff opens in Terminal.app. |
 | iTerm2 | `DVV_TERMINAL_LAUNCHER=iterm2 dvv ssh` | SSH handoff opens in iTerm2 when installed. |
-| Workspace | `dvv workspace` | Editor openers resolve `code`, `cursor`, `opencode`, `codex`, or shell according to local tools. |
+| Workspace | `dvv workspace` | Editor openers resolve correctly; a disposable template applies its branch pattern and project directory aliases. |
 | Tmux | `dvv tmux`, `dvv tmux:session`, and `dvv tmux:home` | Tmux sessions open in the configured terminal launcher. |
 | Database | `dvv db` | MySQL client and rclone flows work with local credentials. |
 | Resources | `dvv resources` | `brew services` and Docker Desktop resources are detected when available; logs open through Terminal.app or iTerm2. |
 | Secrets | `dvv secrets` | Secret status and AGE/SSH backup actions work with local files. |
-| Config | `dvv config` | Theme and terminal launcher config persist in `~/.config/devv/config.env`. |
+| Config | `dvv config` | Scalar toggles persist in `config.env`; structured templates load from `config.json`; explicit local `false` values are honored. |
+| SCP downloads | `dvv doctor --fix`, then `dvv ssh` | The downloads directory stays absent until a download to the default destination is confirmed. |
 
 ## Disposable Integration Harnesses
 

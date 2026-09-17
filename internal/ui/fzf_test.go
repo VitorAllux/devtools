@@ -79,6 +79,57 @@ func TestFZFHubCanOverrideHeight(t *testing.T) {
 	}
 }
 
+func TestFZFHubAppliesConfiguredLayoutGlobally(t *testing.T) {
+	defer SetFZFHubLayout(FZFHubLayout{})
+	SetFZFHubLayout(FZFHubLayout{HeightPercent: 85, MinHeight: 24, PreviewWidthPercent: 42})
+
+	hub := FZFHub{
+		Height:        "42%",
+		MinHeight:     "16",
+		Preview:       "printf test",
+		PreviewWindow: "right,34%,border-rounded,wrap",
+	}
+	args := strings.Join(hub.Args(), "\n")
+	for _, want := range []string{"--height=85%", "--min-height=24", "--preview-window=right,42%,border-rounded,wrap"} {
+		if !strings.Contains(args, want) {
+			t.Fatalf("global FZF layout missing %q in %s", want, args)
+		}
+	}
+}
+
+func TestFZFHubIgnoresUnsafeConfiguredLayout(t *testing.T) {
+	defer SetFZFHubLayout(FZFHubLayout{})
+	SetFZFHubLayout(FZFHubLayout{HeightPercent: 10, MinHeight: 500, PreviewWidthPercent: 90})
+
+	hub := FZFHub{
+		Height:        "42%",
+		MinHeight:     "16",
+		Preview:       "printf test",
+		PreviewWindow: "right,34%,border-rounded,wrap",
+	}
+	args := strings.Join(hub.Args(), "\n")
+	for _, want := range []string{"--height=42%", "--min-height=16", "--preview-window=right,34%,border-rounded,wrap"} {
+		if !strings.Contains(args, want) {
+			t.Fatalf("fallback FZF layout missing %q in %s", want, args)
+		}
+	}
+}
+
+func TestFZFThemeArgsAppliesConfiguredHeightToNonHubSelectors(t *testing.T) {
+	defer SetFZFHubLayout(FZFHubLayout{})
+	SetFZFHubLayout(FZFHubLayout{HeightPercent: 85, MinHeight: 24})
+
+	args := strings.Join(FZFThemeArgs("pick> "), "\n")
+	for _, want := range []string{"--height=85%", "--min-height=24"} {
+		if !strings.Contains(args, want) {
+			t.Fatalf("configured selector layout missing %q in %s", want, args)
+		}
+	}
+	if strings.Contains(args, "--height=~85%") {
+		t.Fatalf("configured selector should not retain adaptive height: %s", args)
+	}
+}
+
 func TestFZFPreviewCommandDeckPrintsEveryShortcut(t *testing.T) {
 	deck := FZFPreviewCommandDeck([]FZFShortcut{
 		{Label: "Enter", Description: "open"},

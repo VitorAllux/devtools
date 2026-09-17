@@ -8,6 +8,15 @@ dvv.config.json
 
 The file is versioned because it defines project behavior, theme identity, and default hub shortcuts.
 
+Personal structured overrides load from `~/.config/devv/config.json`. Scalar values edited by `dvv config` remain in `~/.config/devv/config.env`. Precedence is:
+
+1. Versioned `dvv.config.json`.
+2. Structured local `~/.config/devv/config.json`.
+3. Persisted `~/.config/devv/config.env`.
+4. Explicit process environment variables.
+
+Objects merge recursively and explicit local booleans, including `false`, are preserved. Workspace templates and non-empty bootstrap command lists merge by case-insensitive name, with local named entries replacing versioned entries. An explicit empty bootstrap command list clears the defaults. Duplicate template names inside the local file are rejected. Template hub updates preserve unrelated fields in the local JSON file. Free-form hooks are intentionally JSON-only; common workspace booleans remain editable in the Workspace config hub.
+
 ## Current Shape
 
 ```json
@@ -162,6 +171,7 @@ The file is versioned because it defines project behavior, theme identity, and d
       "reuseExistingBranch": true,
       "createBranchIfMissing": true,
       "branchNameTemplate": "{{ workspace.name }}",
+      "fetchBeforeCreate": false,
       "baseByType": {
         "bug": "prod",
         "issue": "master"
@@ -184,6 +194,11 @@ The file is versioned because it defines project behavior, theme identity, and d
         "edit": "shift+e",
         "delete": "shift+d"
       }
+    },
+    "codeWorkspace": {
+      "enabled": false,
+      "fileNameTemplate": "{{ workspace.name }}.code-workspace",
+      "overwrite": false
     }
   }
 }
@@ -276,7 +291,7 @@ The `ports.hub.shortcuts` section configures the port manager actions:
 
 The `ssh.transfer` section configures SCP transfer helpers in `dvv ssh`:
 
-- `downloadsDir`: local directory for downloaded SCP files. It defaults to `~/Downloads/dvv-scp` and is created by `dvv setup`, `dvv doctor --fix`, and transfer actions.
+- `downloadsDir`: local directory for downloaded SCP files. It defaults to `~/Downloads/dvv-scp` and is created only after a download to that destination is confirmed.
 - `upload`: upload a selected local file or directory to the selected SSH entry.
 - `download`: download a prompted remote path from the selected SSH entry.
 - `openDownloads`: open the downloads directory in a tmux/terminal tab.
@@ -351,17 +366,43 @@ The `workspace` section contains these groups:
 
 - `root`: directory where `workspace-<name>` folders are created.
 - `projects`: explicit ordered base repositories.
-- `templates`: reusable workspace creation presets with base branch rules and project lists.
+- `templates`: reusable workspace creation presets with base branch rules, branch name patterns, project lists, and optional project `destinationName` aliases.
 - `projectSearchRoots`: ordered roots used to discover base git repositories.
 - `projectExcludeDirs`: directory names or absolute paths skipped during base repository discovery.
 - `projectSearchDepth`: discovery depth below each project search root.
-- `git`: remote name, base branch priority, branch reuse/creation rules, branch name template, and base branch by workspace type.
+- `git`: remote name, base branch priority, branch reuse/creation rules, branch name template, optional `fetchBeforeCreate`, and base branch by workspace type.
 - `interactive`: selector, opener, and configurable hub shortcuts.
 - `templateHub`: configurable shortcuts for creating, editing, and deleting workspace templates.
+- `codeWorkspace`: opt-in editor workspace generation. Existing files are preserved unless `overwrite` is true.
+- `bootstrap.commands[].when.projects`: optional case-insensitive source project names. These compose with file and missing-file conditions.
+- `workspaceHarness`: independent controls for workspace `AGENTS.md` and `.agents` output.
+- `hooks`: lifecycle commands loaded from project or local structured config and executed with argument arrays.
 - `bootstrap`: copy rules and conditional commands.
-- `workspaceHarness`: generated workspace `AGENTS.md`, `.agents` manifest, focused guides, rules, and skill lookup paths.
-- `hooks`: commands for workspace and project lifecycle events.
 - `safety`: confirmations, dirty worktree blocking, force remove policy, direct-child-only deletion, and leftover deletion confirmation.
+
+The top-level `ui.hubHeightPercent`, `ui.hubMinHeight`, and `ui.previewWidthPercent` fields optionally override the layout of every fzf hub. They are well suited to personal `~/.config/devv/config.json` settings; omit them to preserve each hub's shared defaults.
+
+Template example:
+
+```json
+{
+  "workspace": {
+    "templates": [
+      {
+        "name": "fullstack-task",
+        "baseKind": "issue",
+        "branchNameTemplate": "task_{{ workspace.name }}",
+        "projects": [
+          {"name": "api-project", "path": "~/Development/api-project", "destinationName": "api"},
+          {"name": "web-project", "path": "~/Development/web-project", "destinationName": "web"}
+        ]
+      }
+    ]
+  }
+}
+```
+
+`destinationName` must be one safe directory name and must be unique within the workspace. The physical workspace remains `workspace-<name>`. When fetch is enabled, `dvv` runs `git fetch --prune <remote>` once per selected source repository before resolving base branches and stops creation if a fetch fails. Copy rules always read from the primary source repository; they do not use files such as `.env.github` as fallback sources.
 
 Workspace metadata is stored inside each workspace:
 
@@ -371,7 +412,7 @@ Workspace metadata is stored inside each workspace:
 
 Existing `workspace-*` directories are adopted when the hub opens if this metadata is missing. Adoption is additive only: it writes `.workspace/config.json` from detected worktrees and leaves all existing files in place.
 
-Workspace templates can be defined in `workspace.templates` or persisted through `DVV_WORKSPACE_TEMPLATES`. The workspace hub opens template management with `Shift+T`, and the template hub can create, edit, or delete templates with its own configurable shortcuts. During `Shift+N` workspace creation, the base selector also lists saved templates, so selecting a template reuses its project list and base branch rule.
+Workspace templates are saved by the template hub in local `config.json`; versioned `workspace.templates` and the compatibility `DVV_WORKSPACE_TEMPLATES` input are also loaded. During `Shift+N` workspace creation, the base selector lists saved templates and reuses their projects, aliases, branch pattern, and base branch rule.
 
 The `workspaceHarness` section controls the files generated for agents working inside a workspace:
 

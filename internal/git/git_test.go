@@ -80,6 +80,20 @@ func TestCurrentBranchAndHasChanges(t *testing.T) {
 	}
 }
 
+func TestFetchPrunesConfiguredRemote(t *testing.T) {
+	runner := &gitRunner{}
+	client := New(runner)
+	if err := client.Fetch(context.Background(), "/repo", "upstream"); err != nil {
+		t.Fatalf("Fetch returned error: %v", err)
+	}
+	if got := strings.Join(runner.runs, "\n"); got != "git -C /repo fetch --prune upstream" {
+		t.Fatalf("fetch command = %q", got)
+	}
+	if err := client.Fetch(context.Background(), "/repo", " "); err == nil {
+		t.Fatal("expected empty remote to be rejected")
+	}
+}
+
 func TestBranchExistsAndBaseBranchChecks(t *testing.T) {
 	runner := &gitRunner{ok: map[string]bool{
 		"git -C /repo show-ref --verify --quiet refs/heads/feature":       true,
@@ -209,8 +223,8 @@ func (r *gitRunner) Output(_ context.Context, _ string, name string, args ...str
 }
 
 func isQuietGitMutation(args []string) bool {
-	return len(args) >= 4 && args[0] == "-C" && args[2] == "worktree" &&
-		(args[3] == "add" || args[3] == "remove" || args[3] == "prune")
+	return len(args) >= 4 && args[0] == "-C" && ((args[2] == "worktree" &&
+		(args[3] == "add" || args[3] == "remove" || args[3] == "prune")) || args[2] == "fetch")
 }
 
 func isQuietGitProbe(args []string) bool {

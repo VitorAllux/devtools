@@ -33,6 +33,11 @@ func Run(args []string) int {
 		return 1
 	}
 	ui.SetTheme(cfg.Project.Theme.Name)
+	ui.SetFZFHubLayout(ui.FZFHubLayout{
+		HeightPercent:       cfg.Project.UI.HubHeightPercent,
+		MinHeight:           cfg.Project.UI.HubMinHeight,
+		PreviewWidthPercent: cfg.Project.UI.PreviewWidthPercent,
+	})
 
 	runner := run.ExecRunner{}
 	if len(args) > 0 && args[0] == "__tmux:theme-block" {

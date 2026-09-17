@@ -293,6 +293,17 @@ func TestKnownEntriesIncludesRuntimeShortcutKey(t *testing.T) {
 	if _, ok := findEntry(entries, "DVV_WORKSPACE_TEMPLATES"); !ok {
 		t.Fatalf("knownEntries should include DVV_WORKSPACE_TEMPLATES")
 	}
+	for _, key := range []string{
+		"DVV_WORKSPACE_FETCH_BEFORE_CREATE",
+		"DVV_WORKSPACE_CODE_WORKSPACE_ENABLED",
+		"DVV_WORKSPACE_AGENTS_FILE_ENABLED",
+		"DVV_WORKSPACE_AGENTS_DIR_ENABLED",
+	} {
+		entry, ok := findEntry(entries, key)
+		if !ok || entry.Category != "Workspace" || entry.Kind != "bool" {
+			t.Fatalf("knownEntries workspace toggle %s = %#v, found=%v", key, entry, ok)
+		}
+	}
 	if _, ok := findEntry(entries, "DVV_WORKSPACE_HARNESS_AGENTS_DIR"); !ok {
 		t.Fatalf("knownEntries should include DVV_WORKSPACE_HARNESS_AGENTS_DIR")
 	}

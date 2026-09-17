@@ -21,11 +21,12 @@ type Workspace struct {
 }
 
 type Project struct {
-	Name       string `json:"name"`
-	Source     string `json:"source"`
-	Path       string `json:"path"`
-	BaseBranch string `json:"baseBranch"`
-	WorkBranch string `json:"workBranch"`
+	Name            string `json:"name"`
+	DestinationName string `json:"destinationName,omitempty"`
+	Source          string `json:"source"`
+	Path            string `json:"path"`
+	BaseBranch      string `json:"baseBranch"`
+	WorkBranch      string `json:"workBranch"`
 }
 
 func Path(workspacePath string) string {

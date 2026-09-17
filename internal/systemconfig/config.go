@@ -174,7 +174,8 @@ func (m Manager) selectCategory(ctx context.Context, entries []Entry) (Category,
 func (m Manager) basicCategoryHub(ctx context.Context, entries []Entry) error {
 	categories := configCategories()
 	ui.Title("Configuration")
-	ui.Info("File: %s", m.Config.ConfigFile)
+	ui.Info("Runtime file: %s", m.Config.ConfigFile)
+	ui.Info("Structured file: %s", m.Config.LocalConfigFile)
 	for index, category := range categories {
 		count := len(entriesForCategory(category.ID, entries))
 		status := fmt.Sprintf("%d key(s)", count)
@@ -1034,6 +1035,14 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.Workspace.TemplateHub.Shortcuts.Delete = value
 	case "DVV_WORKSPACE_TEMPLATES":
 		m.Config.Project.Workspace.Templates = parseRuntimeWorkspaceTemplates(value)
+	case "DVV_WORKSPACE_FETCH_BEFORE_CREATE":
+		m.Config.Project.Workspace.Git.FetchBeforeCreate = value == "1"
+	case "DVV_WORKSPACE_CODE_WORKSPACE_ENABLED":
+		m.Config.Project.Workspace.CodeWorkspace.Enabled = value == "1"
+	case "DVV_WORKSPACE_AGENTS_FILE_ENABLED":
+		m.Config.Project.Workspace.WorkspaceHarness.AgentsFile.Enabled = value == "1"
+	case "DVV_WORKSPACE_AGENTS_DIR_ENABLED":
+		m.Config.Project.Workspace.WorkspaceHarness.AgentsDir.Enabled = value == "1"
 	case "DVV_WORKSPACE_HARNESS_AGENTS_DIR":
 		m.Config.Project.Workspace.WorkspaceHarness.AgentsDir.Path = value
 	case "DVV_WORKSPACE_HARNESS_SKILL_PATHS":
@@ -1120,7 +1129,8 @@ func (m Manager) validate(entry Entry) {
 
 func (m Manager) print(entries []Entry) {
 	ui.Title("Configuration")
-	ui.Info("File: %s", m.Config.ConfigFile)
+	ui.Info("Runtime file: %s", m.Config.ConfigFile)
+	ui.Info("Structured file: %s", m.Config.LocalConfigFile)
 	keyWidth := 34
 	for _, entry := range entries {
 		if len(entry.Key) > keyWidth {
@@ -1349,6 +1359,10 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Workspace", "DVV_WORKSPACE_PROJECT_SEARCH_DEPTH", "Limits repository discovery depth.", "number", fmt.Sprintf("%d", cfg.Project.Workspace.ProjectSearchDepth), "", false},
 		{"Workspace", "DVV_WORKSPACE_OPENER", "Sets how a selected workspace opens.", "choice", defaultString(cfg.Project.Workspace.Interactive.Opener, "auto"), "", false},
 		{"Workspace", "DVV_WORKSPACE_TEMPLATES", "Stores saved workspace templates with base branch and project list.", "json", workspaceTemplatesJSON(cfg.Project.Workspace.Templates), "", false},
+		{"Workspace", "DVV_WORKSPACE_FETCH_BEFORE_CREATE", "Fetches and prunes the configured remote before workspace planning.", "bool", boolValue(cfg.Project.Workspace.Git.FetchBeforeCreate), "", false},
+		{"Workspace", "DVV_WORKSPACE_CODE_WORKSPACE_ENABLED", "Creates an opt-in VS Code or Cursor workspace file.", "bool", boolValue(cfg.Project.Workspace.CodeWorkspace.Enabled), "", false},
+		{"Workspace", "DVV_WORKSPACE_AGENTS_FILE_ENABLED", "Creates the workspace-level AGENTS.md file.", "bool", boolValue(cfg.Project.Workspace.WorkspaceHarness.AgentsFile.Enabled), "", false},
+		{"Workspace", "DVV_WORKSPACE_AGENTS_DIR_ENABLED", "Creates the workspace .agents manifest, guides, and skills directory.", "bool", boolValue(cfg.Project.Workspace.WorkspaceHarness.AgentsDir.Enabled), "", false},
 		{"Workspace", "DVV_WORKSPACE_HARNESS_AGENTS_DIR", "Sets where workspace agent guides and manifest are written.", "path", cfg.Project.Workspace.WorkspaceHarness.AgentsDir.Path, "", false},
 		{"Workspace", "DVV_WORKSPACE_HARNESS_SKILL_PATHS", "Sets workspace and user skill lookup paths for agents.", "path-list", strings.Join(cfg.Project.Workspace.WorkspaceHarness.SkillPaths, string(os.PathListSeparator)), "", false},
 		{"Workspace", "DVV_WORKSPACE_HARNESS_PROJECT_SKILL_PATHS", "Sets per-project skill lookup paths relative to each worktree.", "path-list", strings.Join(cfg.Project.Workspace.WorkspaceHarness.ProjectSkillPaths, string(os.PathListSeparator)), "", false},

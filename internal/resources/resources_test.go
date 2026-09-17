@@ -20,7 +20,7 @@ func TestResourcesDetectsServiceEntries(t *testing.T) {
 		},
 	}
 
-	got, err := (Manager{Config: testConfig(), Runner: runner}).Resources(context.Background())
+	got, err := (Manager{Config: testConfig(), Runner: runner, OS: "linux"}).Resources(context.Background())
 	if err != nil {
 		t.Fatalf("Resources returned error: %v", err)
 	}
@@ -231,16 +231,16 @@ func TestCommandDetailsAndActionUseDetectedResource(t *testing.T) {
 			"service mysql status": []byte("mysql is stopped\n"),
 		},
 	}
-	manager := Manager{Config: testConfig(), Runner: runner}
+	manager := Manager{Config: testConfig(), Runner: runner, OS: "linux"}
 
 	if err := manager.CommandDetails(context.Background(), []string{"service:mysql"}); err != nil {
 		t.Fatalf("CommandDetails returned error: %v", err)
 	}
-	if err := manager.CommandAction(context.Background(), "start", []string{"service:mysql"}); err != nil {
+	if err := manager.CommandAction(context.Background(), "start", []string{"service:mysql", "--sudo"}); err != nil {
 		t.Fatalf("CommandAction returned error: %v", err)
 	}
-	if !runner.hasRun("service mysql start") {
-		t.Fatalf("runs = %#v, want service mysql start", runner.runs)
+	if !runner.hasRun("service mysql start") && !runner.hasRun("sudo service mysql start") {
+		t.Fatalf("runs = %#v, want service start with host-appropriate sudo", runner.runs)
 	}
 }
 

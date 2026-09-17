@@ -20,7 +20,7 @@ func (m *Manager) DiscoverProjects(ctx context.Context) ([]discovery.Project, er
 		if project.Enabled != nil && !*project.Enabled {
 			continue
 		}
-		configured = append(configured, discovery.Project{Name: project.Name, Path: project.Path})
+		configured = append(configured, discovery.Project{Name: project.Name, Path: project.Path, DestinationName: project.DestinationName})
 	}
 	return discovery.Discover(ctx, m.Git, configured, cfg.ProjectSearchRoots, cfg.ProjectExcludeDirs, cfg.ProjectSearchDepth)
 }
@@ -59,7 +59,7 @@ func (m *Manager) ManageProjects(ctx context.Context, ws Workspace) ([]ManagePro
 			continue
 		}
 		rows = append(rows, ManageProject{
-			Project:  discovery.Project{Name: included.Name, Path: included.Source},
+			Project:  discovery.Project{Name: included.Name, Path: included.Source, DestinationName: included.DestinationName},
 			Included: true,
 			Worktree: includedByName[included.Name],
 		})
