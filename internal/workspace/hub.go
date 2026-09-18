@@ -959,11 +959,10 @@ print_commands() {
 }
 if [ "$raw" = "__dvv_empty__" ]; then
   printf "%sWorkspace hub%s\n" "$dvv_heading" "$dvv_reset"
+  printf "\n%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
+  print_commands
   printf "  %sNo workspaces yet%s\n" "$dvv_label" "$dvv_reset"
   printf "  %sUse the create shortcut to start one.%s\n" "$dvv_muted" "$dvv_reset"
-  printf "\n%s--------------------------------%s\n" "$dvv_muted" "$dvv_reset"
-  printf "%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
-  print_commands
   exit 0
 fi
 workspace_name=$(basename "$raw")
@@ -978,8 +977,7 @@ printf "  %s%-9s%s %s\n" "$dvv_label" "State" "$dvv_reset" "$status"
 printf "  %s%-9s%s %s\n" "$dvv_label" "Size" "$dvv_reset" "$row_size"
 printf "  %s%-9s%s %s\n" "$dvv_label" "Activity" "$dvv_reset" "$last_active"
 printf "  %s%-9s%s %s\n" "$dvv_label" "Path" "$dvv_reset" "$raw"
-printf "\n%s--------------------------------%s\n" "$dvv_muted" "$dvv_reset"
-printf "%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
+printf "\n%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
 print_commands
 ' sh {}`
 }

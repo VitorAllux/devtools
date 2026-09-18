@@ -113,7 +113,7 @@ func mainHubItems(cfg *config.Config) []mainHubItem {
 		{"ports", "Development", "hub", "", "Inspect local listening ports, open URLs, copy URLs, and kill stuck processes."},
 		{"resources", "Resources", "hub", "", "Inspect local services, containers, state, logs, and service actions."},
 		{"secrets", "Secrets", "hub", "", "Prepare AGE keys and sync encrypted SSH backup files."},
-		{"config", "System", "hub", "", "Change themes, profiles, paths, shortcuts, safety, and integrations."},
+		{"config", "System", "hub", "", "Change appearance, profiles, environment keys, and integration settings."},
 		{"maintenance", "System", "menu", "", "Run doctor, build, check, setup, repair, and bootstrap actions."},
 		{"help", "System", "help", "", "Show the command-oriented help screen."},
 	}
@@ -231,9 +231,11 @@ printf "  %s%-10s%s %s\n" "$dvv_label" "Type" "$dvv_reset" "$type"
 if [ -n "$shortcut" ]; then
   printf "  %s%-10s%s %s\n" "$dvv_label" "Shortcut" "$dvv_reset" "$shortcut"
 fi
+printf "\n%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Enter" "$dvv_reset" "$dvv_muted" "open" "$dvv_reset"
+printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Esc" "$dvv_reset" "$dvv_muted" "exit" "$dvv_reset"
 printf "\n%sWhat it does%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%s%s\n" "$dvv_muted" "$description" "$dvv_reset"
-printf "\n%sEnter open | Esc exit%s\n" "$dvv_muted" "$dvv_reset"
 ' sh {}`
 }
 

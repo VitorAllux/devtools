@@ -164,17 +164,22 @@ func (h FZFHub) ExpectKeys() string {
 
 func replaceFZFHeightArgs(args []string, height string, minHeight string) []string {
 	filtered := make([]string, 0, len(args)+2)
+	height = strings.TrimSpace(height)
+	minHeight = strings.TrimSpace(minHeight)
 	for _, arg := range args {
-		if strings.HasPrefix(arg, "--height=") || strings.HasPrefix(arg, "--min-height=") {
+		if height != "" && strings.HasPrefix(arg, "--height=") {
+			continue
+		}
+		if minHeight != "" && strings.HasPrefix(arg, "--min-height=") {
 			continue
 		}
 		filtered = append(filtered, arg)
 	}
-	if strings.TrimSpace(height) != "" {
-		filtered = append(filtered, "--height="+strings.TrimSpace(height))
+	if height != "" {
+		filtered = append(filtered, "--height="+height)
 	}
-	if strings.TrimSpace(minHeight) != "" {
-		filtered = append(filtered, "--min-height="+strings.TrimSpace(minHeight))
+	if minHeight != "" {
+		filtered = append(filtered, "--min-height="+minHeight)
 	}
 	return filtered
 }

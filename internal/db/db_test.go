@@ -534,7 +534,7 @@ func TestDriveDumpFZFLineKeepsNameWithSpacesInDedicatedField(t *testing.T) {
 
 func TestDriveDumpRowCompactsLongNames(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
-	name := "veolia_on_premise_eloverde_prod_bg_2620_2026_09_16_11_44_37.sql.gz"
+	name := "sample_on_premise_api_prod_bg_2620_2026_09_16_11_44_37.sql.gz"
 	row := driveDumpRow(DriveDumpEntry{Name: name, Size: 10, IsDir: false})
 	if strings.Contains(row, "SIZE") || !strings.Contains(row, "10 B") {
 		t.Fatalf("Drive row should include size without header text: %q", row)

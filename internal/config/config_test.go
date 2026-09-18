@@ -281,6 +281,18 @@ func TestResolveThemeConfigUsesEnvOverride(t *testing.T) {
 	}
 }
 
+func TestResolveUIConfigUsesEnvOverrides(t *testing.T) {
+	t.Setenv("DVV_UI_HUB_HEIGHT_PERCENT", "82")
+	t.Setenv("DVV_UI_HUB_MIN_HEIGHT", "21")
+	t.Setenv("DVV_UI_PREVIEW_WIDTH_PERCENT", "37")
+
+	cfg := resolveUIConfig(DefaultProjectConfig().UI)
+
+	if cfg.HubHeightPercent != 82 || cfg.HubMinHeight != 21 || cfg.PreviewWidthPercent != 37 {
+		t.Fatalf("UI config = %#v", cfg)
+	}
+}
+
 func TestResolveTerminalConfigUsesEnvOverride(t *testing.T) {
 	t.Setenv("DVV_TERMINAL_LAUNCHER", "iTerm2")
 
@@ -697,6 +709,8 @@ func TestResolveDBConfigUsesEnvOverrides(t *testing.T) {
 }
 
 func TestResolveDBConfigMakesRelativeDumpsDirProjectRelative(t *testing.T) {
+	t.Setenv("DVV_DUMPS_DIR", "")
+	t.Setenv("DEVT_DUMPS_DIR", "")
 	cfg := defaultDBConfigForTest()
 	cfg.DumpsDir = "runtime-dumps"
 

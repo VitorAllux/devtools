@@ -76,11 +76,12 @@ func TestSecretsPrepareCreatesLocalFiles(t *testing.T) {
 func TestSecretRowsKeepRawIDHidden(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	rows := strings.Split(strings.TrimSpace(secretRows([]StatusItem{{
-		ID:      "age-key",
-		Label:   "AGE private key",
-		State:   "ready",
-		Path:    "/tmp/age.key",
-		Details: "Private key used to decrypt local dvv backups.",
+		ID:       "age-key",
+		Label:    "Local AGE private key",
+		State:    "ready",
+		Path:     "/tmp/age.key",
+		Details:  "Private key used to decrypt local dvv backups.",
+		NextStep: "No action needed.",
 	}})), "\n")
 	if len(rows) != 2 {
 		t.Fatalf("secretRows returned unexpected rows: %#v", rows)
@@ -89,10 +90,13 @@ func TestSecretRowsKeepRawIDHidden(t *testing.T) {
 		t.Fatalf("raw secret id = %q, want age-key", raw)
 	}
 	fields := strings.Split(rows[1], "\t")
-	if len(fields) < 6 {
+	if len(fields) < 7 {
 		t.Fatalf("secret row fields = %#v", fields)
 	}
-	if strings.Contains(fields[5], "Private key used") {
+	if strings.Contains(fields[6], "Private key used") {
 		t.Fatalf("visible secret row should keep details in preview only: %q", fields[5])
+	}
+	if !strings.Contains(fields[6], "No action needed") {
+		t.Fatalf("visible secret row should show next step: %#v", fields)
 	}
 }

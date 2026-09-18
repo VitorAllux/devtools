@@ -1167,12 +1167,12 @@ func TestExecuteCreatePlanReportsProgressForEachProject(t *testing.T) {
 
 func TestCreateItemStageErrorIncludesActionContext(t *testing.T) {
 	err := createItemStageError("git worktree", CreatePlanItem{
-		Project:    discovery.Project{Name: "api-eloverde"},
+		Project:    discovery.Project{Name: "api-sample"},
 		Action:     CreateBranchAction,
 		BaseBranch: "prod",
 	}, errors.New("branch already checked out"))
 
-	for _, want := range []string{"git worktree", "api-eloverde", "create-branch", "base=prod", "branch already checked out"} {
+	for _, want := range []string{"git worktree", "api-sample", "create-branch", "base=prod", "branch already checked out"} {
 		if !strings.Contains(err, want) {
 			t.Fatalf("error missing %q in %q", want, err)
 		}

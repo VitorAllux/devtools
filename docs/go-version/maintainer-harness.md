@@ -87,9 +87,9 @@ Workspace generation is controlled by project config and metadata, not by shell 
 | Workspace appears with a corrupted name | workspace directory name and UTF-8 validity | Run `dvv doctor`, delete or rename only the invalid directory manually after confirming it is not needed. |
 | VS Code opens a broken WSL workspace | opener value and WSL remote URI | Use the `code` CLI from WSL, update VS Code Remote WSL, and verify the selected path exists. |
 | Dump import fails with binary data | file extension and gzip detection | Use `.sql`, `.sql.gz`, or a valid gzip file; imports pass binary mode to MySQL. |
-| Dump does not show in the picker | configured dumps directory and file extension | Check `dvv config` -> `Paths`; unsupported files are intentionally filtered. |
-| SSH or tmux opens in the wrong place | terminal launcher preference | Check `dvv config` -> `Integrations` and platform terminal support. |
-| Resource logs do not open | terminal launcher preference and Docker/service manager availability | Check `dvv resources`, `dvv config` -> `Resources`, and `dvv doctor`. |
+| Dump does not show in the picker | configured dumps directory and file extension | Check `dvv config` -> `Environment Keys` -> `Paths`; unsupported files are intentionally filtered. |
+| SSH or tmux opens in the wrong place | terminal launcher preference | Check `dvv config` -> `Environment Keys` -> `Integrations` and platform terminal support. |
+| Resource logs do not open | terminal launcher preference and Docker/service manager availability | Check `dvv resources`, `dvv config` -> `Environment Keys` -> `Resources`, and `dvv doctor`. |
 | A hub has noisy or missing shortcuts | `dvv.config.json` and runtime config | Keep public commands hub-first and hub actions inside preview panels. |
 
 ## Change Discipline

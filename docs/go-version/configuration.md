@@ -218,19 +218,29 @@ First-level categories:
 
 | Category | Purpose |
 | --- | --- |
-| `Theme` | Select and preview CLI themes. |
+| `Appearance` | Select CLI themes and tune shared fzf hub layout. |
+| `Environment Keys` | Open raw `DVV_*` keys and focused runtime key groups. |
+| `Profiles` | Select the active runtime profile from project config. |
+
+Environment key categories:
+
+| Category | Purpose |
+| --- | --- |
 | `All Keys` | Edit every known runtime config key, including focused category keys and custom values. |
+| `UI Layout` | Tune shared fzf hub height, minimum height, and preview width. |
 | `Paths` | Manage workspace, dumps, SSH, AGE, and config paths. |
 | `Shortcuts` | Manage shell shortcuts, tmux shortcuts, and hub action keys. |
 | `Workspace` | Manage workspace root, project discovery, opener, and action keys. |
 | `Database` | Manage MySQL, dump directory, rclone, and database safety defaults. |
 | `Tmux` | Manage directory picker, home session, reset shortcut, and custom API/Web environments. |
 | `Resources` | Manage resource hub settings, port manager shortcuts, and log tail settings. |
-| `Integrations` | Configure rclone, Bitwarden, terminal launcher, and local tool defaults. |
+| `Secrets` | Manage secret file paths, Bitwarden item names, and secrets hub shortcuts. |
+| `Integrations` | Configure terminal, rclone, Drive, and database client defaults. |
 | `Safety` | Manage database and workspace confirmation rules. |
-| `Profiles` | Select the active runtime profile from project config. |
 
-The `All Keys` category keeps the complete raw key editing flow available for advanced usage and script compatibility. Focused categories such as `Workspace`, `Tmux`, and `Shortcuts` are filtered views over the same known runtime keys so common settings are easier to find.
+The `Environment Keys` hub keeps the complete raw key editing flow available in `All Keys` for advanced usage and script compatibility. Focused categories such as `UI Layout`, `Secrets`, `Workspace`, `Tmux`, and `Shortcuts` are filtered views over the same known runtime keys so common settings are easier to find without crowding the first screen.
+
+`dvv secrets` remains the operational hub for preparing, restoring, and syncing secret files. `Environment Keys` -> `Secrets` only edits secret-related configuration values such as file paths, Bitwarden item names, and shortcuts.
 
 Every known key includes a short `What it does` explanation in the preview panel. `dvv config list` also prints a `DESCRIPTION` column for non-interactive review. Custom persisted keys are listed under the `Custom` group with a generic description so values added through the hub do not disappear from the UI.
 
@@ -387,7 +397,7 @@ The `workspace` section contains these groups:
 - `bootstrap`: copy rules and conditional commands.
 - `safety`: confirmations, dirty worktree blocking, force remove policy, direct-child-only deletion, and leftover deletion confirmation.
 
-The top-level `ui.hubHeightPercent`, `ui.hubMinHeight`, and `ui.previewWidthPercent` fields optionally override the layout of every fzf hub. They are well suited to personal `~/.config/devv/config.json` settings; omit them to preserve each hub's shared defaults.
+The top-level `ui.hubHeightPercent`, `ui.hubMinHeight`, and `ui.previewWidthPercent` fields optionally override the layout of every fzf hub. They are well suited to personal `~/.config/devv/config.json` settings and can also be edited through `dvv config` as `DVV_UI_HUB_HEIGHT_PERCENT`, `DVV_UI_HUB_MIN_HEIGHT`, and `DVV_UI_PREVIEW_WIDTH_PERCENT`; omit them or use `0` to preserve each hub's shared defaults. Valid ranges are `20-100` for hub height percent, `10-100` for minimum height rows, and `20-70` for preview width percent.
 
 Template example:
 
