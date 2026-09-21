@@ -50,17 +50,8 @@ func TestValidKey(t *testing.T) {
 func TestConfigCategoriesUseExpectedOrder(t *testing.T) {
 	categories := configCategories()
 	want := []string{
-		"theme",
-		"keys",
-		"paths",
-		"shortcuts",
-		"workspace",
-		"ssh",
-		"database",
-		"tmux",
-		"resources",
-		"integrations",
-		"safety",
+		"appearance",
+		"environment",
 		"profiles",
 	}
 	if len(categories) != len(want) {
@@ -73,13 +64,39 @@ func TestConfigCategoriesUseExpectedOrder(t *testing.T) {
 	}
 }
 
+func TestEnvironmentKeyCategoriesUseExpectedOrder(t *testing.T) {
+	categories := environmentKeyCategories()
+	want := []string{
+		"keys",
+		"ui",
+		"paths",
+		"shortcuts",
+		"workspace",
+		"ssh",
+		"database",
+		"tmux",
+		"resources",
+		"secrets",
+		"integrations",
+		"safety",
+	}
+	if len(categories) != len(want) {
+		t.Fatalf("len(environmentKeyCategories()) = %d, want %d", len(categories), len(want))
+	}
+	for index, id := range want {
+		if categories[index].ID != id {
+			t.Fatalf("environment category %d = %q, want %q", index, categories[index].ID, id)
+		}
+	}
+}
+
 func TestFindCategoryInputSupportsIndexIDAndLabel(t *testing.T) {
-	categories := configCategories()
+	categories := append(configCategories(), environmentKeyCategories()...)
 	tests := []struct {
 		value string
 		want  string
 	}{
-		{value: "1", want: "theme"},
+		{value: "1", want: "appearance"},
 		{value: "keys", want: "keys"},
 		{value: "Database", want: "database"},
 		{value: "tmux", want: "tmux"},
@@ -100,24 +117,44 @@ func TestFindCategoryInputSupportsIndexIDAndLabel(t *testing.T) {
 
 func TestCategoryRowsKeepRawIDHidden(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
-	rows := strings.Split(strings.TrimSpace(categoryRows(testEntries())), "\n")
+	rows := strings.Split(strings.TrimSpace(categoryRows(configCategories(), testEntries())), "\n")
 	if len(rows) < 2 {
 		t.Fatalf("categoryRows returned too few rows: %#v", rows)
 	}
 	raw := ui.FZFSelectedRaw(rows[1])
-	if raw != "theme" {
-		t.Fatalf("first category raw id = %q, want theme", raw)
+	if raw != "appearance" {
+		t.Fatalf("first category raw id = %q, want appearance", raw)
 	}
-	if !strings.Contains(rows[2], "All Keys") || !strings.Contains(rows[2], "54 key(s)") {
-		t.Fatalf("All Keys row should include label and count: %q", rows[2])
+	if !strings.Contains(rows[1], "Appearance") || !strings.Contains(rows[1], "selector") {
+		t.Fatalf("Appearance row should include label and selector status: %q", rows[1])
+	}
+	if !strings.Contains(rows[2], "Environment Keys") || !strings.Contains(rows[2], "selector") {
+		t.Fatalf("Environment Keys row should include label and selector status: %q", rows[2])
 	}
 	fields := strings.Split(rows[2], "\t")
 	if len(fields) < 5 {
 		t.Fatalf("category row fields = %#v", fields)
 	}
 	visible := strings.Join(fields[4:], "\t")
-	if strings.Contains(visible, "Edit every known") {
+	if strings.Contains(visible, "Open raw") {
 		t.Fatalf("visible category row should keep description in preview only: %q", visible)
+	}
+}
+
+func TestEnvironmentCategoryRowsKeepRawIDHidden(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	rows := strings.Split(strings.TrimSpace(categoryRows(environmentKeyCategories(), testEntries())), "\n")
+	if len(rows) < 4 {
+		t.Fatalf("environment category rows returned too few rows: %#v", rows)
+	}
+	if raw := ui.FZFSelectedRaw(rows[1]); raw != "keys" {
+		t.Fatalf("first environment category raw id = %q, want keys", raw)
+	}
+	if !strings.Contains(rows[1], "All Keys") || !strings.Contains(rows[1], "57 key(s)") {
+		t.Fatalf("All Keys row should include label and count: %q", rows[1])
+	}
+	if !strings.Contains(rows[2], "UI Layout") || !strings.Contains(rows[2], "3 key(s)") {
+		t.Fatalf("UI Layout row should include label and count: %q", rows[2])
 	}
 }
 
@@ -179,7 +216,8 @@ func TestEntriesForCategoryFiltersExpectedGroups(t *testing.T) {
 		category string
 		keys     []string
 	}{
-		{category: "keys", keys: []string{"DVV_THEME", "DVV_PROFILE", "DVV_TERMINAL_LAUNCHER", "API_DIR", "DVV_DB_HOST", "DVV_TMUX_SESSION_SHORTCUT", "DVV_TMUX_HOME_DIR", "DVV_TMUX_HOME_SHORTCUT", "DVV_TMUX_RESET_SHORTCUT", "DVV_SHELL_MAIN_SHORTCUT", "DVV_SHELL_WORKSPACE_SHORTCUT", "DVV_SHELL_TMUX_SHORTCUT", "DVV_SHELL_SSH_SHORTCUT", "DVV_CONFIG_ADD_SHORTCUT", "DVV_CONFIG_CLEAR_SHORTCUT", "DVV_CONFIG_VALIDATE_SHORTCUT", "DVV_CONFIG_SECRETS_SHORTCUT", "DVV_SSH_ADD_SHORTCUT", "DVV_SSH_REMOVE_SHORTCUT", "DVV_SSH_NEW_TERMINAL_SHORTCUT", "DVV_SCP_DOWNLOADS_DIR", "DVV_SCP_UPLOAD_SHORTCUT", "DVV_SCP_DOWNLOAD_SHORTCUT", "DVV_SCP_OPEN_DOWNLOADS_SHORTCUT", "DVV_SCP_CLEAN_DOWNLOADS_SHORTCUT", "DVV_TMUX_HUB_START_SHORTCUT", "DVV_TMUX_HUB_STOP_SHORTCUT", "DVV_TMUX_HUB_RESTART_API_SHORTCUT", "DVV_TMUX_HUB_RESTART_WEB_SHORTCUT", "DVV_TMUX_HUB_CREATE_SHORTCUT", "DVV_TMUX_THEME_ENABLED", "DVV_TMUX_THEME_FOLLOW_CLI", "DVV_TMUX_THEME_NAME", "DVV_TMUX_ENVIRONMENTS", "DVV_WORKSPACES_DIR", "DVV_WORKSPACE_PROJECT_EXCLUDE_DIRS", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "DVV_WORKSPACE_HARNESS_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT", "DVV_WORKSPACE_TEMPLATES", "DVV_WORKSPACE_HARNESS_AGENTS_DIR", "DVV_WORKSPACE_HARNESS_SKILL_PATHS", "DVV_WORKSPACE_HARNESS_PROJECT_SKILL_PATHS", "DVV_RCLONE_REMOTE", "DVV_DB_DRIVE_FOLDER_ID", "DVV_RESOURCES_START_SHORTCUT", "DVV_RESOURCES_LOGS_SHORTCUT", "DVV_RESOURCES_LOG_TAIL", "DVV_PORTS_KILL_SHORTCUT", "DVV_PORTS_COPY_SHORTCUT", "DVV_DB_SAFETY_CONFIRM", "DVV_SECRETS_SYNC_SHORTCUT"}},
+		{category: "keys", keys: []string{"DVV_THEME", "DVV_PROFILE", "DVV_UI_HUB_HEIGHT_PERCENT", "DVV_UI_HUB_MIN_HEIGHT", "DVV_UI_PREVIEW_WIDTH_PERCENT", "DVV_TERMINAL_LAUNCHER", "API_DIR", "DVV_DB_HOST", "DVV_TMUX_SESSION_SHORTCUT", "DVV_TMUX_HOME_DIR", "DVV_TMUX_HOME_SHORTCUT", "DVV_TMUX_RESET_SHORTCUT", "DVV_SHELL_MAIN_SHORTCUT", "DVV_SHELL_WORKSPACE_SHORTCUT", "DVV_SHELL_TMUX_SHORTCUT", "DVV_SHELL_SSH_SHORTCUT", "DVV_CONFIG_ADD_SHORTCUT", "DVV_CONFIG_CLEAR_SHORTCUT", "DVV_CONFIG_VALIDATE_SHORTCUT", "DVV_CONFIG_SECRETS_SHORTCUT", "DVV_SSH_ADD_SHORTCUT", "DVV_SSH_REMOVE_SHORTCUT", "DVV_SSH_NEW_TERMINAL_SHORTCUT", "DVV_SCP_DOWNLOADS_DIR", "DVV_SCP_UPLOAD_SHORTCUT", "DVV_SCP_DOWNLOAD_SHORTCUT", "DVV_SCP_OPEN_DOWNLOADS_SHORTCUT", "DVV_SCP_CLEAN_DOWNLOADS_SHORTCUT", "DVV_TMUX_HUB_START_SHORTCUT", "DVV_TMUX_HUB_STOP_SHORTCUT", "DVV_TMUX_HUB_RESTART_API_SHORTCUT", "DVV_TMUX_HUB_RESTART_WEB_SHORTCUT", "DVV_TMUX_HUB_CREATE_SHORTCUT", "DVV_TMUX_THEME_ENABLED", "DVV_TMUX_THEME_FOLLOW_CLI", "DVV_TMUX_THEME_NAME", "DVV_TMUX_ENVIRONMENTS", "DVV_WORKSPACES_DIR", "DVV_WORKSPACE_PROJECT_EXCLUDE_DIRS", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "DVV_WORKSPACE_HARNESS_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT", "DVV_WORKSPACE_TEMPLATES", "DVV_WORKSPACE_HARNESS_AGENTS_DIR", "DVV_WORKSPACE_HARNESS_SKILL_PATHS", "DVV_WORKSPACE_HARNESS_PROJECT_SKILL_PATHS", "DVV_RCLONE_REMOTE", "DVV_DB_DRIVE_FOLDER_ID", "DVV_RESOURCES_START_SHORTCUT", "DVV_RESOURCES_LOGS_SHORTCUT", "DVV_RESOURCES_LOG_TAIL", "DVV_PORTS_KILL_SHORTCUT", "DVV_PORTS_COPY_SHORTCUT", "DVV_DB_SAFETY_CONFIRM", "DVV_SECRETS_SYNC_SHORTCUT"}},
+		{category: "ui", keys: []string{"DVV_UI_HUB_HEIGHT_PERCENT", "DVV_UI_HUB_MIN_HEIGHT", "DVV_UI_PREVIEW_WIDTH_PERCENT"}},
 		{category: "paths", keys: []string{"API_DIR", "DVV_TMUX_HOME_DIR", "DVV_SCP_DOWNLOADS_DIR", "DVV_WORKSPACES_DIR", "DVV_WORKSPACE_PROJECT_EXCLUDE_DIRS", "DVV_WORKSPACE_HARNESS_AGENTS_DIR", "DVV_WORKSPACE_HARNESS_SKILL_PATHS", "DVV_WORKSPACE_HARNESS_PROJECT_SKILL_PATHS"}},
 		{category: "shortcuts", keys: []string{"DVV_TMUX_SESSION_SHORTCUT", "DVV_TMUX_HOME_SHORTCUT", "DVV_TMUX_RESET_SHORTCUT", "DVV_SHELL_MAIN_SHORTCUT", "DVV_SHELL_WORKSPACE_SHORTCUT", "DVV_SHELL_TMUX_SHORTCUT", "DVV_SHELL_SSH_SHORTCUT", "DVV_CONFIG_ADD_SHORTCUT", "DVV_CONFIG_CLEAR_SHORTCUT", "DVV_CONFIG_VALIDATE_SHORTCUT", "DVV_CONFIG_SECRETS_SHORTCUT", "DVV_SSH_ADD_SHORTCUT", "DVV_SSH_REMOVE_SHORTCUT", "DVV_SSH_NEW_TERMINAL_SHORTCUT", "DVV_SCP_UPLOAD_SHORTCUT", "DVV_SCP_DOWNLOAD_SHORTCUT", "DVV_SCP_OPEN_DOWNLOADS_SHORTCUT", "DVV_SCP_CLEAN_DOWNLOADS_SHORTCUT", "DVV_TMUX_HUB_START_SHORTCUT", "DVV_TMUX_HUB_STOP_SHORTCUT", "DVV_TMUX_HUB_RESTART_API_SHORTCUT", "DVV_TMUX_HUB_RESTART_WEB_SHORTCUT", "DVV_TMUX_HUB_CREATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_SHORTCUT", "DVV_WORKSPACE_HARNESS_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_CREATE_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_EDIT_SHORTCUT", "DVV_WORKSPACE_TEMPLATE_DELETE_SHORTCUT", "DVV_RESOURCES_START_SHORTCUT", "DVV_RESOURCES_LOGS_SHORTCUT", "DVV_PORTS_KILL_SHORTCUT", "DVV_PORTS_COPY_SHORTCUT", "DVV_SECRETS_SYNC_SHORTCUT"}},
 		{category: "tmux", keys: []string{"DVV_TMUX_HOME_DIR", "DVV_TMUX_THEME_ENABLED", "DVV_TMUX_THEME_FOLLOW_CLI", "DVV_TMUX_THEME_NAME", "DVV_TMUX_ENVIRONMENTS"}},
@@ -189,6 +227,7 @@ func TestEntriesForCategoryFiltersExpectedGroups(t *testing.T) {
 		{category: "integrations", keys: []string{"DVV_TERMINAL_LAUNCHER", "DVV_DB_HOST", "DVV_RCLONE_REMOTE", "DVV_DB_DRIVE_FOLDER_ID"}},
 		{category: "theme", keys: []string{"DVV_THEME"}},
 		{category: "resources", keys: []string{"DVV_RESOURCES_START_SHORTCUT", "DVV_RESOURCES_LOGS_SHORTCUT", "DVV_RESOURCES_LOG_TAIL", "DVV_PORTS_KILL_SHORTCUT", "DVV_PORTS_COPY_SHORTCUT"}},
+		{category: "secrets", keys: []string{"DVV_SECRETS_SYNC_SHORTCUT"}},
 		{category: "safety", keys: []string{"DVV_DB_SAFETY_CONFIRM"}},
 		{category: "profiles", keys: []string{"DVV_PROFILE"}},
 	}
@@ -247,6 +286,12 @@ func TestKnownEntriesIncludesRuntimeShortcutKey(t *testing.T) {
 	}
 	if _, ok := findEntry(entries, "DVV_PROFILE"); !ok {
 		t.Fatalf("knownEntries should include DVV_PROFILE")
+	}
+	for _, key := range []string{"DVV_UI_HUB_HEIGHT_PERCENT", "DVV_UI_HUB_MIN_HEIGHT", "DVV_UI_PREVIEW_WIDTH_PERCENT"} {
+		entry, ok := findEntry(entries, key)
+		if !ok || entry.Category != "UI" || entry.Kind != "number" {
+			t.Fatalf("knownEntries UI key %s = %#v, found=%v", key, entry, ok)
+		}
 	}
 	if _, ok := findEntry(entries, "DVV_TMUX_ENVIRONMENTS"); !ok {
 		t.Fatalf("knownEntries should include DVV_TMUX_ENVIRONMENTS")
@@ -419,6 +464,28 @@ func TestSetRuntimeOnlyValueDoesNotRefreshManagedIntegration(t *testing.T) {
 	}
 }
 
+func TestSetRejectsInvalidUILayoutValues(t *testing.T) {
+	cfg := &config.Config{
+		ConfigFile: filepath.Join(t.TempDir(), "config.env"),
+		Project:    config.DefaultProjectConfig(),
+	}
+	manager := Manager{Config: cfg, Runner: &configFakeRunner{}}
+
+	if err := manager.Set(context.Background(), []string{"DVV_UI_HUB_MIN_HEIGHT", "9"}); err == nil {
+		t.Fatalf("Set should reject min height below 10")
+	}
+	values, err := readConfigFile(cfg.ConfigFile)
+	if err != nil {
+		t.Fatalf("readConfigFile returned error: %v", err)
+	}
+	if _, ok := values["DVV_UI_HUB_MIN_HEIGHT"]; ok {
+		t.Fatalf("invalid UI layout value should not be persisted: %#v", values)
+	}
+	if err := manager.Set(context.Background(), []string{"DVV_UI_HUB_MIN_HEIGHT", "0"}); err != nil {
+		t.Fatalf("Set should allow 0 as default reset: %v", err)
+	}
+}
+
 func TestWriteValueAppliesRuntimeConfig(t *testing.T) {
 	t.Setenv("HOME", "/home/tester")
 	cfg := &config.Config{
@@ -587,6 +654,9 @@ func testEntries() []Entry {
 	return []Entry{
 		{Category: "Theme", Key: "DVV_THEME", Description: "Selects the CLI color theme.", Kind: "theme"},
 		{Category: "Profiles", Key: "DVV_PROFILE", Description: "Selects the active runtime profile.", Kind: "profile"},
+		{Category: "UI", Key: "DVV_UI_HUB_HEIGHT_PERCENT", Description: "Sets fzf hub height.", Kind: "number"},
+		{Category: "UI", Key: "DVV_UI_HUB_MIN_HEIGHT", Description: "Sets fzf hub minimum height.", Kind: "number"},
+		{Category: "UI", Key: "DVV_UI_PREVIEW_WIDTH_PERCENT", Description: "Sets fzf preview width.", Kind: "number"},
 		{Category: "Integrations", Key: "DVV_TERMINAL_LAUNCHER", Description: "Selects the terminal launcher.", Kind: "choice"},
 		{Category: "Project", Key: "API_DIR", Description: "Sets the default API project path.", Kind: "path"},
 		{Category: "Database", Key: "DVV_DB_HOST", Description: "Sets the MySQL host.", Kind: "text"},

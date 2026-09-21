@@ -1,6 +1,6 @@
 # Themes
 
-The default visual identity is `Royal Noir`: black foundation, royal purple interaction, and restrained gold status. Additional terminal themes are available through `dvv config` -> `Theme` or `DVV_THEME`.
+The default visual identity is `Royal Noir`: black foundation, royal purple interaction, and restrained gold status. Additional terminal themes are available through `dvv config` -> `Appearance` -> `Theme` or `DVV_THEME`.
 
 ## Palette
 

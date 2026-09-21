@@ -179,7 +179,7 @@ func (m *Manager) Targets(ctx context.Context) ([]Target, error) {
 	apiDir := config.ExpandPath(os.Getenv("API_DIR"))
 	webDir := config.ExpandPath(os.Getenv("WEB_DIR"))
 	window := firstNonEmpty(os.Getenv("TMUX_WIN"), "dev")
-	session := cleanSessionName(firstNonEmpty(os.Getenv("TMUX_SESSION"), "eloverde"))
+	session := cleanSessionName(firstNonEmpty(os.Getenv("TMUX_SESSION"), "devtools"))
 
 	targets := []Target{m.buildTarget(ctx, "Default config", session, window, apiDir, webDir)}
 	for _, environment := range m.Config.Project.Tmux.Environments {
@@ -1396,11 +1396,10 @@ printf "%sTmux target%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$target_name"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Status" "$dvv_reset" "$target_status"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Session" "$dvv_reset" "$raw"
+printf "\n%sCommands%s\n" "$dvv_heading" "$dvv_reset"
+print_commands
 printf "\n%sDetails%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%s%s\n" "$dvv_muted" "$target_details" "$dvv_reset"
-printf "\n%s--------------------------------%s\n" "$dvv_muted" "$dvv_reset"
-printf "%sCommands%s\n" "$dvv_heading" "$dvv_reset"
-print_commands
 ' sh {}`
 }
 

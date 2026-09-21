@@ -135,12 +135,12 @@ func TestRoyalStatusLoaderUpdatesCurrentFrame(t *testing.T) {
 		Detail:  "workspace-task",
 	})
 
-	loader.Set("creating", "api-eloverde", "create-branch in workspace-task")
+	loader.Set("creating", "api-sample", "create-branch in workspace-task")
 	frame := renderRoyalLoaderFrame(loader.snapshot(), 0, 0)
 
 	expected := []string{
 		"creating",
-		"api-eloverde",
+		"api-sample",
 		"create-branch in workspace-task",
 	}
 	for _, value := range expected {

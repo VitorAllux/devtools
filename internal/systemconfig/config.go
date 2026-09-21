@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/VitorAllux/devtools/internal/config"
@@ -78,8 +79,11 @@ func (m Manager) Hub(ctx context.Context) error {
 }
 
 func (m Manager) openCategory(ctx context.Context, category Category) error {
-	if category.ID == "theme" {
-		return m.themeHub(ctx)
+	if category.ID == "appearance" {
+		return m.appearanceHub(ctx)
+	}
+	if category.ID == "environment" {
+		return m.environmentKeysHub(ctx)
 	}
 	if category.ID == "profiles" {
 		return m.profileHub(ctx)
@@ -93,6 +97,58 @@ func (m Manager) openCategory(ctx context.Context, category Category) error {
 		return fmt.Errorf("config category has no editable values: %s", category.Label)
 	}
 	return m.keyHub(ctx, category, filtered)
+}
+
+func (m Manager) appearanceHub(ctx context.Context) error {
+	for {
+		entries, err := m.Entries()
+		if err != nil {
+			return err
+		}
+		if _, err := m.Runner.LookPath("fzf"); err != nil {
+			return m.basicAppearanceHub(ctx, entries)
+		}
+		category, ok, err := m.selectAppearanceCategory(ctx, entries)
+		if err != nil || !ok {
+			return err
+		}
+		if category.ID == "theme" {
+			if err := m.themeHub(ctx); err != nil {
+				return err
+			}
+			continue
+		}
+		filtered := entriesForCategory(category.ID, entries)
+		if len(filtered) == 0 {
+			return fmt.Errorf("config category has no editable values: %s", category.Label)
+		}
+		if err := m.keyHub(ctx, category, filtered); err != nil {
+			return err
+		}
+	}
+}
+
+func (m Manager) environmentKeysHub(ctx context.Context) error {
+	for {
+		entries, err := m.Entries()
+		if err != nil {
+			return err
+		}
+		if _, err := m.Runner.LookPath("fzf"); err != nil {
+			return m.basicEnvironmentKeysHub(ctx, entries)
+		}
+		category, ok, err := m.selectEnvironmentKeyCategory(ctx, entries)
+		if err != nil || !ok {
+			return err
+		}
+		filtered := entriesForCategory(category.ID, entries)
+		if len(filtered) == 0 {
+			return fmt.Errorf("config category has no editable values: %s", category.Label)
+		}
+		if err := m.keyHub(ctx, category, filtered); err != nil {
+			return err
+		}
+	}
 }
 
 func (m Manager) keyHub(ctx context.Context, category Category, initial []Entry) error {
@@ -159,7 +215,7 @@ func (m Manager) handleEntryAction(ctx context.Context, key string, entry Entry,
 }
 
 func (m Manager) selectCategory(ctx context.Context, entries []Entry) (Category, bool, error) {
-	output, err := m.Runner.OutputWithInput(ctx, "", []byte(categoryRows(entries)), "fzf", categoryFZFArgs()...)
+	output, err := m.Runner.OutputWithInput(ctx, "", []byte(categoryRows(configCategories(), entries)), "fzf", categoryFZFArgs("dvv config")...)
 	if err != nil && len(output) == 0 {
 		return Category{}, false, nil
 	}
@@ -171,17 +227,41 @@ func (m Manager) selectCategory(ctx context.Context, entries []Entry) (Category,
 	return category, ok, nil
 }
 
+func (m Manager) selectAppearanceCategory(ctx context.Context, entries []Entry) (Category, bool, error) {
+	categories := appearanceCategories()
+	output, err := m.Runner.OutputWithInput(ctx, "", []byte(categoryRows(categories, entries)), "fzf", categoryFZFArgs("dvv config > appearance")...)
+	if err != nil && len(output) == 0 {
+		return Category{}, false, nil
+	}
+	if err != nil {
+		return Category{}, false, err
+	}
+	raw := ui.FZFSelectedRaw(strings.TrimSpace(string(output)))
+	category, ok := findCategoryIn(categories, raw)
+	return category, ok, nil
+}
+
+func (m Manager) selectEnvironmentKeyCategory(ctx context.Context, entries []Entry) (Category, bool, error) {
+	categories := environmentKeyCategories()
+	output, err := m.Runner.OutputWithInput(ctx, "", []byte(categoryRows(categories, entries)), "fzf", categoryFZFArgs("dvv config > environment keys")...)
+	if err != nil && len(output) == 0 {
+		return Category{}, false, nil
+	}
+	if err != nil {
+		return Category{}, false, err
+	}
+	raw := ui.FZFSelectedRaw(strings.TrimSpace(string(output)))
+	category, ok := findCategoryIn(categories, raw)
+	return category, ok, nil
+}
+
 func (m Manager) basicCategoryHub(ctx context.Context, entries []Entry) error {
 	categories := configCategories()
 	ui.Title("Configuration")
 	ui.Info("Runtime file: %s", m.Config.ConfigFile)
 	ui.Info("Structured file: %s", m.Config.LocalConfigFile)
 	for index, category := range categories {
-		count := len(entriesForCategory(category.ID, entries))
-		status := fmt.Sprintf("%d key(s)", count)
-		if category.ID == "theme" {
-			status = "selector"
-		}
+		status := categoryStatus(category, entries)
 		fmt.Printf("  %2d  %-14s %-10s %s\n", index+1, category.Label, status, category.Description)
 	}
 	value, err := ui.Prompt("Config category")
@@ -198,10 +278,79 @@ func (m Manager) basicCategoryHub(ctx context.Context, entries []Entry) error {
 	return m.openCategory(ctx, category)
 }
 
+func (m Manager) basicAppearanceHub(ctx context.Context, entries []Entry) error {
+	categories := appearanceCategories()
+	ui.Title("Appearance")
+	for index, category := range categories {
+		status := categoryStatus(category, entries)
+		fmt.Printf("  %2d  %-14s %-10s %s\n", index+1, category.Label, status, category.Description)
+	}
+	value, err := ui.Prompt("Appearance category")
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	category, ok := findCategoryInput(categories, value)
+	if !ok {
+		return fmt.Errorf("unknown appearance category: %s", value)
+	}
+	if category.ID == "theme" {
+		return m.themeHub(ctx)
+	}
+	entries = entriesForCategory(category.ID, entries)
+	if len(entries) == 0 {
+		return fmt.Errorf("config category has no editable values: %s", category.Label)
+	}
+	return m.keyHub(ctx, category, entries)
+}
+
+func (m Manager) basicEnvironmentKeysHub(ctx context.Context, entries []Entry) error {
+	categories := environmentKeyCategories()
+	ui.Title("Environment Keys")
+	ui.Info("Runtime file: %s", m.Config.ConfigFile)
+	for index, category := range categories {
+		status := categoryStatus(category, entries)
+		fmt.Printf("  %2d  %-14s %-10s %s\n", index+1, category.Label, status, category.Description)
+	}
+	value, err := ui.Prompt("Environment key category")
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	category, ok := findCategoryInput(categories, value)
+	if !ok {
+		return fmt.Errorf("unknown environment key category: %s", value)
+	}
+	entries = entriesForCategory(category.ID, entries)
+	if len(entries) == 0 {
+		return fmt.Errorf("config category has no editable values: %s", category.Label)
+	}
+	return m.keyHub(ctx, category, entries)
+}
+
 func configCategories() []Category {
 	return []Category{
+		{"appearance", "Appearance", "Manage theme and shared hub layout"},
+		{"environment", "Environment Keys", "Open raw DVV_* keys and focused runtime key groups"},
+		{"profiles", "Profiles", "Select a machine or context profile"},
+	}
+}
+
+func appearanceCategories() []Category {
+	return []Category{
 		{"theme", "Theme", "Select and preview CLI themes"},
+		{"ui", "UI Layout", "Tune shared hub height, minimum height, and preview width"},
+	}
+}
+
+func environmentKeyCategories() []Category {
+	return []Category{
 		{"keys", "All Keys", "Edit every known runtime config key, including focused category keys and custom values"},
+		{"ui", "UI Layout", "Tune shared hub height, minimum height, and preview width"},
 		{"paths", "Paths", "Manage workspace, dumps, SSH, AGE, and config paths"},
 		{"shortcuts", "Shortcuts", "Manage shell, tmux, and hub action keys"},
 		{"workspace", "Workspace", "Manage workspace root, discovery, opener, and action keys"},
@@ -209,17 +358,17 @@ func configCategories() []Category {
 		{"database", "Database", "Manage MySQL, dumps, rclone, and DB safety defaults"},
 		{"tmux", "Tmux", "Manage directory picker and home session settings"},
 		{"resources", "Resources", "Manage resource and port hub settings"},
+		{"secrets", "Secrets", "Manage secret file paths, Bitwarden item names, and secrets shortcuts"},
 		{"integrations", "Integrations", "Configure terminal, rclone, Bitwarden, and local tool defaults"},
 		{"safety", "Safety", "Manage database and workspace confirmation rules"},
-		{"profiles", "Profiles", "Select a machine or context profile"},
 	}
 }
 
-func categoryRows(entries []Entry) string {
+func categoryRows(categories []Category, entries []Entry) string {
 	var builder strings.Builder
 	builder.WriteString(categoryLine("__dvv_header__", "", "", "", categoryHeader()))
 	builder.WriteByte('\n')
-	for index, category := range configCategories() {
+	for index, category := range categories {
 		status := categoryStatus(category, entries)
 		builder.WriteString(categoryLine(category.ID, category.Label, status, category.Description, categoryRow(index, category, status)))
 		builder.WriteByte('\n')
@@ -238,7 +387,7 @@ func categoryHeader() string {
 func categoryStatus(category Category, entries []Entry) string {
 	count := len(entriesForCategory(category.ID, entries))
 	status := fmt.Sprintf("%d key(s)", count)
-	if category.ID == "theme" || category.ID == "profiles" {
+	if category.ID == "theme" || category.ID == "profiles" || category.ID == "appearance" || category.ID == "environment" {
 		status = "selector"
 	}
 	return status
@@ -262,10 +411,10 @@ func categoryLine(raw string, label string, status string, description string, d
 	}, "\t")
 }
 
-func categoryFZFArgs() []string {
+func categoryFZFArgs(borderLabel string) []string {
 	return ui.FZFHub{
 		Prompt:        ui.Crown("config") + ui.Muted("> "),
-		BorderLabel:   "dvv config",
+		BorderLabel:   borderLabel,
 		Preview:       categoryPreviewCommand(),
 		PreviewLabel:  "category panel",
 		PreviewWindow: "right,40%,border-rounded,wrap",
@@ -292,8 +441,10 @@ printf "%sConfig category%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-10s%s %s\n" "$dvv_label" "Category" "$dvv_reset" "$category"
 printf "  %s%-10s%s %s\n" "$dvv_label" "Status" "$dvv_reset" "$status"
 printf "  %s%-10s%s %s\n" "$dvv_label" "ID" "$dvv_reset" "$raw"
+printf "\n%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Enter" "$dvv_reset" "$dvv_muted" "open" "$dvv_reset"
+printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Esc" "$dvv_reset" "$dvv_muted" "exit/back" "$dvv_reset"
 printf "\n%s%s%s\n" "$dvv_muted" "$detail" "$dvv_reset"
-printf "\n%sEnter open | Esc exit%s\n" "$dvv_muted" "$dvv_reset"
 ' sh {}`
 }
 
@@ -320,13 +471,13 @@ func entriesForCategory(categoryID string, entries []Entry) []Entry {
 	case "integrations":
 		return filterEntries(entries, func(entry Entry) bool {
 			switch entry.Key {
-			case "DVV_TERMINAL_LAUNCHER", "DVV_RCLONE_REMOTE", "DVV_DB_DRIVE_FOLDER_ID", "DVV_BW_AGE_KEY_ITEM", "DVV_DB_HOST", "DVV_DB_PORT", "DVV_DB_USER":
+			case "DVV_TERMINAL_LAUNCHER", "DVV_RCLONE_REMOTE", "DVV_DB_DRIVE_FOLDER_ID", "DVV_DB_HOST", "DVV_DB_PORT", "DVV_DB_USER":
 				return true
 			default:
 				return false
 			}
 		})
-	case "theme", "resources", "safety":
+	case "theme", "ui", "resources", "secrets", "safety":
 		return filterEntriesByCategory(entries, categoryID)
 	case "profiles":
 		return filterEntriesByCategory(entries, "Profiles")
@@ -352,7 +503,11 @@ func filterEntries(entries []Entry, keep func(Entry) bool) []Entry {
 }
 
 func findCategory(id string) (Category, bool) {
-	for _, category := range configCategories() {
+	return findCategoryIn(configCategories(), id)
+}
+
+func findCategoryIn(categories []Category, id string) (Category, bool) {
+	for _, category := range categories {
 		if category.ID == id {
 			return category, true
 		}
@@ -605,11 +760,13 @@ printf "%sProfile%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-10s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$name"
 printf "  %s%-10s%s %s\n" "$dvv_label" "Status" "$dvv_reset" "$status"
 printf "  %s%-10s%s %s\n" "$dvv_label" "ID" "$dvv_reset" "$raw"
+printf "\n%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Enter" "$dvv_reset" "$dvv_muted" "set active profile" "$dvv_reset"
+printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Esc" "$dvv_reset" "$dvv_muted" "back" "$dvv_reset"
 printf "\n%sWhat it does%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%s%s\n" "$dvv_muted" "$description" "$dvv_reset"
 printf "\n%sOverrides%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%s%s\n" "$dvv_muted" "$values" "$dvv_reset"
-printf "\n%sEnter set active profile | Esc back%s\n" "$dvv_muted" "$dvv_reset"
 ' sh {}`
 }
 
@@ -703,10 +860,12 @@ printf "  %s%-10s%s %s\n" "$dvv_label" "Status" "$dvv_reset" "$status"
 printf "  %s%-10s%s %s\n" "$dvv_label" "Accent" "$dvv_reset" "$theme_accent"
 printf "  %s%-10s%s %s\n" "$dvv_label" "Status" "$dvv_reset" "$theme_status"
 printf "  %s%-10s%s %s\n" "$dvv_label" "Border" "$dvv_reset" "$theme_border"
+printf "\n%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Enter" "$dvv_reset" "$dvv_muted" "set theme" "$dvv_reset"
+printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Esc" "$dvv_reset" "$dvv_muted" "back" "$dvv_reset"
 printf "\n%s%s%s\n" "$dvv_muted" "$detail" "$dvv_reset"
 printf "\n%s[█████░░░░░░░░░░░░░] working%s\n" "$dvv_status" "$dvv_reset"
 printf "%s[██████████████████] completed 100%%%s\n" "$dvv_status" "$dvv_reset"
-printf "\n%sEnter set theme | Esc back%s\n" "$dvv_muted" "$dvv_reset"
 ' sh {}`
 }
 
@@ -856,6 +1015,9 @@ func (m Manager) addCustom(ctx context.Context) error {
 }
 
 func (m Manager) writeValue(key string, value string) error {
+	if err := validateRuntimeValue(key, value); err != nil {
+		return err
+	}
 	values, err := readConfigFile(m.Config.ConfigFile)
 	if err != nil {
 		return err
@@ -868,6 +1030,34 @@ func (m Manager) writeValue(key string, value string) error {
 		return err
 	}
 	m.applyRuntimeValue(key, value)
+	return nil
+}
+
+func validateRuntimeValue(key string, value string) error {
+	switch key {
+	case "DVV_UI_HUB_HEIGHT_PERCENT":
+		return validateOptionalRange(key, value, 20, 100)
+	case "DVV_UI_HUB_MIN_HEIGHT":
+		return validateOptionalRange(key, value, 10, 100)
+	case "DVV_UI_PREVIEW_WIDTH_PERCENT":
+		return validateOptionalRange(key, value, 20, 70)
+	default:
+		return nil
+	}
+}
+
+func validateOptionalRange(key string, value string, min int, max int) error {
+	value = strings.TrimSpace(value)
+	if value == "" || value == "0" {
+		return nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fmt.Errorf("%s must be a number between %d and %d, or 0 to use the default", key, min, max)
+	}
+	if parsed < min || parsed > max {
+		return fmt.Errorf("%s must be between %d and %d, or 0 to use the default", key, min, max)
+	}
 	return nil
 }
 
@@ -921,6 +1111,21 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		}
 	case "DVV_PROFILE":
 		m.Config.Project.Profiles.Active = strings.ToLower(strings.TrimSpace(value))
+	case "DVV_UI_HUB_HEIGHT_PERCENT":
+		if isNumber(value) {
+			fmt.Sscanf(value, "%d", &m.Config.Project.UI.HubHeightPercent)
+			m.applyUILayout()
+		}
+	case "DVV_UI_HUB_MIN_HEIGHT":
+		if isNumber(value) {
+			fmt.Sscanf(value, "%d", &m.Config.Project.UI.HubMinHeight)
+			m.applyUILayout()
+		}
+	case "DVV_UI_PREVIEW_WIDTH_PERCENT":
+		if isNumber(value) {
+			fmt.Sscanf(value, "%d", &m.Config.Project.UI.PreviewWidthPercent)
+			m.applyUILayout()
+		}
 	case "DVV_SHELL_MAIN_SHORTCUT":
 		m.Config.Project.Shell.Shortcuts.MainHub = value
 	case "DVV_SHELL_WORKSPACE_SHORTCUT":
@@ -1096,6 +1301,14 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 	}
 }
 
+func (m Manager) applyUILayout() {
+	ui.SetFZFHubLayout(ui.FZFHubLayout{
+		HeightPercent:       m.Config.Project.UI.HubHeightPercent,
+		MinHeight:           m.Config.Project.UI.HubMinHeight,
+		PreviewWidthPercent: m.Config.Project.UI.PreviewWidthPercent,
+	})
+}
+
 func (m Manager) validate(entry Entry) {
 	switch entry.Kind {
 	case "path":
@@ -1244,6 +1457,8 @@ source=$(printf "%s" "$line" | cut -f6)
 default_value=$(printf "%s" "$line" | cut -f7)
 printf "%sConfig entry%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Key" "$dvv_reset" "$raw"
+printf "\n%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
+` + commandDeck + `
 printf "\n%sWhat it does%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%s%s\n" "$dvv_muted" "$description" "$dvv_reset"
 printf "\n%sCurrent value%s\n" "$dvv_heading" "$dvv_reset"
@@ -1255,8 +1470,6 @@ printf "\n%sMetadata%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Group" "$dvv_reset" "$category"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Type" "$dvv_reset" "$kind"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Source" "$dvv_reset" "$source"
-printf "\n%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
-` + commandDeck + `
 ' sh {}`
 }
 
@@ -1321,11 +1534,14 @@ func knownEntries(cfg *config.Config) []Entry {
 	return []Entry{
 		{"Theme", "DVV_THEME", "Selects the CLI color theme.", "theme", cfg.Project.Theme.Name, "", false},
 		{"Profiles", "DVV_PROFILE", "Selects the active runtime profile from project config.", "profile", cfg.Project.Profiles.Active, "", false},
+		{"UI", "DVV_UI_HUB_HEIGHT_PERCENT", "Sets the shared fzf hub height as a terminal percentage. Valid range: 20-100.", "number", fmt.Sprintf("%d", cfg.Project.UI.HubHeightPercent), "", false},
+		{"UI", "DVV_UI_HUB_MIN_HEIGHT", "Sets the shared fzf hub minimum height in terminal rows. Valid range: 10-100.", "number", fmt.Sprintf("%d", cfg.Project.UI.HubMinHeight), "", false},
+		{"UI", "DVV_UI_PREVIEW_WIDTH_PERCENT", "Sets the shared fzf preview pane width as a terminal percentage. Valid range: 20-70.", "number", fmt.Sprintf("%d", cfg.Project.UI.PreviewWidthPercent), "", false},
 		{"Integrations", "DVV_TERMINAL_LAUNCHER", "Selects the terminal launcher for new SSH and tmux tabs.", "choice", cfg.Project.Terminal.Launcher, "", false},
 		{"Project", "API_DIR", "Sets the default API project path for legacy tmux flows.", "path", "", "", false},
 		{"Project", "WEB_DIR", "Sets the default Web project path for legacy tmux flows.", "path", "", "", false},
 		{"Tmux", "TMUX_DEFAULT_DIR", "Sets the legacy default root for directory pickers.", "path", "~/workspace", "", false},
-		{"Tmux", "TMUX_SESSION", "Sets the legacy tmux environment session name.", "text", "eloverde", "", false},
+		{"Tmux", "TMUX_SESSION", "Sets the legacy tmux environment session name.", "text", "devtools", "", false},
 		{"Tmux", "TMUX_WIN", "Sets the legacy tmux environment window name.", "text", "dev", "", false},
 		{"Tmux", "DVV_TMUX_SESSION_SEARCH_ROOTS", "Sets roots scanned by the tmux directory picker.", "path-list", strings.Join(cfg.Project.Tmux.Session.SearchRoots, string(os.PathListSeparator)), "", false},
 		{"Tmux", "DVV_TMUX_SESSION_SEARCH_DEPTH", "Limits directory picker search depth.", "number", fmt.Sprintf("%d", cfg.Project.Tmux.Session.SearchDepth), "", false},

@@ -94,8 +94,8 @@ find ~/workspace -maxdepth 1 -type d -name 'workspace-*' -printf '%p\0' | xargs 
 
 | Detail | Current rule | Action |
 | --- | --- | --- |
-| First screen | `dvv config` opens a category hub. | Keep the complete raw key list inside `All Keys` and common settings inside focused sub-hubs. |
-| Current raw editor | `All Keys` preserves the old key/value editor. | Keep `dvv config list` and `dvv config set` script-friendly. |
+| First screen | `dvv config` opens a small category hub: `Appearance`, `Environment Keys`, and `Profiles`. | Keep raw and focused runtime key groups inside `Environment Keys` instead of crowding the first screen. |
+| Current raw editor | `Environment Keys` -> `All Keys` preserves the old key/value editor. | Keep `dvv config list` and `dvv config set` script-friendly. |
 | Visible categories | Every first-level category must open a working selector or key hub. | Keep future categories hidden until their backend exists. |
 | Runtime keys | Category sub-hubs expose only keys that affect current behavior. | Add runtime config support before making a setting editable. |
 | Profiles | `Profiles` selects `DVV_PROFILE`; project profile values apply before normal config resolution. | Use for machine/context presets without overriding explicit shell exports. |

@@ -12,11 +12,12 @@ import (
 )
 
 type StatusItem struct {
-	ID      string
-	Label   string
-	State   string
-	Path    string
-	Details string
+	ID       string
+	Label    string
+	State    string
+	Path     string
+	Details  string
+	NextStep string
 }
 
 func RunSecrets(ctx context.Context, cfg *config.Config, runner run.Runner, args []string) error {
@@ -70,16 +71,17 @@ func (m Manager) Hub(ctx context.Context) error {
 
 func (m Manager) StatusItems() []StatusItem {
 	return []StatusItem{
-		fileStatus("age-key", "AGE private key", m.Config.AgeKeyFile, m.ageKeyExists(), "Private key used to decrypt local dvv backups."),
-		fileStatus("age-recipients", "AGE recipients", m.Config.AgeRecipientsFile, fileHasContent(m.Config.AgeRecipientsFile), "Public recipients used when encrypting backups."),
-		fileStatus("ssh-list", "SSH server list", m.Config.ServersFile, fileHasContent(m.Config.ServersFile), "Local SSH entries consumed by the SSH hub."),
-		fileStatus("ssh-backup", "Encrypted SSH backup", m.Config.EncryptedServersFile, fileHasContent(m.Config.EncryptedServersFile), "Encrypted copy of the SSH server list."),
+		fileStatus("age-key", "Local AGE private key", m.Config.AgeKeyFile, m.ageKeyExists(), "Decrypts local dvv backups, including the encrypted SSH server list.", "Run prepare to create it, or restore from Bitwarden when configured."),
+		fileStatus("age-recipients", "AGE recipients file", m.Config.AgeRecipientsFile, fileHasContent(m.Config.AgeRecipientsFile), "Stores public AGE recipients used when dvv encrypts backup files.", "Run prepare after the AGE private key exists."),
+		fileStatus("ssh-list", "Local SSH server list", m.Config.ServersFile, fileHasContent(m.Config.ServersFile), "Stores local SSH entries consumed by the SSH hub.", "Run prepare to create an empty file, or restore from the encrypted backup."),
+		fileStatus("ssh-backup", "Encrypted SSH backup file", m.Config.EncryptedServersFile, fileHasContent(m.Config.EncryptedServersFile), "Encrypted copy of the local SSH server list used for restore/bootstrap.", "Run sync after editing SSH entries, or restore if this file already exists."),
 		{
-			ID:      "bitwarden",
-			Label:   "Bitwarden AGE item",
-			State:   configuredState(m.Config.BitwardenAgeKeyItem),
-			Path:    maskRef(m.Config.BitwardenAgeKeyItem),
-			Details: "Optional Bitwarden item ID/name used to restore the AGE private key.",
+			ID:       "bitwarden",
+			Label:    "Bitwarden AGE key item",
+			State:    configuredState(m.Config.BitwardenAgeKeyItem),
+			Path:     maskRef(m.Config.BitwardenAgeKeyItem),
+			Details:  "Optional Bitwarden item ID/name used by restore/bootstrap to recover the AGE private key.",
+			NextStep: bitwardenNextStep(m.Config.BitwardenAgeKeyItem),
 		},
 	}
 }
@@ -87,7 +89,7 @@ func (m Manager) StatusItems() []StatusItem {
 func (m Manager) PrintStatus() {
 	ui.Title("Secrets")
 	for _, item := range m.StatusItems() {
-		fmt.Printf("  %-20s %-12s %s\n", item.Label, item.State, item.Path)
+		fmt.Printf("  %-26s %-14s %s\n", item.Label, item.State, item.Path)
 	}
 }
 
@@ -137,8 +139,8 @@ func (m Manager) fzfHub(ctx context.Context, items []StatusItem, hubError string
 		Shortcuts:     shortcuts,
 		ExtraArgs: []string{
 			"--delimiter=\t",
-			"--with-nth=6",
-			"--nth=1,2,3,4,5,6",
+			"--with-nth=7",
+			"--nth=1,2,3,4,5,6,7",
 			"--header-lines=1",
 		},
 	}.Args()
@@ -213,12 +215,14 @@ func (m Manager) basicHub(ctx context.Context, items []StatusItem, hubError stri
 	return true, "", nil
 }
 
-func fileStatus(id string, label string, path string, ok bool, details string) StatusItem {
+func fileStatus(id string, label string, path string, ok bool, details string, missingStep string) StatusItem {
 	state := "missing"
+	nextStep := missingStep
 	if ok {
 		state = "ready"
+		nextStep = "No action needed."
 	}
-	return StatusItem{ID: id, Label: label, State: state, Path: path, Details: details}
+	return StatusItem{ID: id, Label: label, State: state, Path: path, Details: details, NextStep: nextStep}
 }
 
 func configuredState(value string) string {
@@ -235,40 +239,50 @@ func maskRef(value string) string {
 	return "<set>"
 }
 
+func bitwardenNextStep(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "Set DVV_BW_AGE_KEY_ITEM in config if you want restore/bootstrap to fetch the AGE key."
+	}
+	return "No action needed unless the referenced Bitwarden item changed."
+}
+
 func secretRows(items []StatusItem) string {
 	var builder strings.Builder
-	builder.WriteString(secretLine("__dvv_header__", "", "", "", "", secretHeader()))
+	builder.WriteString(secretLine("__dvv_header__", "", "", "", "", "", secretHeader()))
 	builder.WriteByte('\n')
 	for index, item := range items {
-		builder.WriteString(secretLine(item.ID, item.Label, item.State, item.Path, item.Details, secretRow(index, item)))
+		builder.WriteString(secretLine(item.ID, item.Label, item.State, item.Path, item.Details, item.NextStep, secretRow(index, item)))
 		builder.WriteByte('\n')
 	}
 	return builder.String()
 }
 
 func secretHeader() string {
-	return fmt.Sprintf(" %s  %s  %s",
+	return fmt.Sprintf(" %s  %s  %s  %s",
 		ui.Crown("NO"),
-		ui.Crown(fixedWidth("SECRET", 22)),
+		ui.Crown(fixedWidth("SECRET", 28)),
 		ui.Crown(fixedWidth("STATE", 14)),
+		ui.Crown(fixedWidth("NEXT STEP", 34)),
 	)
 }
 
 func secretRow(index int, item StatusItem) string {
-	return fmt.Sprintf("%s  %s  %s",
+	return fmt.Sprintf("%s  %s  %s  %s",
 		ui.Muted(fmt.Sprintf("%02d", index+1)),
-		ui.Accent(fixedWidth(item.Label, 22)),
+		ui.Accent(fixedWidth(item.Label, 28)),
 		ui.Gold(fixedWidth(item.State, 14)),
+		ui.Muted(fixedWidth(item.NextStep, 34)),
 	)
 }
 
-func secretLine(raw string, label string, state string, path string, details string, display string) string {
+func secretLine(raw string, label string, state string, path string, details string, nextStep string, display string) string {
 	return strings.Join([]string{
 		cleanField(raw),
 		cleanField(label),
 		cleanField(state),
 		cleanField(path),
 		cleanField(details),
+		cleanField(nextStep),
 		display,
 	}, "\t")
 }
@@ -276,9 +290,9 @@ func secretLine(raw string, label string, state string, path string, details str
 func secretsHubShortcuts(keys config.SecretsHubKeyBindings) []ui.FZFShortcut {
 	return []ui.FZFShortcut{
 		{Label: "Enter", Description: "details"},
-		{Key: keys.Prepare.FZFKey, Label: keys.Prepare.Label, Description: "prepare local files"},
-		{Key: keys.Restore.FZFKey, Label: keys.Restore.Label, Description: "restore backup"},
-		{Key: keys.Sync.FZFKey, Label: keys.Sync.Label, Description: "sync backup"},
+		{Key: keys.Prepare.FZFKey, Label: keys.Prepare.Label, Description: "create missing AGE and SSH files"},
+		{Key: keys.Restore.FZFKey, Label: keys.Restore.Label, Description: "restore AGE key and SSH list"},
+		{Key: keys.Sync.FZFKey, Label: keys.Sync.Label, Description: "encrypt current SSH list backup"},
 		{Label: "Esc", Description: "exit hub"},
 	}
 }
@@ -299,6 +313,7 @@ name=$(printf "%s" "$line" | cut -f2)
 state=$(printf "%s" "$line" | cut -f3)
 path=$(printf "%s" "$line" | cut -f4)
 details=$(printf "%s" "$line" | cut -f5)
+next_step=$(printf "%s" "$line" | cut -f6)
 print_commands() {
 ` + commandDeck + `
 }
@@ -307,11 +322,12 @@ printf "  %s%-8s%s %s\n" "$dvv_label" "ID" "$dvv_reset" "$id"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$name"
 printf "  %s%-8s%s %s\n" "$dvv_label" "State" "$dvv_reset" "$state"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Path" "$dvv_reset" "$path"
-printf "\n%sWhat it does%s\n" "$dvv_heading" "$dvv_reset"
-printf "  %s%s%s\n" "$dvv_muted" "$details" "$dvv_reset"
-printf "\n%s--------------------------------%s\n" "$dvv_muted" "$dvv_reset"
-printf "%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
+printf "\n%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
 print_commands
+printf "\n%sPurpose%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%s%s\n" "$dvv_muted" "$details" "$dvv_reset"
+printf "\n%sNext step%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s%s%s\n" "$dvv_muted" "$next_step" "$dvv_reset"
 ' sh {}`
 }
 
@@ -321,7 +337,8 @@ func describeStatusItem(item StatusItem) string {
 		"Name: " + item.Label,
 		"State: " + item.State,
 		"Path: " + item.Path,
-		"Details: " + item.Details,
+		"Purpose: " + item.Details,
+		"Next step: " + item.NextStep,
 	}, "\n")
 }
 

@@ -35,7 +35,7 @@ Run these checks on the machine that will use the CLI daily:
 | Help | `dvv help` | Only public hub-first commands are shown. |
 | Doctor | `dvv doctor` | Missing optional tools are warnings, not failures. |
 | Doctor fix | `dvv doctor --fix` | Safe runtime dirs/files are created, binary rebuilds, and shell/tmux integration is refreshed. |
-| Config | `dvv config` | Category hub opens; Theme and All Keys work. |
+| Config | `dvv config` | Category hub opens; Appearance, Profiles, and Environment Keys work; All Keys and Secrets are inside Environment Keys. |
 | SSH | `dvv ssh` | Hub opens, fake or real entries render, selected entries open in a new terminal tab, and SCP transfer shortcuts render. |
 | Workspace | `dvv workspace` | Hub opens even when empty, existing `workspace-*` dirs are adopted, create/manage/delete/template/harness sync flows show loaders. |
 | Workspace agent harness | `Shift+H` from `dvv workspace` | Selected workspace gets `AGENTS.md`, `.agents/manifest.json`, focused guides, and `.agents/skills/` without overwriting edited guides by default. |

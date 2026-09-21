@@ -1707,6 +1707,10 @@ size=$(printf "%s" "$line" | cut -f4)
 modified=$(printf "%s" "$line" | cut -f5)
 printf "%sGoogle Drive dump%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-9s%s ` + shellQuote(dbDefaultString(currentPath, "/")) + `\n" "$dvv_label" "Folder" "$dvv_reset"
+printf "\n%sCommands%s\n" "$dvv_heading" "$dvv_reset"
+printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Tab" "$dvv_reset" "$dvv_muted" "mark files" "$dvv_reset"
+printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Shift+M" "$dvv_reset" "$dvv_muted" "move marked files" "$dvv_reset"
+printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Shift+R" "$dvv_reset" "$dvv_muted" "refresh folder" "$dvv_reset"
 printf "\n%sSelected%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-9s%s %s\n" "$dvv_label" "Type" "$dvv_reset" "$kind"
 printf "  %s%-9s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$name"
@@ -1719,10 +1723,6 @@ elif [ "$kind" = "folder" ]; then
 else
   printf "\n%sPress Enter to download and import this dump.%s\n" "$dvv_muted" "$dvv_reset"
 fi
-printf "\n%sCommands%s\n" "$dvv_heading" "$dvv_reset"
-printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Tab" "$dvv_reset" "$dvv_muted" "mark files" "$dvv_reset"
-printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Shift+M" "$dvv_reset" "$dvv_muted" "move marked files" "$dvv_reset"
-printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "Shift+R" "$dvv_reset" "$dvv_muted" "refresh folder" "$dvv_reset"
 ' sh {}`
 }
 

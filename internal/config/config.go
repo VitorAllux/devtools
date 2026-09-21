@@ -418,6 +418,7 @@ func Load() (*Config, error) {
 		Project:              projectConfig,
 	}
 	cfg.Project.Theme = resolveThemeConfig(cfg.Project.Theme)
+	cfg.Project.UI = resolveUIConfig(cfg.Project.UI)
 	cfg.Project.Profiles = resolveProfilesConfig(cfg.Project.Profiles)
 	cfg.Project.Terminal = resolveTerminalConfig(cfg.Project.Terminal)
 	cfg.Project.Shell = resolveShellConfig(cfg.Project.Shell)
@@ -1193,6 +1194,25 @@ func resolveThemeConfig(cfg ThemeConfig) ThemeConfig {
 		cfg.Name = DefaultProjectConfig().Theme.Name
 	}
 	cfg.Name = strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(cfg.Name), "_", "-"), " ", "-"))
+	return cfg
+}
+
+func resolveUIConfig(cfg UIConfig) UIConfig {
+	if value := firstSetEnv("DVV_UI_HUB_HEIGHT_PERCENT"); value != "" {
+		if parsed := parsePositiveInt(value); parsed > 0 {
+			cfg.HubHeightPercent = parsed
+		}
+	}
+	if value := firstSetEnv("DVV_UI_HUB_MIN_HEIGHT"); value != "" {
+		if parsed := parsePositiveInt(value); parsed > 0 {
+			cfg.HubMinHeight = parsed
+		}
+	}
+	if value := firstSetEnv("DVV_UI_PREVIEW_WIDTH_PERCENT"); value != "" {
+		if parsed := parsePositiveInt(value); parsed > 0 {
+			cfg.PreviewWidthPercent = parsed
+		}
+	}
 	return cfg
 }
 

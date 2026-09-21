@@ -916,8 +916,7 @@ printf "  %s%-8s%s %s\n" "$dvv_label" "Name" "$dvv_reset" "$name"
 printf "  %s%-8s%s %s\n" "$dvv_label" "State" "$dvv_reset" "$state"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Manager" "$dvv_reset" "$manager"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Details" "$dvv_reset" "$details"
-printf "\n%s--------------------------------%s\n" "$dvv_muted" "$dvv_reset"
-printf "%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
+printf "\n%sHub commands%s\n" "$dvv_heading" "$dvv_reset"
 while [ "$#" -gt 1 ]; do
   printf "  %s[%-7s]%s %s%s%s\n" "$dvv_status" "$1" "$dvv_reset" "$dvv_muted" "$2" "$dvv_reset"
   shift 2

@@ -2,7 +2,7 @@
 
 Personal developer CLI for local automation.
 
-Current version: `2.0.0-alpha.5`
+Current version: `2.0.0`
 
 `dvv` is the Go rewrite of the previous shell-based devtools project. The command prefix is now `dvv`; the old `devv` command is intentionally not the public command.
 
@@ -246,7 +246,7 @@ Creation rules:
 
 Workspace templates are managed from the hub with `Shift+T` and saved in `~/.config/devv/config.json`. A template stores a name, optional description, base selection, branch name pattern, selected projects, and optional worktree directory aliases. For example, workspace `123` can remain `workspace-123`, use branch `task_123`, and place `api-project` in an `api` directory. The template hub preview shows these choices before use. `DVV_WORKSPACE_TEMPLATES` remains supported as a compatibility input.
 
-Workspace preferences for fetching remotes before creation, generating a `.code-workspace` file, and enabling either agent harness output are available in the `Workspace` category of `dvv config`. Free-form lifecycle hooks and project-targeted bootstrap commands belong in the structured local JSON file. Bootstrap copy rules read from the primary source checkout, so the default `.env` rule copies `<source-repository>/.env` into the new worktree.
+Workspace preferences for fetching remotes before creation, generating a `.code-workspace` file, and enabling either agent harness output are available in `dvv config` -> `Environment Keys` -> `Workspace`. Free-form lifecycle hooks and project-targeted bootstrap commands belong in the structured local JSON file. Bootstrap copy rules read from the primary source checkout, so the default `.env` rule copies `<source-repository>/.env` into the new worktree.
 
 Workspace opening separates the opener from its target. `folder` preserves the existing behavior, `codeWorkspace` requires the configured file, and `preferCodeWorkspace` uses it when present with a folder fallback. The `system` opener uses macOS `open`; an optional system application makes the folder fallback deterministic. The Cursor opener also detects the CLI bundled inside `Cursor.app`, and `cursorWindowMode=classic` forces a normal IDE window instead of the Agents Window. When code workspace project sync is enabled, add/remove flows and `Shift+H` update only the generated `folders` list while preserving settings and other fields.
 
@@ -354,7 +354,7 @@ Common overrides:
 DVV_DB_HOST=127.0.0.1
 DVV_DB_PORT=3306
 DVV_DB_USER=root
-DVV_DUMPS_DIR=~/workspace/personal/devtools/dumps
+DVV_DUMPS_DIR=~/dvv/dumps
 DVV_RCLONE_REMOTE=gdrive
 DVV_DB_DRIVE_FOLDER_ID=<google-drive-folder-id-or-folder-url>
 ```
@@ -433,9 +433,11 @@ Structured personal settings, including workspace templates and lifecycle hooks,
 
 Load precedence is project `dvv.config.json`, structured local `config.json`, persisted `config.env`, then explicit process environment values. Templates are merged by case-insensitive name; a local template replaces a versioned template with the same name.
 
-`dvv config` opens a category hub first. Use `Theme` to switch the CLI theme, `Profiles` to select the active runtime profile, `All Keys` for the complete raw key editor, or choose a focused area such as `Paths`, `Shortcuts`, `Workspace`, `SSH`, `Database`, `Tmux`, `Resources`/ports, `Integrations`, or `Safety`.
+`dvv config` opens a small category hub first. Use `Appearance` for theme and shared hub layout, `Profiles` to select the active runtime profile, or `Environment Keys` for direct raw `DVV_*` editing and focused key groups such as `All Keys`, `Paths`, `Shortcuts`, `Workspace`, `SSH`, `Database`, `Tmux`, `Resources`/ports, `Secrets`, `Integrations`, and `Safety`.
 
-Every known config key shows a short explanation in the preview panel. `dvv config list` also prints a `DESCRIPTION` column for non-interactive review. Custom keys saved through the hub are kept visible in `All Keys` under the `Custom` group.
+Every known config key shows a short explanation in the preview panel. `dvv config list` also prints a `DESCRIPTION` column for non-interactive review. Custom keys saved through the hub are kept visible in `Environment Keys` -> `All Keys` under the `Custom` group.
+
+`dvv secrets` remains the operational hub for preparing, restoring, and syncing secret files. `dvv config` -> `Environment Keys` -> `Secrets` only edits the paths, Bitwarden item names, and shortcuts used by that hub.
 
 Changing managed zsh or tmux integration keys through `dvv config` automatically rewrites the managed integration files. Shells that have loaded the managed wrapper also reload shortcuts in the current session; older open shells may still need `exec zsh` once.
 
@@ -511,6 +513,16 @@ Theme:
 ```bash
 DVV_THEME=royal-noir
 ```
+
+UI layout:
+
+```bash
+DVV_UI_HUB_HEIGHT_PERCENT=80
+DVV_UI_HUB_MIN_HEIGHT=18
+DVV_UI_PREVIEW_WIDTH_PERCENT=40
+```
+
+Valid UI layout ranges are `20-100` for `DVV_UI_HUB_HEIGHT_PERCENT`, `10-100` for `DVV_UI_HUB_MIN_HEIGHT`, and `20-70` for `DVV_UI_PREVIEW_WIDTH_PERCENT`. Leave a value empty or `0` to keep the shared default.
 
 Global shell shortcuts:
 
@@ -615,7 +627,7 @@ DVV_PORTS_KILL_SHORTCUT=shift+k
 | Secrets | `dvv secrets` manages local AGE/SSH backup state; `dvv bootstrap` restores AGE/Bitwarden-backed SSH data without committing private files. |
 | Doctor fix | `dvv doctor --fix` creates safe local runtime files, rebuilds, and reinstalls managed shell/tmux integration. |
 | Long operations | Confirmed actions use Royal Noir loaders; imports use a percentage bar that fills to `completed`. |
-| Colors/loaders | Default theme is Royal Noir. Use `dvv config` -> `Theme` or `DVV_THEME` to switch themes. Run `dvv setup` to refresh tmux colors. Set `NO_COLOR=1` or `DVV_NO_LOADER=1` to disable color/loader behavior. |
+| Colors/loaders | Default theme is Royal Noir. Use `dvv config` -> `Appearance` -> `Theme` or `DVV_THEME` to switch themes. Run `dvv setup` to refresh tmux colors. Set `NO_COLOR=1` or `DVV_NO_LOADER=1` to disable color/loader behavior. |
 | Autocomplete | Public hub commands are completed by default. Set `DVV_COMPLETE_COMPAT=1` to expose script-friendly compatibility routes in zsh completion. |
 
 More detail lives in [docs/go-version/operational-map.md](docs/go-version/operational-map.md).
@@ -698,6 +710,14 @@ Main packages:
 Before adding a new hub, use `internal/ui.FZFHub`, keep shortcuts configurable, and document the public command in this README and completion.
 
 ## Version Notes
+
+`2.0.0`:
+
+- Promoted the Go implementation to the stable daily-use version.
+- Refined `dvv config` into `Appearance`, `Environment Keys`, and `Profiles` with nested focused key groups.
+- Added editable UI layout environment keys with range validation and predictable fzf sizing.
+- Clarified `dvv secrets` operational status and secret-related configuration previews.
+- Kept hub previews action-first by moving hub command decks near the top.
 
 `2.0.0-alpha.5`:
 

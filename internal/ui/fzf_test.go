@@ -130,6 +130,18 @@ func TestFZFThemeArgsAppliesConfiguredHeightToNonHubSelectors(t *testing.T) {
 	}
 }
 
+func TestFZFThemeArgsPreservesDefaultHeightWhenOnlyMinHeightIsConfigured(t *testing.T) {
+	defer SetFZFHubLayout(FZFHubLayout{})
+	SetFZFHubLayout(FZFHubLayout{MinHeight: 10})
+
+	args := strings.Join(FZFThemeArgs("pick> "), "\n")
+	for _, want := range []string{"--height=~85%", "--min-height=10"} {
+		if !strings.Contains(args, want) {
+			t.Fatalf("min-only layout missing %q in %s", want, args)
+		}
+	}
+}
+
 func TestFZFPreviewCommandDeckPrintsEveryShortcut(t *testing.T) {
 	deck := FZFPreviewCommandDeck([]FZFShortcut{
 		{Label: "Enter", Description: "open"},
