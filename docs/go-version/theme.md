@@ -34,6 +34,7 @@ Danger              #f87171
 - For interactive processes such as SSH, show loaders only before handoff; do not keep loaders running over the interactive session.
 - `NO_COLOR` disables color.
 - `DVV_NO_LOADER=1` disables animated loaders.
+- Loader lines fit the current stderr terminal width, leaving the last column unused to prevent autowrap. Long subjects and details are shortened by display width, and progress percentages stay visible.
 
 ## FZF Rules
 

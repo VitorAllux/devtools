@@ -2,7 +2,7 @@
 
 Personal developer CLI for local automation.
 
-Current version: `2.0.0`
+Current version: `2.1.1`
 
 `dvv` is the Go rewrite of the previous shell-based devtools project. The command prefix is now `dvv`; the old `devv` command is intentionally not the public command.
 
@@ -710,6 +710,11 @@ Main packages:
 Before adding a new hub, use `internal/ui.FZFHub`, keep shortcuts configurable, and document the public command in this README and completion.
 
 ## Version Notes
+
+`2.1.1`:
+
+- Fixed dump import progress wrapping into repeated terminal lines with long dump or table names.
+- Made shared loaders fit the current terminal width, preserve import percentages, and clear correctly with `NO_COLOR=1`.
 
 `2.0.0`:
 

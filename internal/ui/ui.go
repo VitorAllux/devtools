@@ -201,21 +201,14 @@ func RunWithRoyalStatusLoader(options LoaderOptions, fn func(*RoyalStatusLoader)
 	ticker := time.NewTicker(80 * time.Millisecond)
 	defer ticker.Stop()
 	index := 0
-	clearWidth := 160
 	render := func() {
 		elapsed := time.Since(start).Truncate(100 * time.Millisecond)
 		clearTerminalLine()
 		fmt.Fprintf(os.Stderr, "\r%s", renderRoyalLoaderFrame(loader.snapshot(), index, elapsed))
 		index++
 	}
-	clear := func() {
-		clearTerminalLine()
-		if !useColor() {
-			fmt.Fprint(os.Stderr, "\r"+strings.Repeat(" ", clearWidth)+"\r")
-		}
-	}
 	finish := func(err error) {
-		clear()
+		clearTerminalLine()
 		finishOptions := options
 		if err != nil {
 			finishOptions = loader.snapshot()
@@ -267,49 +260,41 @@ func LoaderEnabled() bool {
 }
 
 func renderRoyalLoaderFrame(options LoaderOptions, index int, _ time.Duration) string {
-	action := strings.TrimSpace(options.Action)
+	action := loaderText(options.Action)
 	if action == "" {
 		action = "working"
 	}
 
-	parts := []string{
+	return loaderLine(
 		loaderBar(index),
 		Crown(action),
-	}
-	if subject := strings.TrimSpace(options.Subject); subject != "" {
-		parts = append(parts, Accent(subject))
-	}
-	if detail := strings.TrimSpace(options.Detail); detail != "" {
-		parts = append(parts, Muted(detail))
-	}
-	return "  " + strings.Join(parts, " ")
+		options.Subject,
+		options.Detail,
+		"",
+	)
 }
 
 func renderRoyalLoaderResult(options LoaderOptions, ok bool) string {
-	action := strings.TrimSpace(options.SuccessAction)
+	action := loaderText(options.SuccessAction)
 	if action == "" {
 		action = "done"
 	}
 	style := Success
 	if !ok {
-		action = strings.TrimSpace(options.FailureAction)
+		action = loaderText(options.FailureAction)
 		if action == "" {
 			action = "failed"
 		}
 		style = Danger
 	}
 
-	parts := []string{
+	return loaderLine(
 		loaderResultBar(ok),
 		style(action),
-	}
-	if subject := strings.TrimSpace(options.Subject); subject != "" {
-		parts = append(parts, Accent(subject))
-	}
-	if detail := strings.TrimSpace(options.Detail); detail != "" {
-		parts = append(parts, Muted(detail))
-	}
-	return "  " + strings.Join(parts, " ")
+		options.Subject,
+		options.Detail,
+		"",
+	)
 }
 
 func loaderBar(index int) string {
