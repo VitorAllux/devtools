@@ -19,24 +19,22 @@ type ProgressOptions struct {
 }
 
 type RoyalProgressLoader struct {
-	mu        sync.RWMutex
-	options   ProgressOptions
-	current   atomic.Int64
-	done      chan struct{}
-	stopped   chan struct{}
-	started   atomic.Bool
-	finish    sync.Once
-	interval  time.Duration
-	clearSize int
+	mu       sync.RWMutex
+	options  ProgressOptions
+	current  atomic.Int64
+	done     chan struct{}
+	stopped  chan struct{}
+	started  atomic.Bool
+	finish   sync.Once
+	interval time.Duration
 }
 
 func NewRoyalProgressLoader(options ProgressOptions) *RoyalProgressLoader {
 	return &RoyalProgressLoader{
-		options:   options,
-		done:      make(chan struct{}),
-		stopped:   make(chan struct{}),
-		interval:  100 * time.Millisecond,
-		clearSize: 160,
+		options:  options,
+		done:     make(chan struct{}),
+		stopped:  make(chan struct{}),
+		interval: 100 * time.Millisecond,
 	}
 }
 
@@ -113,7 +111,6 @@ func (p *RoyalProgressLoader) Finish(ok bool) {
 	p.finish.Do(func() {
 		close(p.done)
 		<-p.stopped
-		p.clear()
 		if ok {
 			p.render(progressSuccess)
 		} else {
@@ -136,13 +133,6 @@ func (p *RoyalProgressLoader) render(status progressStatus) {
 	fmt.Fprintf(os.Stderr, "\r%s", renderRoyalProgressFrame(p.snapshot(), percent, status))
 }
 
-func (p *RoyalProgressLoader) clear() {
-	clearTerminalLine()
-	if !useColor() {
-		fmt.Fprint(os.Stderr, "\r"+strings.Repeat(" ", p.clearSize)+"\r")
-	}
-}
-
 type progressStatus int
 
 const (
@@ -155,37 +145,31 @@ func renderRoyalProgressFrame(options ProgressOptions, percent int, status progr
 	percent = clampProgressPercent(percent)
 	action := progressActionLabel(options, status)
 
-	parts := []string{
+	return loaderLine(
 		progressBar(percent, status),
 		action,
-	}
-	if subject := strings.TrimSpace(options.Subject); subject != "" {
-		parts = append(parts, Accent(subject))
-	}
-	if detail := strings.TrimSpace(options.Detail); detail != "" {
-		parts = append(parts, Muted(detail))
-	}
-	parts = append(parts, Muted(fmt.Sprintf("%3d%%", percent)))
-
-	return "  " + strings.Join(parts, " ")
+		options.Subject,
+		options.Detail,
+		Muted(fmt.Sprintf("%3d%%", percent)),
+	)
 }
 
 func progressActionLabel(options ProgressOptions, status progressStatus) string {
 	switch status {
 	case progressSuccess:
-		action := strings.TrimSpace(options.SuccessAction)
+		action := loaderText(options.SuccessAction)
 		if action == "" {
 			action = "completed"
 		}
 		return Success(action)
 	case progressFailure:
-		action := strings.TrimSpace(options.FailureAction)
+		action := loaderText(options.FailureAction)
 		if action == "" {
 			action = "failed"
 		}
 		return Danger(action)
 	default:
-		action := strings.TrimSpace(options.Action)
+		action := loaderText(options.Action)
 		if action == "" {
 			action = "working"
 		}

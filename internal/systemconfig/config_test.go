@@ -68,6 +68,7 @@ func TestEnvironmentKeyCategoriesUseExpectedOrder(t *testing.T) {
 	categories := environmentKeyCategories()
 	want := []string{
 		"keys",
+		"custom",
 		"ui",
 		"paths",
 		"shortcuts",
@@ -153,8 +154,11 @@ func TestEnvironmentCategoryRowsKeepRawIDHidden(t *testing.T) {
 	if !strings.Contains(rows[1], "All Keys") || !strings.Contains(rows[1], "57 key(s)") {
 		t.Fatalf("All Keys row should include label and count: %q", rows[1])
 	}
-	if !strings.Contains(rows[2], "UI Layout") || !strings.Contains(rows[2], "3 key(s)") {
-		t.Fatalf("UI Layout row should include label and count: %q", rows[2])
+	if !strings.Contains(rows[2], "Custom") || !strings.Contains(rows[2], "0 key(s)") {
+		t.Fatalf("Custom should remain accessible when empty: %q", rows[2])
+	}
+	if !strings.Contains(rows[3], "UI Layout") || !strings.Contains(rows[3], "3 key(s)") {
+		t.Fatalf("UI Layout row should include label and count: %q", rows[3])
 	}
 }
 
@@ -204,7 +208,7 @@ func TestConfigPreviewExplainsSelectedKey(t *testing.T) {
 		t.Fatalf("config preview should render configured shortcuts: %s", preview)
 	}
 	args := configFZFArgs(Category{Label: "Database"}, keys)
-	if !containsString(args, "--with-nth=2,3,4") || containsString(args, "--with-nth=2,3,4,5") {
+	if !containsString(args, "--with-nth=2,3,4,10") || containsString(args, "--with-nth=2,3,4,5") {
 		t.Fatalf("config fzf args should keep hidden metadata out of visible columns: %#v", args)
 	}
 }

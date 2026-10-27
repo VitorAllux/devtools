@@ -25,6 +25,8 @@ const env = {
   ...process.env,
   HOME: home,
   XDG_CONFIG_HOME: xdgConfigHome,
+  ZDOTDIR: home,
+  DVV_SKIP_SHELL_INTEGRATION: "0",
   DVV_AUTO_BUILD: "0",
   DVV_DIR: root,
   DVV_NO_LOADER: "1",
@@ -95,6 +97,31 @@ assertIncludes(tmuxConf, "pane-active-border-style \"fg=#bb9af7\"", "managed Tok
 const completion = readFile(path.join(root, "completions", "_dvv"));
 assertIncludes(completion, "DVV_COMPLETE_COMPAT", "compatibility completion gate");
 assertIncludes(completion, "ssh:Open the SSH hub", "hub-first SSH completion");
+
+for (const shell of ["bash", "zsh"]) {
+  const probe = childProcess.spawnSync(shell, ["--version"], { encoding: "utf8" });
+  if (probe.error?.code === "ENOENT") continue;
+  const startup = path.join(home, shell === "bash" ? ".bashrc" : ".zshrc");
+  const script = `
+export PATH="$1:$PATH"
+. "$2"
+dvv config set --global DVV_SMOKE_GLOBAL 'literal $HOME value' || exit 10
+[ "$DVV_SMOKE_GLOBAL" = 'literal $HOME value' ] || exit 11
+sh -c '[ "$DVV_SMOKE_GLOBAL" = "$1" ]' sh 'literal $HOME value' || exit 12
+dvv config set DVV_SMOKE_GLOBAL 'updated value' || exit 13
+[ "$DVV_SMOKE_GLOBAL" = 'updated value' ] || exit 14
+dvv config set DVV_SMOKE_LOCAL 'local only' || exit 15
+[ "\${DVV_SMOKE_LOCAL+x}" != x ] || exit 16
+dvv config scope DVV_SMOKE_GLOBAL local || exit 17
+[ "\${DVV_SMOKE_GLOBAL+x}" != x ] || exit 18
+dvv config scope DVV_SMOKE_GLOBAL global || exit 19
+[ "$DVV_SMOKE_GLOBAL" = 'updated value' ] || exit 20
+dvv setup || exit 21
+dvv config scope DVV_SMOKE_GLOBAL local || exit 22
+[ "\${DVV_SMOKE_GLOBAL+x}" != x ] || exit 23
+`;
+  run(`${shell} global config lifecycle`, shell, ["-c", script, "dvv-smoke", path.dirname(bin), startup]);
+}
 
 console.error("dvv smoke ok");
 

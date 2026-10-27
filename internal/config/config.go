@@ -72,6 +72,7 @@ type SystemConfigHubConfig struct {
 }
 
 type SystemConfigHubShortcuts struct {
+	Global   string `json:"global"`
 	Add      string `json:"add"`
 	Clear    string `json:"clear"`
 	Validate string `json:"validate"`
@@ -582,6 +583,7 @@ func DefaultProjectConfig() ProjectConfig {
 		System: SystemConfig{
 			ConfigHub: SystemConfigHubConfig{
 				Shortcuts: SystemConfigHubShortcuts{
+					Global:   "shift+g",
 					Add:      "shift+n",
 					Clear:    "shift+d",
 					Validate: "shift+v",
@@ -1048,6 +1050,9 @@ func mergeShellConfigDefaults(target ShellConfig, defaults ShellConfig) ShellCon
 }
 
 func mergeSystemConfigDefaults(target SystemConfig, defaults SystemConfig) SystemConfig {
+	if strings.TrimSpace(target.ConfigHub.Shortcuts.Global) == "" {
+		target.ConfigHub.Shortcuts.Global = defaults.ConfigHub.Shortcuts.Global
+	}
 	if strings.TrimSpace(target.ConfigHub.Shortcuts.Add) == "" {
 		target.ConfigHub.Shortcuts.Add = defaults.ConfigHub.Shortcuts.Add
 	}
@@ -1244,6 +1249,9 @@ func resolveShellConfig(cfg ShellConfig) ShellConfig {
 }
 
 func resolveSystemConfig(cfg SystemConfig) SystemConfig {
+	if value := firstSetEnv("DVV_CONFIG_GLOBAL_SHORTCUT"); value != "" {
+		cfg.ConfigHub.Shortcuts.Global = value
+	}
 	if value := firstSetEnv("DVV_CONFIG_ADD_SHORTCUT"); value != "" {
 		cfg.ConfigHub.Shortcuts.Add = value
 	}

@@ -55,7 +55,16 @@ _dvv() {
             config_actions+=(
               "list:List effective configuration values"
               "set:Persist a configuration value"
+              "scope:Change a saved variable scope to global or local"
             )
+          fi
+          if [[ -n "${DVV_COMPLETE_COMPAT:-}" && "${words[3]:-}" == "set" ]]; then
+            _values 'config scope flags' '--global[Export to Bash/Zsh]' '--local[Keep local to dvv]'
+            return
+          fi
+          if [[ -n "${DVV_COMPLETE_COMPAT:-}" && "${words[3]:-}" == "scope" && CURRENT -ge 5 ]]; then
+            _values 'variable scope' global local
+            return
           fi
           _describe -t config-actions 'config actions' config_actions
           ;;

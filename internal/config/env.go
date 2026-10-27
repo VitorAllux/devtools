@@ -66,7 +66,7 @@ func SetEnvFileValue(path string, key string, value string) error {
 		return err
 	}
 	values[strings.TrimSpace(key)] = value
-	if err := WriteEnvFile(path, values); err != nil {
+	if err := WriteRuntimeEnvFile(path, values); err != nil {
 		return err
 	}
 	return os.Setenv(strings.TrimSpace(key), value)
@@ -78,7 +78,7 @@ func UnsetEnvFileValue(path string, key string) error {
 		return err
 	}
 	delete(values, strings.TrimSpace(key))
-	return WriteEnvFile(path, values)
+	return WriteRuntimeEnvFile(path, values)
 }
 
 func WriteEnvFile(path string, values map[string]string) error {

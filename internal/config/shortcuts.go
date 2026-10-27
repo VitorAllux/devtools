@@ -37,6 +37,7 @@ type TmuxHubKeyBindings struct {
 }
 
 type SystemConfigHubKeyBindings struct {
+	Global   KeyBinding
 	Add      KeyBinding
 	Clear    KeyBinding
 	Validate KeyBinding
@@ -112,6 +113,7 @@ func (c *Config) TmuxHubKeys() TmuxHubKeyBindings {
 func (c *Config) SystemConfigHubKeys() SystemConfigHubKeyBindings {
 	defaults := DefaultProjectConfig().System.ConfigHub.Shortcuts
 	return SystemConfigHubKeyBindings{
+		Global:   normalizeKeyOrDefault(c.Project.System.ConfigHub.Shortcuts.Global, defaults.Global),
 		Add:      normalizeKeyOrDefault(c.Project.System.ConfigHub.Shortcuts.Add, defaults.Add),
 		Clear:    normalizeKeyOrDefault(c.Project.System.ConfigHub.Shortcuts.Clear, defaults.Clear),
 		Validate: normalizeKeyOrDefault(c.Project.System.ConfigHub.Shortcuts.Validate, defaults.Validate),
