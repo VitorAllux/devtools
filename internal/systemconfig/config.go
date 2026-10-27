@@ -174,21 +174,23 @@ func (m Manager) keyHub(ctx context.Context, category Category, initial []Entry)
 			return m.basicHub(ctx, entries)
 		}
 		keys := m.Config.SystemConfigHubKeys()
-		args := configFZFArgs(category, keys)
-		if len(entries) == 0 {
-			args = append(args, "--header=No custom keys yet. "+keys.Add.Label+" to add a variable.")
-		}
+		args := configFZFArgs(category, keys, len(entries) == 0)
 		output, err := m.Runner.OutputWithInput(ctx, "", []byte(configRows(entries)), "fzf", args...)
-		if err != nil && len(output) == 0 {
+		key, selected := ui.ParseFZFExpectOutput(string(output), keys.Add.FZFKey, keys.Secrets.FZFKey)
+		if run.IsExitCode(err, 130) {
 			return nil
 		}
 		if err != nil {
-			return err
+			if !run.IsExitCode(err, 1) {
+				return err
+			}
+			if key != keys.Add.FZFKey && key != keys.Secrets.FZFKey {
+				return nil
+			}
 		}
 		if strings.TrimSpace(string(output)) == "" {
 			return nil
 		}
-		key, selected := ui.ParseFZFExpectOutput(string(output))
 		if key == keys.Add.FZFKey {
 			if err := m.addCustom(ctx); err != nil {
 				ui.Error("%v", err)
@@ -1461,7 +1463,7 @@ func (m Manager) printSecretStatus() {
 	checkSecret("AGE recipients", m.Config.AgeRecipientsFile)
 }
 
-func configFZFArgs(category Category, keys config.SystemConfigHubKeyBindings) []string {
+func configFZFArgs(category Category, keys config.SystemConfigHubKeyBindings, empty bool) []string {
 	borderLabel := "dvv config / " + category.Label
 	if strings.TrimSpace(category.Label) == "" {
 		borderLabel = "dvv config"
@@ -1475,7 +1477,7 @@ func configFZFArgs(category Category, keys config.SystemConfigHubKeyBindings) []
 		{Key: keys.Secrets.FZFKey, Label: keys.Secrets.Label, Description: "show secrets status"},
 		{Label: "Esc", Description: "back"},
 	}
-	return ui.FZFHub{
+	hub := ui.FZFHub{
 		Prompt:        ui.Crown("config") + ui.Muted("> "),
 		BorderLabel:   borderLabel,
 		Preview:       configPreviewCommand(shortcuts),
@@ -1488,7 +1490,17 @@ func configFZFArgs(category Category, keys config.SystemConfigHubKeyBindings) []
 			"--nth=1,2,3,4,5,9,10",
 			"--header-lines=1",
 		},
-	}.Args()
+	}
+	if empty {
+		hub.Preview = ""
+		hub.HeaderLines = []string{"No custom keys yet."}
+		hub.Shortcuts = []ui.FZFShortcut{
+			{Key: keys.Add.FZFKey, Label: keys.Add.Label, Description: "add custom key"},
+			{Label: "Esc", Description: "back"},
+		}
+		hub.ShortcutsInHeader = true
+	}
+	return hub.Args()
 }
 
 func configRows(entries []Entry) string {

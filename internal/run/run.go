@@ -80,10 +80,18 @@ func (ExecRunner) LookPath(name string) (string, error) {
 }
 
 func commandError(name string, args []string, output []byte, err error) error {
+	if name == "fzf" {
+		return fmt.Errorf("fzf: %w", err)
+	}
 	if len(output) == 0 {
 		return err
 	}
 	return fmt.Errorf("%w: %s %v: %s", err, name, args, bytes.TrimSpace(output))
+}
+
+func IsExitCode(err error, code int) bool {
+	var exitError *exec.ExitError
+	return errors.As(err, &exitError) && exitError.ExitCode() == code
 }
 
 func IsNotFound(err error) bool {

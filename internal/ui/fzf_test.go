@@ -185,3 +185,14 @@ func TestParseFZFExpectOutputSupportsMultiSelect(t *testing.T) {
 		t.Fatalf("got key=%q selected=%#v", key, selected)
 	}
 }
+
+func TestParseFZFExpectOutputRecognizesActionsWithoutSelection(t *testing.T) {
+	key, selected := ParseFZFExpectOutput("N\n", "N", "S")
+	if key != "N" || len(selected) != 0 {
+		t.Fatalf("empty selection action = %q, %#v", key, selected)
+	}
+	key, selected = ParseFZFExpectOutput("raw-selection\n", "N", "S")
+	if key != "" || len(selected) != 1 || selected[0] != "raw-selection" {
+		t.Fatalf("raw selection fallback changed: %q, %#v", key, selected)
+	}
+}

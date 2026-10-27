@@ -24,6 +24,17 @@ func TestIsNotFound(t *testing.T) {
 	}
 }
 
+func TestFZFErrorKeepsExitCodeWithoutPreviewOrSelection(t *testing.T) {
+	err := exec.Command("sh", "-c", "exit 1").Run()
+	err = commandError("fzf", []string{"--preview=private preview command"}, []byte("N\n"), err)
+	if !IsExitCode(err, 1) || IsExitCode(err, 2) || IsExitCode(nil, 1) {
+		t.Fatalf("wrapped fzf exit code was lost: %v", err)
+	}
+	if strings.Contains(err.Error(), "preview") || strings.Contains(err.Error(), "N\n") {
+		t.Fatalf("fzf error exposes internal arguments or output: %v", err)
+	}
+}
+
 func TestExecRunnerOutputAndInput(t *testing.T) {
 	runner := ExecRunner{}
 	out, err := runner.Output(context.Background(), "", "sh", "-c", "printf dvv")

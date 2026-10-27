@@ -278,7 +278,7 @@ func FZFSelectedRaw(selection string) string {
 	return strings.TrimSpace(raw)
 }
 
-func ParseFZFExpectOutput(output string) (string, []string) {
+func ParseFZFExpectOutput(output string, expectedKeys ...string) (string, []string) {
 	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
 	if len(lines) == 0 {
 		return "", nil
@@ -287,6 +287,11 @@ func ParseFZFExpectOutput(output string) (string, []string) {
 		line := strings.TrimSpace(lines[0])
 		if line == "" {
 			return "", nil
+		}
+		for _, key := range expectedKeys {
+			if line == key {
+				return key, nil
+			}
 		}
 		return "", []string{line}
 	}
