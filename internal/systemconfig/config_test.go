@@ -207,7 +207,7 @@ func TestConfigPreviewExplainsSelectedKey(t *testing.T) {
 	if !strings.Contains(preview, "Shift+N") || !strings.Contains(preview, "add custom key") {
 		t.Fatalf("config preview should render configured shortcuts: %s", preview)
 	}
-	args := configFZFArgs(Category{Label: "Database"}, keys)
+	args := configFZFArgs(Category{Label: "Database"}, keys, false)
 	if !containsString(args, "--with-nth=2,3,4,10") || containsString(args, "--with-nth=2,3,4,5") {
 		t.Fatalf("config fzf args should keep hidden metadata out of visible columns: %#v", args)
 	}
