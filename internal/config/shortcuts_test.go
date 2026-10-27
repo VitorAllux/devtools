@@ -123,7 +123,7 @@ func TestSystemConfigHubKeysUseDefaults(t *testing.T) {
 	cfg := Config{Project: DefaultProjectConfig()}
 	keys := cfg.SystemConfigHubKeys()
 
-	if keys.Add.FZFKey != "N" || keys.Clear.FZFKey != "D" || keys.Validate.FZFKey != "V" || keys.Secrets.FZFKey != "S" {
+	if keys.Add.FZFKey != "N" || keys.Clear.FZFKey != "D" || keys.Validate.FZFKey != "V" || keys.Secrets.FZFKey != "S" || keys.Global.FZFKey != "G" {
 		t.Fatalf("system config keys = %#v", keys)
 	}
 }

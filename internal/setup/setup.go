@@ -88,7 +88,10 @@ func (m Manager) Setup(ctx context.Context) error {
 	if err := m.Runner.Run(ctx, m.Config.RootDir, "node", "scripts/setup.js"); err != nil {
 		return err
 	}
-	ui.OK("Open a new terminal or run `exec zsh` to reload completion and shortcuts.")
+	if err := InstallShellEnvironment(m.Config); err != nil {
+		return err
+	}
+	ui.OK("Open a new terminal or reload ~/.zshrc or ~/.bashrc to load shell integration and global variables.")
 	return nil
 }
 
@@ -129,6 +132,7 @@ func (m Manager) Doctor(ctx context.Context, fix bool) error {
 	checkPath("Dumps dir", m.Config.Project.DB.DumpsDir, false)
 	checkZshCompletion(m.Config.RootDir)
 	checkZshShortcutBlock(m.Config)
+	checkShellEnvironment(m.Config)
 	checkTmuxShortcutBlock(m.Config)
 	if fix {
 		fmt.Println()
@@ -165,6 +169,9 @@ func (m Manager) Fix(ctx context.Context) error {
 	if err := ui.RunWithRoyalLoader(ui.LoaderOptions{Action: "installing", Subject: "local integration", ShowResult: true, SuccessAction: "installed"}, func() error {
 		return run.Quiet(ctx, m.Runner, m.Config.RootDir, "node", "scripts/setup.js")
 	}); err != nil {
+		return err
+	}
+	if err := InstallShellEnvironment(m.Config); err != nil {
 		return err
 	}
 	ui.OK("Doctor fixes complete")
@@ -578,6 +585,7 @@ func showSetupHelp() {
 	helpSection("Actions")
 	helpEntry("zsh completion", "Copy completions/_dvv to ~/.zfunc/_dvv when possible")
 	helpEntry("shell shortcuts", "Install managed Alt shortcuts for main, workspace, tmux, SSH, picker, home, and reset fallback")
+	helpEntry("global variables", "Load selected config keys into Bash/Zsh and refresh them after dvv exits")
 	helpEntry("tmux integration", "Install managed Alt+R reset shortcut and theme block")
 }
 

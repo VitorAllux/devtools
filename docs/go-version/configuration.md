@@ -71,6 +71,7 @@ Objects merge recursively and explicit local booleans, including `false`, are pr
         "add": "shift+n",
         "clear": "shift+d",
         "validate": "shift+v",
+        "global": "shift+g",
         "secrets": "shift+s"
       }
     }
@@ -227,6 +228,7 @@ Environment key categories:
 | Category | Purpose |
 | --- | --- |
 | `All Keys` | Edit every known runtime config key, including focused category keys and custom values. |
+| `Custom` | Add and manage personal variables, including local/global shell scope. |
 | `UI Layout` | Tune shared fzf hub height, minimum height, and preview width. |
 | `Paths` | Manage workspace, dumps, SSH, AGE, and config paths. |
 | `Shortcuts` | Manage shell shortcuts, tmux shortcuts, and hub action keys. |
@@ -242,7 +244,29 @@ The `Environment Keys` hub keeps the complete raw key editing flow available in 
 
 `dvv secrets` remains the operational hub for preparing, restoring, and syncing secret files. `Environment Keys` -> `Secrets` only edits secret-related configuration values such as file paths, Bitwarden item names, and shortcuts.
 
-Every known key includes a short `What it does` explanation in the preview panel. `dvv config list` also prints a `DESCRIPTION` column for non-interactive review. Custom persisted keys are listed under the `Custom` group with a generic description so values added through the hub do not disappear from the UI.
+Every known key includes a short `What it does` explanation in the preview panel. `dvv config list` also prints `DESCRIPTION` and `SCOPE` columns for non-interactive review. Custom persisted keys are listed in both `Custom` and `All Keys`; the Custom group remains available before any personal variables exist.
+
+### Local And Global Variables
+
+Existing keys stay local to dvv by default. `Shift+G` toggles a selected key between local and global scope. This action is configurable through `system.configHub.shortcuts.global` or `DVV_CONFIG_GLOBAL_SHORTCUT`. Adding a custom key prompts for global export as well.
+
+Script-friendly compatibility commands:
+
+```bash
+dvv config set --global MY_API_TOKEN 'example-token'
+dvv config set MY_API_TOKEN 'updated-token'  # Preserve scope.
+dvv config scope MY_API_TOKEN local
+dvv config scope MY_API_TOKEN global
+dvv config set --local MY_API_TOKEN 'local-value'
+```
+
+Global scope is recorded as an `export KEY='value'` assignment in local `config.env`. Ordinary assignments remain local. Existing Go config loading accepts both forms. Shared runtime writers preserve scope, and clearing a key removes its generated export. Scope changes require a persisted key; toggling a built-in default in the hub first saves its current value.
+
+`dvv setup` generates `shell-env.sh` beside `config.env` and installs managed loaders into `.bashrc`, the first existing Bash login file (`.bash_profile`, `.bash_login`, `.profile`, falling back to a new `.profile`), and `.zshrc` under `$ZDOTDIR` or `$HOME`. Existing startup content is preserved. Set `DVV_SKIP_SHELL_INTEGRATION=1` to skip installation. Runtime paths honor `XDG_CONFIG_HOME`.
+
+Only global keys are written to the generated export file. Both runtime config and generated exports are private (`0600`), and values are shell-quoted as literal data. Runtime values must be single-line strings without NUL bytes. Tokens, passwords, secrets, cookies, and auth keys are masked in key lists and previews.
+
+After installing, reload the startup file once or open a new terminal. The managed Bash/Zsh `dvv` wrapper refreshes exports after any dvv invocation, including interactive hub changes, and clears exports revoked in that shell. It preserves the CLI exit status. Other open shells must reload their startup file; running applications must restart from an updated shell. Global applies to the current user's interactive/login Bash and interactive Zsh shells and their child processes, rather than already-running processes, services, or other users. Manually editing `config.env` requires `dvv setup` to regenerate exports.
 
 Built-in themes:
 

@@ -49,6 +49,7 @@
         "add": "shift+n",
         "clear": "shift+d",
         "validate": "shift+v",
+        "global": "shift+g",
         "secrets": "shift+s"
       }
     }

@@ -2,7 +2,7 @@
 
 Personal developer CLI for local automation.
 
-Current version: `2.1.1`
+Current version: `2.2.0`
 
 `dvv` is the Go rewrite of the previous shell-based devtools project. The command prefix is now `dvv`; the old `devv` command is intentionally not the public command.
 
@@ -435,7 +435,23 @@ Load precedence is project `dvv.config.json`, structured local `config.json`, pe
 
 `dvv config` opens a small category hub first. Use `Appearance` for theme and shared hub layout, `Profiles` to select the active runtime profile, or `Environment Keys` for direct raw `DVV_*` editing and focused key groups such as `All Keys`, `Paths`, `Shortcuts`, `Workspace`, `SSH`, `Database`, `Tmux`, `Resources`/ports, `Secrets`, `Integrations`, and `Safety`.
 
-Every known config key shows a short explanation in the preview panel. `dvv config list` also prints a `DESCRIPTION` column for non-interactive review. Custom keys saved through the hub are kept visible in `Environment Keys` -> `All Keys` under the `Custom` group.
+Every known config key shows a short explanation in the preview panel. `dvv config list` also prints `DESCRIPTION` and `SCOPE` columns for non-interactive review. Personal variables have a dedicated `Environment Keys` -> `Custom` group and also appear in `All Keys`.
+
+Variables are local to dvv by default. In a key hub, use `Shift+G` to toggle the selected variable between `local` and `global`. Adding a custom key also asks whether to export it globally. Global means the current user's interactive/login Bash and interactive Zsh shells and their child processes.
+
+```bash
+dvv setup
+# Reload your current shell integration once, or open a new terminal:
+source ~/.zshrc  # Bash: source ~/.bashrc
+
+dvv config set --global MY_API_TOKEN 'example-token'
+dvv config scope MY_API_TOKEN local
+dvv config scope MY_API_TOKEN global
+```
+
+The managed wrapper refreshes global variables in the calling shell after dvv returns, including edits made inside the hub. Other already-open terminals need to reload their shell startup file; already-running applications need to be restarted from an updated shell. Updates without a scope flag preserve the current scope; `dvv config set --local KEY VALUE` saves a local-only value. Global values are literal strings, so `$HOME` and command substitutions inside a saved value are not evaluated.
+
+`dvv setup` installs managed blocks in `~/.bashrc`, the active Bash login file (`~/.bash_profile`, `~/.bash_login`, or `~/.profile`), and `~/.zshrc` (`$ZDOTDIR/.zshrc` when set). `DVV_SKIP_SHELL_INTEGRATION=1` skips this installation. Only selected global keys are exported; the private `shell-env.sh` file is regenerated when config values change.
 
 `dvv secrets` remains the operational hub for preparing, restoring, and syncing secret files. `dvv config` -> `Environment Keys` -> `Secrets` only edits the paths, Bitwarden item names, and shortcuts used by that hub.
 
@@ -448,6 +464,7 @@ Shortcuts:
 | `Enter` | Open selected category or edit selected value inside a key hub. |
 | `Shift+N` | Add custom config key. |
 | `Shift+D` | Clear selected persisted value. |
+| `Shift+G` | Toggle selected variable between local and global Bash/Zsh scope. |
 | `Shift+V` | Validate selected value. |
 | `Shift+S` | Show secret file status. |
 | `Esc` | Exit. |
@@ -467,6 +484,7 @@ Runtime/local data lives outside the repository:
 | Data | Path |
 | --- | --- |
 | Runtime config | `~/.config/devv/config.env` |
+| Generated global exports | `~/.config/devv/shell-env.sh` |
 | Structured local config | `~/.config/devv/config.json` |
 | SSH list | `~/.config/devv/servers.list` |
 | AGE private key | `~/.config/devv/keys/age.key` |
@@ -710,6 +728,12 @@ Main packages:
 Before adding a new hub, use `internal/ui.FZFHub`, keep shortcuts configurable, and document the public command in this README and completion.
 
 ## Version Notes
+
+`2.2.0`:
+
+- Added per-variable local/global scope to config, including configurable `Shift+G` and script-friendly scope flags.
+- Added managed Bash/Zsh exports with current-shell refresh after dvv returns.
+- Added a dedicated Custom group under Environment Keys, including empty-state creation.
 
 `2.1.1`:
 

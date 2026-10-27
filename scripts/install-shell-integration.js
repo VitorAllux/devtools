@@ -70,6 +70,7 @@ const block = [
   `dvv() {`,
   `  command dvv "$@"`,
   `  local __dvv_status=$?`,
+  `  if (( $+functions[__dvv_reload_global_env] )); then __dvv_reload_global_env; fi`,
   `  if [[ $__dvv_status -eq 0 ]]; then`,
   `    case "$1" in`,
   `      config|setup) __dvv_reload_shell_shortcuts ;;`,

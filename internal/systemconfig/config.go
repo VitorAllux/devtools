@@ -1,7 +1,6 @@
 package systemconfig
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -24,6 +23,7 @@ type Entry struct {
 	Default     string
 	Value       string
 	Persisted   bool
+	Global      bool
 }
 
 type Category struct {
@@ -50,6 +50,11 @@ func Run(ctx context.Context, cfg *config.Config, runner run.Runner, args []stri
 		return manager.List()
 	case "set":
 		return manager.Set(ctx, args[1:])
+	case "scope":
+		if len(args) != 3 || (args[2] != "global" && args[2] != "local") {
+			return fmt.Errorf("usage: dvv config scope <KEY> <global|local>")
+		}
+		return manager.setScope(args[1], args[2] == "global")
 	default:
 		return fmt.Errorf("unknown config action: %s", args[0])
 	}
@@ -93,7 +98,7 @@ func (m Manager) openCategory(ctx context.Context, category Category) error {
 		return err
 	}
 	filtered := entriesForCategory(category.ID, entries)
-	if len(filtered) == 0 {
+	if len(filtered) == 0 && category.ID != "custom" {
 		return fmt.Errorf("config category has no editable values: %s", category.Label)
 	}
 	return m.keyHub(ctx, category, filtered)
@@ -142,7 +147,7 @@ func (m Manager) environmentKeysHub(ctx context.Context) error {
 			return err
 		}
 		filtered := entriesForCategory(category.ID, entries)
-		if len(filtered) == 0 {
+		if len(filtered) == 0 && category.ID != "custom" {
 			return fmt.Errorf("config category has no editable values: %s", category.Label)
 		}
 		if err := m.keyHub(ctx, category, filtered); err != nil {
@@ -162,19 +167,26 @@ func (m Manager) keyHub(ctx context.Context, category Category, initial []Entry)
 			}
 			entries = entriesForCategory(category.ID, entries)
 		}
-		if len(entries) == 0 {
+		if len(entries) == 0 && category.ID != "custom" {
 			return fmt.Errorf("config category has no editable values: %s", category.Label)
 		}
 		if _, err := m.Runner.LookPath("fzf"); err != nil {
 			return m.basicHub(ctx, entries)
 		}
 		keys := m.Config.SystemConfigHubKeys()
-		output, err := m.Runner.OutputWithInput(ctx, "", []byte(configRows(entries)), "fzf", configFZFArgs(category, keys)...)
+		args := configFZFArgs(category, keys)
+		if len(entries) == 0 {
+			args = append(args, "--header=No custom keys yet. "+keys.Add.Label+" to add a variable.")
+		}
+		output, err := m.Runner.OutputWithInput(ctx, "", []byte(configRows(entries)), "fzf", args...)
 		if err != nil && len(output) == 0 {
 			return nil
 		}
 		if err != nil {
 			return err
+		}
+		if strings.TrimSpace(string(output)) == "" {
+			return nil
 		}
 		key, selected := ui.ParseFZFExpectOutput(string(output))
 		if key == keys.Add.FZFKey {
@@ -203,6 +215,13 @@ func (m Manager) keyHub(ctx context.Context, category Category, initial []Entry)
 
 func (m Manager) handleEntryAction(ctx context.Context, key string, entry Entry, keys config.SystemConfigHubKeyBindings) error {
 	switch key {
+	case keys.Global.FZFKey:
+		if !entry.Persisted {
+			if err := m.writeValue(entry.Key, entry.Value); err != nil {
+				return err
+			}
+		}
+		return m.setScope(entry.Key, !entry.Global)
 	case keys.Clear.FZFKey:
 		return m.Unset(entry.Key)
 	case keys.Validate.FZFKey:
@@ -326,7 +345,7 @@ func (m Manager) basicEnvironmentKeysHub(ctx context.Context, entries []Entry) e
 		return fmt.Errorf("unknown environment key category: %s", value)
 	}
 	entries = entriesForCategory(category.ID, entries)
-	if len(entries) == 0 {
+	if len(entries) == 0 && category.ID != "custom" {
 		return fmt.Errorf("config category has no editable values: %s", category.Label)
 	}
 	return m.keyHub(ctx, category, entries)
@@ -350,6 +369,7 @@ func appearanceCategories() []Category {
 func environmentKeyCategories() []Category {
 	return []Category{
 		{"keys", "All Keys", "Edit every known runtime config key, including focused category keys and custom values"},
+		{"custom", "Custom", "Add and manage personal variables with local or global Bash/Zsh scope"},
 		{"ui", "UI Layout", "Tune shared hub height, minimum height, and preview width"},
 		{"paths", "Paths", "Manage workspace, dumps, SSH, AGE, and config paths"},
 		{"shortcuts", "Shortcuts", "Manage shell, tmux, and hub action keys"},
@@ -477,7 +497,7 @@ func entriesForCategory(categoryID string, entries []Entry) []Entry {
 				return false
 			}
 		})
-	case "theme", "ui", "resources", "secrets", "safety":
+	case "theme", "ui", "resources", "secrets", "safety", "custom":
 		return filterEntriesByCategory(entries, categoryID)
 	case "profiles":
 		return filterEntriesByCategory(entries, "Profiles")
@@ -889,19 +909,42 @@ func themePreviewCaseScript() string {
 }
 
 func (m Manager) basicHub(ctx context.Context, entries []Entry) error {
+	if len(entries) == 0 {
+		return m.addCustom(ctx)
+	}
 	m.print(entries)
-	key, err := ui.Prompt("Config key")
+	key, err := ui.Prompt("Config key (+ to add)")
 	if err != nil {
 		return err
 	}
 	if strings.TrimSpace(key) == "" {
 		return nil
 	}
+	if strings.TrimSpace(key) == "+" {
+		return m.addCustom(ctx)
+	}
 	entry, ok := findEntry(entries, strings.TrimSpace(key))
 	if !ok {
 		return fmt.Errorf("unknown config key: %s", key)
 	}
-	return m.edit(ctx, entry)
+	action, err := ui.Prompt("Action [edit/global/local]")
+	if err != nil {
+		return err
+	}
+	action = strings.TrimSpace(action)
+	switch action {
+	case "global", "local":
+		if !entry.Persisted {
+			if err := m.writeValue(entry.Key, entry.Value); err != nil {
+				return err
+			}
+		}
+		return m.setScope(entry.Key, action == "global")
+	case "", "edit":
+		return m.edit(ctx, entry)
+	default:
+		return fmt.Errorf("unknown config action: %s", action)
+	}
 }
 
 func (m Manager) List() error {
@@ -914,8 +957,14 @@ func (m Manager) List() error {
 }
 
 func (m Manager) Set(ctx context.Context, args []string) error {
+	global := false
+	setScope := len(args) > 0 && (args[0] == "--global" || args[0] == "--local")
+	if setScope {
+		global = args[0] == "--global"
+		args = args[1:]
+	}
 	if len(args) < 2 {
-		return fmt.Errorf("usage: dvv config set <KEY> <VALUE>")
+		return fmt.Errorf("usage: dvv config set [--global|--local] <KEY> <VALUE>")
 	}
 	key := strings.TrimSpace(args[0])
 	value := strings.Join(args[1:], " ")
@@ -924,6 +973,11 @@ func (m Manager) Set(ctx context.Context, args []string) error {
 	}
 	if err := m.writeValue(key, value); err != nil {
 		return err
+	}
+	if setScope {
+		if err := m.setScope(key, global); err != nil {
+			return err
+		}
 	}
 	ui.OK("Set %s in %s", key, m.Config.ConfigFile)
 	return m.refreshManagedIntegrationIfNeeded(ctx, key)
@@ -946,9 +1000,14 @@ func (m Manager) Entries() ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
+	globals, err := config.GlobalEnvKeys(m.Config.ConfigFile)
+	if err != nil {
+		return nil, err
+	}
 	entries := knownEntries(m.Config)
 	known := map[string]bool{}
 	for index := range entries {
+		entries[index].Global = globals[entries[index].Key]
 		known[entries[index].Key] = true
 		if value, ok := values[entries[index].Key]; ok {
 			entries[index].Value = value
@@ -977,6 +1036,7 @@ func (m Manager) Entries() ([]Entry, error) {
 			Kind:        "text",
 			Value:       values[key],
 			Persisted:   true,
+			Global:      globals[key],
 		})
 	}
 	return entries, nil
@@ -1011,7 +1071,27 @@ func (m Manager) addCustom(ctx context.Context) error {
 	if err := m.writeValue(key, value); err != nil {
 		return err
 	}
+	if ui.Confirm("Export " + key + " globally to Bash/Zsh?") {
+		if err := m.setScope(key, true); err != nil {
+			return err
+		}
+	}
 	return m.refreshManagedIntegrationIfNeeded(ctx, key)
+}
+
+func (m Manager) setScope(key string, global bool) error {
+	if !validKey(key) {
+		return fmt.Errorf("invalid config key: %s", key)
+	}
+	if err := config.SetGlobalEnvScope(m.Config.ConfigFile, key, global); err != nil {
+		return err
+	}
+	if global {
+		ui.OK("%s is global. Run `dvv setup` once to enable Bash/Zsh integration.", key)
+	} else {
+		ui.OK("%s is local to dvv. Reload other open shells to remove its old export.", key)
+	}
+	return nil
 }
 
 func (m Manager) writeValue(key string, value string) error {
@@ -1136,6 +1216,8 @@ func (m Manager) applyRuntimeValue(key string, value string) {
 		m.Config.Project.Shell.Shortcuts.SSH = value
 	case "DVV_CONFIG_ADD_SHORTCUT":
 		m.Config.Project.System.ConfigHub.Shortcuts.Add = value
+	case "DVV_CONFIG_GLOBAL_SHORTCUT":
+		m.Config.Project.System.ConfigHub.Shortcuts.Global = value
 	case "DVV_CONFIG_CLEAR_SHORTCUT":
 		m.Config.Project.System.ConfigHub.Shortcuts.Clear = value
 	case "DVV_CONFIG_VALIDATE_SHORTCUT":
@@ -1358,7 +1440,7 @@ func (m Manager) print(entries []Entry) {
 			keyWidth = len(entry.Key)
 		}
 	}
-	fmt.Printf("  %-3s %-*s %-26s %-12s %s\n", "SET", keyWidth, "KEY", "VALUE", "GROUP", "DESCRIPTION")
+	fmt.Printf("  %-3s %-*s %-26s %-12s %-6s %s\n", "SET", keyWidth, "KEY", "VALUE", "GROUP", "SCOPE", "DESCRIPTION")
 	for _, entry := range entries {
 		status := "[ ]"
 		if entry.Default != "" {
@@ -1367,7 +1449,7 @@ func (m Manager) print(entries []Entry) {
 		if entry.Persisted {
 			status = "[x]"
 		}
-		fmt.Printf("  %-3s %-*s %-26s %-12s %s\n", status, keyWidth, entry.Key, compactField(maskValue(entry), 26), entry.Category, entry.Description)
+		fmt.Printf("  %-3s %-*s %-26s %-12s %-6s %s\n", status, keyWidth, entry.Key, compactField(maskValue(entry), 26), entry.Category, entryScope(entry), entry.Description)
 	}
 }
 
@@ -1388,6 +1470,7 @@ func configFZFArgs(category Category, keys config.SystemConfigHubKeyBindings) []
 		{Label: "Enter", Description: "edit"},
 		{Key: keys.Add.FZFKey, Label: keys.Add.Label, Description: "add custom key"},
 		{Key: keys.Clear.FZFKey, Label: keys.Clear.Label, Description: "clear persisted value"},
+		{Key: keys.Global.FZFKey, Label: keys.Global.Label, Description: "toggle global Bash/Zsh scope"},
 		{Key: keys.Validate.FZFKey, Label: keys.Validate.Label, Description: "validate value"},
 		{Key: keys.Secrets.FZFKey, Label: keys.Secrets.Label, Description: "show secrets status"},
 		{Label: "Esc", Description: "back"},
@@ -1401,8 +1484,8 @@ func configFZFArgs(category Category, keys config.SystemConfigHubKeyBindings) []
 		Shortcuts:     shortcuts,
 		ExtraArgs: []string{
 			"--delimiter=\t",
-			"--with-nth=2,3,4",
-			"--nth=1,2,3,4,5,10",
+			"--with-nth=2,3,4,10",
+			"--nth=1,2,3,4,5,9,10",
 			"--header-lines=1",
 		},
 	}.Args()
@@ -1428,6 +1511,8 @@ func configHeader() string {
 		"",
 		"",
 		"",
+		"",
+		ui.Crown(fixedWidth("SCOPE", 6)),
 	}, "\t")
 }
 
@@ -1442,6 +1527,7 @@ func configRow(entry Entry) string {
 		cleanField(defaultPreviewValue(entry)),
 		cleanField(value),
 		cleanField(entry.Description),
+		entryScope(entry),
 	}, "\t")
 }
 
@@ -1451,7 +1537,8 @@ func configPreviewCommand(shortcuts []ui.FZFShortcut) string {
 raw=$(printf "%s" "$line" | cut -f1)
 category=$(printf "%s" "$line" | cut -f4)
 value=$(printf "%s" "$line" | cut -f8)
-description=$(printf "%s" "$line" | cut -f9-)
+description=$(printf "%s" "$line" | cut -f9)
+scope=$(printf "%s" "$line" | cut -f10)
 kind=$(printf "%s" "$line" | cut -f5)
 source=$(printf "%s" "$line" | cut -f6)
 default_value=$(printf "%s" "$line" | cut -f7)
@@ -1470,6 +1557,7 @@ printf "\n%sMetadata%s\n" "$dvv_heading" "$dvv_reset"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Group" "$dvv_reset" "$category"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Type" "$dvv_reset" "$kind"
 printf "  %s%-8s%s %s\n" "$dvv_label" "Source" "$dvv_reset" "$source"
+printf "  %s%-8s%s %s\n" "$dvv_label" "Scope" "$dvv_reset" "$scope"
 ' sh {}`
 }
 
@@ -1531,7 +1619,10 @@ func chooseOne(label string, values []string) (string, error) {
 }
 
 func knownEntries(cfg *config.Config) []Entry {
-	return []Entry{
+	defaults := []struct {
+		Category, Key, Description, Kind, Default, Value string
+		Persisted                                        bool
+	}{
 		{"Theme", "DVV_THEME", "Selects the CLI color theme.", "theme", cfg.Project.Theme.Name, "", false},
 		{"Profiles", "DVV_PROFILE", "Selects the active runtime profile from project config.", "profile", cfg.Project.Profiles.Active, "", false},
 		{"UI", "DVV_UI_HUB_HEIGHT_PERCENT", "Sets the shared fzf hub height as a terminal percentage. Valid range: 20-100.", "number", fmt.Sprintf("%d", cfg.Project.UI.HubHeightPercent), "", false},
@@ -1559,6 +1650,7 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Shortcuts", "DVV_SHELL_TMUX_SHORTCUT", "Sets the zsh shortcut for opening the tmux hub.", "shortcut", cfg.Project.Shell.Shortcuts.Tmux, "", false},
 		{"Shortcuts", "DVV_SHELL_SSH_SHORTCUT", "Sets the zsh shortcut for opening the SSH hub.", "shortcut", cfg.Project.Shell.Shortcuts.SSH, "", false},
 		{"Shortcuts", "DVV_CONFIG_ADD_SHORTCUT", "Sets the config hub shortcut for adding a custom key.", "shortcut", cfg.Project.System.ConfigHub.Shortcuts.Add, "", false},
+		{"Shortcuts", "DVV_CONFIG_GLOBAL_SHORTCUT", "Sets the config hub shortcut for toggling global Bash/Zsh scope.", "shortcut", cfg.Project.System.ConfigHub.Shortcuts.Global, "", false},
 		{"Shortcuts", "DVV_CONFIG_CLEAR_SHORTCUT", "Sets the config hub shortcut for clearing a persisted key.", "shortcut", cfg.Project.System.ConfigHub.Shortcuts.Clear, "", false},
 		{"Shortcuts", "DVV_CONFIG_VALIDATE_SHORTCUT", "Sets the config hub shortcut for validating a selected value.", "shortcut", cfg.Project.System.ConfigHub.Shortcuts.Validate, "", false},
 		{"Shortcuts", "DVV_CONFIG_SECRETS_SHORTCUT", "Sets the config hub shortcut for showing secrets status.", "shortcut", cfg.Project.System.ConfigHub.Shortcuts.Secrets, "", false},
@@ -1628,6 +1720,14 @@ func knownEntries(cfg *config.Config) []Entry {
 		{"Secrets", "DVV_SECRETS_RESTORE_SHORTCUT", "Sets the secrets hub shortcut for restoring SSH backup.", "shortcut", cfg.Project.Secrets.Hub.Shortcuts.Restore, "", false},
 		{"Secrets", "DVV_SECRETS_SYNC_SHORTCUT", "Sets the secrets hub shortcut for syncing encrypted SSH backup.", "shortcut", cfg.Project.Secrets.Hub.Shortcuts.Sync, "", false},
 	}
+	entries := make([]Entry, 0, len(defaults))
+	for _, item := range defaults {
+		entries = append(entries, Entry{
+			Category: item.Category, Key: item.Key, Description: item.Description,
+			Kind: item.Kind, Default: item.Default,
+		})
+	}
+	return entries
 }
 
 func tmuxEnvironmentsJSON(environments []config.TmuxEnvironmentConfig) string {
@@ -1682,28 +1782,7 @@ func profileNamesFromConfigEnv() []string {
 }
 
 func readConfigFile(path string) (map[string]string, error) {
-	values := map[string]string{}
-	file, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return values, nil
-		}
-		return nil, err
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		key, value, ok := strings.Cut(line, "=")
-		if !ok {
-			continue
-		}
-		values[strings.TrimSpace(key)] = unquoteConfigValue(strings.TrimSpace(value))
-	}
-	return values, scanner.Err()
+	return config.ReadEnvFile(path)
 }
 
 func unquoteConfigValue(value string) string {
@@ -1718,22 +1797,14 @@ func unquoteConfigValue(value string) string {
 }
 
 func writeConfigFile(path string, values map[string]string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
+	return config.WriteRuntimeEnvFile(path, values)
+}
+
+func entryScope(entry Entry) string {
+	if entry.Global {
+		return "global"
 	}
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	var builder strings.Builder
-	for _, key := range keys {
-		builder.WriteString(key)
-		builder.WriteByte('=')
-		builder.WriteString(shellQuote(values[key]))
-		builder.WriteByte('\n')
-	}
-	return os.WriteFile(path, []byte(builder.String()), 0o600)
+	return "local"
 }
 
 func maskValue(entry Entry) string {
@@ -1745,8 +1816,13 @@ func maskText(value string, kind string, key string) string {
 		return "<empty>"
 	}
 	upperKey := strings.ToUpper(key)
-	if kind == "secret" || strings.Contains(upperKey, "COOKIE") || strings.Contains(upperKey, "TOKEN") {
+	if kind == "secret" {
 		return "<set>"
+	}
+	for _, marker := range []string{"COOKIE", "TOKEN", "PASSWORD", "SECRET", "AUTHKEY"} {
+		if strings.Contains(upperKey, marker) {
+			return "<set>"
+		}
 	}
 	return value
 }
@@ -1922,6 +1998,9 @@ func showHelp() {
 	helpEntry("dvv config", "Open the category-based configuration hub")
 	helpEntry("dvv config list", "List effective configuration values")
 	helpEntry("dvv config set KEY VALUE", "Persist a configuration value")
+	helpEntry("dvv config set --global KEY VALUE", "Persist and export a value to Bash/Zsh")
+	helpEntry("dvv config set --local KEY VALUE", "Persist a value for dvv only")
+	helpEntry("dvv config scope KEY global|local", "Change the scope of a saved variable")
 	fmt.Println()
 	helpSection("Categories")
 	for _, category := range configCategories() {
